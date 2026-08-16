@@ -198,8 +198,14 @@ static int GpuDisabledByFile(void)
 static int LoadShaders(void)
 {
     char  path[SH360_PATH_MAX * 4];
-    void* vsBlob;
-    void* psBlob;
+    /* MUST be initialised. Left uninitialised, the "no override present" path
+     * fell straight into `if (!vsBlob || !psBlob)` with stack garbage, which was
+     * non-NULL, so the embedded fallback was SKIPPED and the magic check read
+     * random memory (hardware log 028: "shader magic bad: vs=9ddf ps=8143").
+     * The gate compiles at -O0, where gcc's -Wmaybe-uninitialised analysis does
+     * not run, so nothing warned. */
+    void* vsBlob = NULL;
+    void* psBlob = NULL;
 
     if (s_shaderDir[0]) {
         snprintf(path, sizeof(path), "%svs.vsu", s_shaderDir);
