@@ -1,17 +1,22 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /*
- * psx_io_xbox360.h - keep the PSX BIOS file API from colliding with POSIX.
+ * psx_io_console.h - keep the PSX BIOS file API from colliding with POSIX.
  *
  * The PSX BIOS exposes open/close/read/write/lseek/rename operating on
  * "buXX:NAME" memory-card paths, and the decomp calls them by those names.
- * mcard_xbox.c implements them. On Xbox that was harmless: nxdk's libc is
- * Win32-backed and provides no POSIX syscalls of those names.
+ * mcard_xbox.c implements them. On the Original Xbox that was harmless: nxdk's
+ * libc is Win32-backed and provides no POSIX syscalls of those names.
  *
- * libXenon uses newlib, whose stdio is built ON those exact symbols. With both
- * definitions present the link fails -- and if the PSX ones had won instead,
- * every fopen in the port would have been routed into the memory-card handler,
- * silently breaking the log and the disc image. Both sets are genuinely needed,
- * so the PSX ones are renamed.
+ * libXenon (360) and PSL1GHT (PS3) are both newlib, whose stdio is built ON
+ * those exact symbols. With both definitions present the link fails -- and if
+ * the PSX ones had won instead, every fopen in the port would have been routed
+ * into the memory-card handler, silently breaking the log and the disc image.
+ * Both sets are genuinely needed, so the PSX ones are renamed.
+ *
+ * Started life as the 360's psx_io_xbox360.h. The name is neutral because the
+ * hazard is newlib's, not any one console's, and a second port hitting the same
+ * wall is what proved it: this file lives in pc_port/include so every console
+ * port picks it up off an include path it already has.
  *
  * FUNCTION-LIKE macros on purpose. An object-like `#define read PsxIo_read`
  * would also rewrite `g_FsQueue.read.idx` in fsqueue_3.c, which is a struct
@@ -21,10 +26,10 @@
  * Included by the definition site (mcard_xbox.c) as well as the call sites, so
  * one header keeps both ends in agreement.
  */
-#ifndef PSX_IO_XBOX360_H
-#define PSX_IO_XBOX360_H
+#ifndef PSX_IO_CONSOLE_H
+#define PSX_IO_CONSOLE_H
 
-#ifdef SH_XBOX360_PORT
+#if defined(SH_XBOX360_PORT) || defined(SH_PS3_PORT)
 
 /* Arguments are deliberately NOT parenthesised. These macros must rewrite the
  * DEFINITIONS in mcard_xbox.c and the PROTOTYPES in psyq/libapi.h as well as the
@@ -39,6 +44,6 @@
 #define lseek(handle, off, w)    PsxIo_lseek(handle, off, w)
 #define rename(from, to)         PsxIo_rename(from, to)
 
-#endif /* SH_XBOX360_PORT */
+#endif /* SH_XBOX360_PORT || SH_PS3_PORT */
 
-#endif /* PSX_IO_XBOX360_H */
+#endif /* PSX_IO_CONSOLE_H */

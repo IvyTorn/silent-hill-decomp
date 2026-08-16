@@ -31,10 +31,24 @@ esac
 
 OUT="$SCRIPT_DIR/build/gate"
 LOG="$SCRIPT_DIR/build/gate.log"
-mkdir -p "$OUT"; : > "$LOG"
+WARNLOG="$SCRIPT_DIR/build/gate_warnings.log"
+mkdir -p "$OUT"; : > "$LOG"; : > "$WARNLOG"
+# Drop objects from a previous run before recompiling. The gate is not
+# incremental -- every source is rebuilt every time -- so this costs nothing and
+# closes a real trap: an object whose SOURCE has since been deleted or renamed
+# lingers here and still gets linked. That is not hypothetical, it broke the
+# link the moment tim_endian_xbox360.c was superseded by pc_port/src/tim_endian.c
+# ("multiple definition of Tim_SwapForBigEndian"). The quieter version of the
+# same bug is a renamed file whose stale twin keeps linking silently.
+rm -f "$OUT"/*.o
 
-# SH_XBOX_PORT rides along because its gates are what select the NATIVE 32-BIT
-# PSX struct layout in the reformat walkers, which 32-bit PPC wants unchanged.
+# SH_XBOX_PORT rides along because the Original Xbox port is this port's base and
+# its gates carry the console-sized memory/heap behaviour we also want.
+# CORRECTED: it does NOT select a "native 32-bit PSX struct layout" in the
+# reformat walkers -- there is no such switch. Every SH_XBOX_PORT block in
+# lm/ipd/dms/as_rodata_reformat.c is a heap-leak fix, and those walkers read disc
+# data through explicit little-endian byte readers (rd32/rd16), so they are
+# already endian-correct at any pointer width.
 # Where a gate turns out to mean "nxdk" rather than "32-bit", it gets split.
 DEFS="-DSH_XBOX360_PORT -DSH_XBOX_PORT -DSH_PC_PORT -DVER_USA -DSKIP_ASM -DUSE_PGXP=0"
 # PsyCross asserts every PSX primitive's size in longs. Wiring these up is the
@@ -72,6 +86,16 @@ else
     TARGETFLAGS="$TARGETFLAGS -fgnu89-inline"
     INCS="$INCS -I${DEVKITXENON:-/usr/local/xenon}/usr/include"
 fi
+
+# Optimisation is an OVERRIDE with no default, deliberately: a warning-harvest
+# run must not be able to change what ships. With it empty the compiler runs at
+# -O0, and that is exactly why -Wmaybe-uninitialized never fired on the
+# uninitialised vsBlob/psBlob that cost two hardware runs -- gcc only runs that
+# analysis with optimisation enabled, so -Wall alone bought nothing. Harvest
+# with SH_OPT='-O2 -fno-strict-aliasing -fwrapv' (the Original Xbox port's
+# flags: the decomp type-puns constantly and relies on wrapping signed overflow,
+# so -O2 without those two is not safe here).
+TARGETFLAGS="$TARGETFLAGS ${SH_OPT:-}"
 
 collect_srcs() {
     local root="${1:-}"
@@ -144,6 +168,10 @@ while IFS= read -r f; do
     esac
     if err=$("$TOOL" $TARGETFLAGS $DEFS $INCS $WARN $EXTRA -c "$f" -o "$obj" 2>&1); then
         pass=$((pass+1))
+        # Warnings from a SUCCESSFUL compile used to be thrown away with $err,
+        # which is how an uninitialised vsBlob/psBlob reached hardware twice: a
+        # green gate said nothing, and there was no file to go read. Keep them.
+        [ -n "$err" ] && { echo "########## $f"; echo "$err"; } >> "$WARNLOG"
     else
         fail=$((fail+1))
         { echo "########## $f"; echo "$err"; } >> "$LOG"

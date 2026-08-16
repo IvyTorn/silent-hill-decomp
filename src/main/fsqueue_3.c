@@ -9,11 +9,14 @@
 #include <string.h>
 #include <errno.h>
 #include "pc_config.h"
-/* Routes the PSX BIOS open()/close() below to PsxIo_* on 360. Function-like
- * macros, so g_FsQueue.read.idx is untouched. No-op elsewhere. */
-#include "psx_io_xbox360.h"
+/* Routes the PSX BIOS open()/close() below to PsxIo_* on the newlib consoles
+ * (360, PS3). Function-like macros, so g_FsQueue.read.idx is untouched.
+ * No-op elsewhere. */
+#include "psx_io_console.h"
 #include "hires_override.h"
 #include "tex_pack.h"
+#include "tim_endian.h"
+#include "anm_endian.h"
 #include "sh_log.h"
 
 #ifndef _WIN32
@@ -863,14 +866,11 @@ bool Fs_QueuePostLoadTim(s_FsQueueEntry* entry)
         (unsigned)entry->extra.image.tPage[0], (unsigned)entry->extra.image.tPage[1],
         (int)entry->extra.image.clutX, (int)entry->extra.image.clutY); fflush(g_ShDebugLog); } }
 #endif
-#ifdef SH_XBOX360_PORT
     /* TIMs are PSX data, so little-endian, and ReadTIM does not copy them -- it
      * points prect/paddr straight into this buffer. Convert once here, before
      * anything reads a field, so the whole downstream path sees native values.
-     * Idempotent via the magic word. */
-    { extern void Tim_SwapForBigEndian(void* addr);
-      Tim_SwapForBigEndian((void*)entry->externalData); }
-#endif
+     * Idempotent via the magic word, and a no-op on little-endian hosts. */
+    Tim_SwapForBigEndian((void*)entry->externalData);
     OpenTIM((u64*)entry->externalData);
     ReadTIM(&tim);
 #ifdef SH_PC_PORT
@@ -1262,6 +1262,11 @@ bool Fs_QueuePostLoadTim(s_FsQueueEntry* entry)
 
 bool Fs_QueuePostLoadAnm(s_FsQueueEntry* entry)
 {
+    /* ANM has no reformat walker -- s_AnmHeader is overlaid straight onto this
+     * buffer -- so convert the header once here, before anything reads a field.
+     * Idempotent, and it validates before touching anything, because Harry's
+     * headerless HB_WEP and HB_M banks must be left alone. */
+    Anm_SwapForBigEndian((void*)entry->externalData);
     Fs_CharaAnimDataUpdate(entry->extra.anm.field_0, entry->extra.anm.charaId, entry->externalData, entry->extra.anm.coords_8);
     return true;
 }

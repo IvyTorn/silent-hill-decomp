@@ -1,0 +1,166 @@
+[BOOT] Silent Hill 360, timebase=1256931919
+[BOOT] root='uda:/silenthill/' bin='Silent Hill (USA).bin' found=1
+[CFG] config file: uda:/silenthill/silenthill.cfg
+[GTE] RotTransPers v(64,32,512) -> sx=352 sy=256 sz=128 flag=0x1000 (expect sx=352 sy=256)
+[CD] bin open: 'uda:/silenthill/Silent Hill (USA).bin'
+[CD] BIN: uda:/silenthill/Silent Hill (USA).bin
+[CD] PVD id='CD001' (expect CD001)
+[GPU] xenos backend: counting no-op, 32768-vertex pool, 64 B/vertex
+[PAD] libxenon usb up
+[MCRD] card path = uda:/silenthill/save\0.MCD
+[BOOT] PSX RAM @ 0x80cf9080
+[BOOT] game data initialised
+[AUD] xenon_sound up: 48000 Hz stereo, 256-frame chunks
+[BOOT] subsystems up; entering MainLoop
+[SH-XBOX] layout check ok: sizeof(s_SysWork)=38584 sizeof(s_GameWork)=1496
+[PAD] PadInitDirect buf=0x81012764
+[ARENA] buf0=0x81446050 buf1=0x81646098
+[SH-XBOX] GameState -> 0 (step 0)
+[MCFSM] state=0 step=0 (was -1/-1 after 0 f)
+[VIB] vibrationEnabled = 0 (0 = off; Options 'Vibration' row)
+[PAD] buttons=F1FF
+[GPU] frame=0 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=2
+[OT] DrawOTag head=0x81007fae (walking; per-node trace off)
+[OT] walk done after 2048 nodes (cap hit=0)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=0 -> IOE (n=1)
+[PAD] buttons=FFFF
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=0 step=0 (was 1/2 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=0 -> IOE (n=2)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=2 step=0 (was 1/2 after 0 f)
+[MCRD] card_clear chan=0 -> IOE (n=1)
+[PAD] buttons=FFBF
+[MCFSM] state=2 step=2 (was 2/0 after 0 f)
+[MCFSM] state=3 step=0 (was 2/2 after 0 f)
+[PAD] buttons=FFFF
+[MCFSM] state=3 step=1 (was 3/0 after 0 f)
+[LOOSE/INIT] allow_loose_files=0  base=gamedata/load/  verbose=no
+[PAD] buttons=FF3F
+[BOOT0/TIM] PostLoadTim file=6 'FONT16.TIM' ss=0x287 img.u=0 img.v=240 tPage=0,16 clutX=304 clutY=511
+[BOOT0/TIM] post ReadTIM: prect=0x80edb6b8 caddr=0x80edb694 paddr=0x80edb6c0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(0,496 256x16)
+[FONTCLOB] Load x=0 y=496 w=256 h=16
+[BOOT0/TIM] pre CLUT LoadImage rect=(304,511 16x1)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=8 'KONAMI.TIM' ss=0x28e img.u=0 img.v=0 tPage=0,12 clutX=0 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x80edb6b8 caddr=0x80edb694 paddr=0x80edb6c0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(768,0 96x384)
+[BOOT0/TIM] pre CLUT LoadImage rect=(0,0 16x1)
+[BOOT0/TIM] PostLoadTim done
+[SH-XBOX] GameState -> 1 (step 0)
+[PRIM?] code=0xff len=3
+[PRIM?] code=0x1d len=1
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x1c len=1
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0xff len=3
+[PRIM?] code=0x1d len=1
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x1c len=1
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0xff len=3
+[PRIM?] code=0x1d len=1
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x1c len=1
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0x80 len=4
+[PRIM?] code=0xff len=3
+[PRIM?] code=0x1d len=1
+[PRIM?] code=0x80 len=4
+[BOOT0/TIM] PostLoadTim file=9 'KONAMI2.TIM' ss=0x2b3 img.u=0 img.v=0 tPage=0,14 clutX=0 clutY=1
+[BOOT0/TIM] post ReadTIM: prect=0x80edb6b8 caddr=0x80edb694 paddr=0x80edb6c0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(896,0 104x160)
+[BOOT0/TIM] pre CLUT LoadImage rect=(0,1 16x1)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1423 'HERO.TIM' ss=0x5a6a img.u=0 img.v=0 tPage=0,27 clutX=736 clutY=480
+[BOOT0/TIM] post ReadTIM: prect=0x80edb878 caddr=0x80edb694 paddr=0x80edb880 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(704,256 64x192)
+[BOOT0/TIM] pre CLUT LoadImage rect=(736,480 16x15)
+[BOOT0/TIM] PostLoadTim done
+[GPU] frame=60 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[BOOT0/TIM] PostLoadTim file=1802 'BLD.TIM' ss=0x795b img.u=0 img.v=0 tPage=0,11 clutX=304 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x80ee6098 caddr=0x80ee5e94 paddr=0x80ee60a0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(704,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(304,0 16x16)
+[BOOT0/TIM] PostLoadTim done
+[OTS] f=120 calls=2 n0=27 n1=18 prims=960 bb=-320,2240,-274,754
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=120 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[MCFSM] STUCK in state=3 step=1 for 120 frames
+[GPU] frame=180 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[OTS] f=240 calls=1 n0=27 n1=18 prims=1320 bb=0,1280,-17,497
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=240 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[GPU] frame=300 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[OTS] f=360 calls=1 n0=27 n1=18 prims=1314 bb=0,1280,-17,497
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=360 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[GPU] frame=420 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[OTS] f=480 calls=1 n0=27 n1=18 prims=1320 bb=0,1280,-17,497
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=480 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[GPU] frame=540 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[SH-XBOX] vblank 600
+[MEM] tick: used=4231KB arena=4238KB
+[OTS] f=600 calls=1 n0=27 n1=18 prims=1320 bb=0,1280,-17,497
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=600 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[GPU] frame=660 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[SH-XBOX] GameState -> 2 (step 0)
+[BOOT0/TIM] PostLoadTim file=1799 'BG_ETC.TIM' ss=0x7906 img.u=0 img.v=0 tPage=0,12 clutX=192 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x80edb7f8 caddr=0x80edb694 paddr=0x80edb800 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(768,0 32x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(192,0 16x11)
+[BOOT0/TIM] PostLoadTim done
+[OTS] f=720 calls=2 n0=23 n1=18 prims=1113 bb=0,1280,-17,497
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=720 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[GPU] frame=780 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[OTS] f=840 calls=1 n0=23 n1=18 prims=840 bb=0,1280,-17,497
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=840 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[GPU] frame=900 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[OTS] f=960 calls=1 n0=23 n1=18 prims=840 bb=0,1280,-17,497
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=960 prims=1 verts=6 (tris~2) texbind=0 blend=1 scissor=1
+[VIB] vibrationEnabled = 128 (0 = off; Options 'Vibration' row)
+[GPU] frame=1020 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1080 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1140 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[SH-XBOX] vblank 1200
+[MEM] tick: used=4231KB arena=4238KB
+[GPU] frame=1200 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1260 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1320 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1380 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1440 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1500 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1560 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1620 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1680 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1740 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[SH-XBOX] vblank 1800
+[MEM] tick: used=4231KB arena=4238KB
+[GPU] frame=1800 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1860 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1920 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=1980 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2040 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2100 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2160 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2220 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2280 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2340 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[SH-XBOX] vblank 2400
+[MEM] tick: used=4231KB arena=4238KB
+[GPU] frame=2400 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2460 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
+[GPU] frame=2520 prims=0 verts=0 (tris~0) texbind=0 blend=0 scissor=0
