@@ -66,7 +66,27 @@ static unsigned long long gs_vcount_start = 0;
 static int gs_vcount_active = 0;
 
 /* High-resolution monotonic counter, abstracted per platform. */
-#if defined(SH_XBOX360_PORT)
+#if defined(SH_N64_PORT)
+/* COP0 Count, read directly rather than through libdragon's TICKS_READ(): this
+ * TU compiles with the game include set, which deliberately cannot see
+ * libdragon's headers (its kernel.h collides with psyq's). Count advances at
+ * half the VR4300's 93.75 MHz core clock, and it is only 32 bits, so it wraps
+ * every ~91 s -- the callers here take differences, and a raw wrap would read
+ * as a 4-billion-tick jump. Folding it into a 64-bit accumulator is correct as
+ * long as this is called more than once per 91 s, which per-frame use is. */
+static unsigned long long Gs_PerfCounter(void)
+{
+    static unsigned int       last = 0;
+    static unsigned long long high = 0;
+    unsigned int              c;
+    __asm__ __volatile__("mfc0 %0, $9" : "=r"(c));
+    if (c < last)
+        high += 0x100000000ULL;
+    last = c;
+    return high + c;
+}
+static unsigned long long Gs_PerfFreq(void)    { return 46875000ULL; }
+#elif defined(SH_XBOX360_PORT)
 #include <ppc/timebase.h>
 static unsigned long long Gs_PerfCounter(void) { return mftb(); }
 static unsigned long long Gs_PerfFreq(void)    { return PPC_TIMEBASE_FREQ; }

@@ -19,7 +19,10 @@
 #include "anm_endian.h"
 #include "sh_log.h"
 
-#ifndef _WIN32
+/* SH_NO_DIRENT: the target has no POSIX directory API at all. newlib for
+ * bare-metal N64 ships a <dirent.h> that is nothing but `#error`, and a
+ * cartridge has no loose-file mods to resolve in the first place. */
+#if !defined(_WIN32) && !defined(SH_NO_DIRENT)
 /* Loose-file paths are built from the disc file table's UPPERCASE folder/names
  * (gamedata/load/CHARA/DOB.TIM). Windows/macOS open those case-insensitively;
  * Linux (ext4) does not, so a mod authored on Windows or with a lowercased
@@ -227,7 +230,7 @@ static const char* HiresPending_PopPath(s_FsQueueEntry* entry)
     return NULL;
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(SH_NO_DIRENT)
 /* Resolve a relative path case-insensitively for case-sensitive filesystems.
  * Walks each component: a verbatim hit wins (stat), else the parent directory
  * is scanned for a strcasecmp match, so "gamedata/load/CHARA/DOB.TIM.png"
@@ -331,7 +334,7 @@ static FILE* Loose_FOpen(const char* path, const char* mode)
 #endif
     {
         FILE* f = fopen(path, mode);
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(SH_NO_DIRENT)
         if (f == NULL)
         {
             char resolved[300];
