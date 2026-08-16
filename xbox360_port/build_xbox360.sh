@@ -38,7 +38,15 @@ echo "=== link ($(ls "$GATE"/*.o | wc -l) objects) ==="
 # --whole-archive for the map overlays: some map objects are reached only
 # through constructors and data tables, never by a symbol the linker is already
 # looking for, so lazy archive semantics would silently drop them.
+# --wrap=console_putch routes libXenon's console output through
+# crash_xbox360.c, which tees it to the log. That is how the exception report
+# from c_except.o's crashdump reaches the USB stick instead of a framebuffer Xe
+# has already taken over. Wrapping rather than redefining because console.o also
+# defines console_init/clrscr/set_colors, so a second definition would clash.
+# If this flag is ever dropped the only symptom is a silent loss of crash
+# reports, so crash_xbox360.c logs a one-line "tee armed" marker at boot.
 if ! xenon-gcc $MACHDEP -n -T "$DK/app.lds" "$GATE"/*.o \
+        -Wl,--wrap=console_putch \
         -Wl,--whole-archive $MAPLIBS -Wl,--no-whole-archive \
         -L"$DK/usr/lib" -lfat -lxenon -lm \
         -Wl,-Map,"$OUT/xenon.map" -o "$OUT/xenon.debug.elf" 2> "$SCRIPT_DIR/build/link.log"; then

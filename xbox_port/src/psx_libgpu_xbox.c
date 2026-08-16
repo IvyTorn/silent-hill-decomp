@@ -260,6 +260,16 @@ int VSync(int mode)
         SH_DBG("[SH-XBOX] vblank %d", s_vblanks);
         Xbox_MemReport("tick");     /* leak watch: free RAM should stay flat */
         Pgxp_CovDump();             /* [PGXP] cov full/mixed per 10s window */
+#ifdef SH_XBOX360_PORT
+        /* Backstop for a HANG, where nothing gets to report anything: without a
+         * periodic flush the 256KB log buffer means the file ends wherever the
+         * last explicit flush was, which on 360 was boot -- so a hang produced a
+         * log that stopped thousands of frames before the freeze and read as if
+         * it had died there. A crash is already covered (crash_xbox360.c flushes
+         * on the exception report); this bounds the loss for everything else to
+         * one 600-vblank window. */
+        { extern void SH_DebugLogFlush(void); SH_DebugLogFlush(); }
+#endif
     }
     return s_vblanks;
 }

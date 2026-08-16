@@ -159,6 +159,7 @@ int main(void)
     SH_DBG("[BOOT] Silent Hill 360, timebase=%llu", (unsigned long long)mftb());
     SH_DBG("[BOOT] root='%s' bin='%s' found=%d",
            Sh360Fs_DataRoot(), Sh360Fs_BinName(), haveBin);
+    { extern void Sh360Crash_Init(void); Sh360Crash_Init(); }
     SH_DebugLogFlush();
 
     /* No launcher on this platform, so the cfg on the data volume is the only
