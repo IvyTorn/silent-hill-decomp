@@ -389,7 +389,22 @@ void Vw_CoordHierarchyMatrixCompute(GsCOORDINATE2* rootCoord, MATRIX* transformM
      * truncated/uninitialised PSX pointer shows up as ~0 / non-canonical and
      * derefs to a wild read (the bad-ending crash: super == -1). Treat any
      * non-canonical link as end-of-chain instead of crashing. */
-    #ifdef SH_XBOX_PORT
+    #if defined(SH_XBOX360_PORT)
+    /* The 360 defines SH_XBOX_PORT too, so it MUST be tested first or it
+     * inherits the Original Xbox ranges below -- which reject every valid 360
+     * pointer. That is not theoretical: it is what this build did. libXenon maps
+     * all 512MB of RAM at 0x80000000, so the ELF, statics, heap and stacks alike
+     * live at 0x8xxxxxxx (log 029: PSX RAM 0x80d07a00, arena 0x81890108, overlay
+     * headers 0x80553474). Every one of those fails "< 0x08000000", then fails
+     * the same-1MB-bucket stack fallback because a static is nowhere near the
+     * stack -- so COORD_PTR_OK was FALSE for essentially every coord and every
+     * transform silently degraded to identity. Nothing is positioned when that
+     * happens, which reads as fast-moving garbage rather than as a crash.
+     * One contiguous window is all that is needed here: 0x80000000 plus 512MB. */
+    #define COORD_PTR_OK(p) ((uintptr_t)(p) >= 0x80000000u && \
+                             (uintptr_t)(p) <  0xA0000000u && \
+                             (((uintptr_t)(p) & 3) == 0))
+    #elif defined(SH_XBOX_PORT)
     /* 32-bit Xbox: the 64-bit canonical test in the #else folds to compile-time
      * TRUE here (uintptr_t is 32 bits), which let a garbage super (0xfffff948)
      * through and crashed writing parentCoord->sub into kernel space. Valid

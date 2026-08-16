@@ -1,0 +1,3023 @@
+[BOOT] Silent Hill 360, timebase=1348231650
+[BOOT] root='uda:/silenthill/' bin='Silent Hill (USA).bin' found=1
+[CFG] config file: uda:/silenthill/silenthill.cfg
+[GTE] RotTransPers v(64,32,512) -> sx=352 sy=256 sz=128 flag=0x1000 (expect sx=352 sy=256)
+[CD] bin open: 'uda:/silenthill/Silent Hill (USA).bin'
+[CD] BIN: uda:/silenthill/Silent Hill (USA).bin
+[CD] PVD id='CD001' (expect CD001)
+[GPU] Xe up: framebuffer 1280x720
+[GPU] using embedded shaders (vs=392 ps=420 bytes)
+[GPU] shaders loaded and instantiated
+[GPU] textures ready, renderer ARMED
+[GPU] xenos backend: 32768-vertex pool, 64 B/vertex
+[PAD] libxenon usb up
+[MCRD] card path = uda:/silenthill/save/0.MCD
+[BOOT] PSX RAM @ 0x8127d700
+[BOOT] game data initialised
+[AUD] xenon_sound up: 48000 Hz stereo, 256-frame chunks
+[BOOT] subsystems up; entering MainLoop
+[SH-XBOX] layout check ok: sizeof(s_SysWork)=38584 sizeof(s_GameWork)=1496
+[PAD] PadInitDirect buf=0x81596de4
+[ARENA] buf0=0x81e41008 buf1=0x82041050
+[SH-XBOX] GameState -> 0 (step 0)
+[MCFSM] state=0 step=0 (was -1/-1 after 0 f)
+[VIB] vibrationEnabled = 0 (0 = off; Options 'Vibration' row)
+[PAD] buttons=F1FF
+[GPU] frame=0 prims=0 verts=0 draws=0 texbind=0 blend=0 scissor=0 ready=1
+[OT] DrawOTag head=0x8158c62f (walking; per-node trace off)
+[OT] walk done after 2048 nodes (cap hit=0)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=0 -> IOE (n=1)
+[PAD] buttons=FFFF
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=0 step=0 (was 1/2 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=0 -> IOE (n=2)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=2 step=0 (was 1/2 after 0 f)
+[MCRD] card_clear chan=0 -> IOE (n=1)
+[PAD] buttons=FF3F
+[MCFSM] state=2 step=2 (was 2/0 after 0 f)
+[MCFSM] state=3 step=0 (was 2/2 after 0 f)
+[MCRD] card_load chan=0 -> IOE (n=1)
+[PAD] buttons=FFFF
+[MCFSM] state=3 step=2 (was 3/0 after 0 f)
+[LOOSE/INIT] allow_loose_files=0  base=gamedata/load/  verbose=no
+[MCFSM] state=4 step=0 (was 3/2 after 0 f)
+[MCRD] dir scan chan=0 (n=1)
+[MCFSM] state=0 step=0 (was 4/0 after 0 f)
+[BOOT0/TIM] PostLoadTim file=6 'FONT16.TIM' ss=0x287 img.u=0 img.v=240 tPage=0,16 clutX=304 clutY=511
+[BOOT0/TIM] post ReadTIM: prect=0x8145fd38 caddr=0x8145fd14 paddr=0x8145fd40 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(0,496 256x16)
+[FONTCLOB] Load x=0 y=496 w=256 h=16
+[BOOT0/TIM] pre CLUT LoadImage rect=(304,511 16x1)
+[BOOT0/TIM] PostLoadTim done
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=1 -> IOE (n=3)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=0 step=0 (was 1/2 after 0 f)
+[BOOT0/TIM] PostLoadTim file=8 'KONAMI.TIM' ss=0x28e img.u=0 img.v=0 tPage=0,12 clutX=0 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x8145fd38 caddr=0x8145fd14 paddr=0x8145fd40 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(768,0 96x384)
+[BOOT0/TIM] pre CLUT LoadImage rect=(0,0 16x1)
+[BOOT0/TIM] PostLoadTim done
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=1 -> IOE (n=4)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=2 step=0 (was 1/2 after 0 f)
+[MCRD] card_clear chan=1 -> IOE (n=2)
+[MCFSM] state=2 step=2 (was 2/0 after 0 f)
+[MCFSM] state=3 step=0 (was 2/2 after 0 f)
+[MCRD] card_load chan=1 -> IOE (n=2)
+[MCFSM] state=3 step=2 (was 3/0 after 0 f)
+[MCFSM] state=4 step=0 (was 3/2 after 0 f)
+[MCRD] dir scan chan=1 (n=2)
+[MCFSM] state=0 step=0 (was 4/0 after 0 f)
+[SH-XBOX] GameState -> 1 (step 0)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=2 -> IOE (n=5)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=0 step=0 (was 1/2 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=2 -> IOE (n=6)
+[BOOT0/TIM] PostLoadTim file=9 'KONAMI2.TIM' ss=0x2b3 img.u=0 img.v=0 tPage=0,14 clutX=0 clutY=1
+[BOOT0/TIM] post ReadTIM: prect=0x8145fd38 caddr=0x8145fd14 paddr=0x8145fd40 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(896,0 104x160)
+[BOOT0/TIM] pre CLUT LoadImage rect=(0,1 16x1)
+[BOOT0/TIM] PostLoadTim done
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=2 step=0 (was 1/2 after 0 f)
+[MCRD] card_clear chan=2 -> IOE (n=3)
+[MCFSM] state=2 step=2 (was 2/0 after 0 f)
+[MCFSM] state=3 step=0 (was 2/2 after 0 f)
+[MCRD] card_load chan=2 -> IOE (n=3)
+[MCFSM] state=3 step=2 (was 3/0 after 0 f)
+[MCFSM] state=4 step=0 (was 3/2 after 0 f)
+[MCRD] dir scan chan=2 (n=3)
+[MCFSM] state=0 step=0 (was 4/0 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=3 -> IOE (n=7)
+[BOOT0/TIM] PostLoadTim file=1423 'HERO.TIM' ss=0x5a6a img.u=0 img.v=0 tPage=0,27 clutX=736 clutY=480
+[BOOT0/TIM] post ReadTIM: prect=0x8145fef8 caddr=0x8145fd14 paddr=0x8145ff00 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(704,256 64x192)
+[BOOT0/TIM] pre CLUT LoadImage rect=(736,480 16x15)
+[BOOT0/TIM] PostLoadTim done
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=0 step=0 (was 1/2 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=3 -> IOE (n=8)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=2 step=0 (was 1/2 after 0 f)
+[MCRD] card_clear chan=3 -> IOE (n=4)
+[MCFSM] state=2 step=2 (was 2/0 after 0 f)
+[MCFSM] state=3 step=0 (was 2/2 after 0 f)
+[MCRD] card_load chan=3 -> IOE (n=4)
+[MCFSM] state=3 step=2 (was 3/0 after 0 f)
+[MCFSM] state=4 step=0 (was 3/2 after 0 f)
+[MCRD] dir scan chan=3 (n=4)
+[MCFSM] state=0 step=0 (was 4/0 after 0 f)
+[BOOT0/TIM] PostLoadTim file=1802 'BLD.TIM' ss=0x795b img.u=0 img.v=0 tPage=0,11 clutX=304 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x8146a718 caddr=0x8146a514 paddr=0x8146a720 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(704,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(304,0 16x16)
+[BOOT0/TIM] PostLoadTim done
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=16 -> IOE (n=9)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=0 step=0 (was 1/2 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=16 -> IOE (n=10)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=2 step=0 (was 1/2 after 0 f)
+[MCRD] card_clear chan=16 -> IOE (n=5)
+[GPU] frame=60 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[MCFSM] state=2 step=2 (was 2/0 after 0 f)
+[MCFSM] state=3 step=0 (was 2/2 after 0 f)
+[MCRD] card_load chan=16 -> IOE (n=5)
+[MCFSM] state=3 step=2 (was 3/0 after 0 f)
+[MCFSM] state=4 step=0 (was 3/2 after 0 f)
+[MCRD] dir scan chan=8 (n=5)
+[MCFSM] state=0 step=0 (was 4/0 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=17 -> IOE (n=11)
+[MCFSM] state=1 step=2 (was 1/0 after 0 f)
+[MCFSM] state=0 step=0 (was 1/2 after 0 f)
+[MCFSM] state=1 step=0 (was 0/0 after 0 f)
+[MCRD] card_info chan=17 -> IOE (n=12)
+[MCRD] card_clear chan=17 -> IOE (n=6)
+[MCRD] card_load chan=17 -> IOE (n=6)
+[MCRD] dir scan chan=9 (n=6)
+[MCRD] card_info chan=18 -> IOE (n=13)
+[MCRD] card_info chan=18 -> IOE (n=14)
+[MCRD] card_clear chan=18 -> IOE (n=7)
+[MCRD] card_load chan=18 -> IOE (n=7)
+[MCRD] dir scan chan=10 (n=7)
+[MCRD] card_info chan=19 -> IOE (n=15)
+[MCRD] card_info chan=19 -> IOE (n=16)
+[MCRD] card_clear chan=19 -> IOE (n=8)
+[MCRD] card_load chan=19 -> IOE (n=8)
+[MCRD] dir scan chan=11 (n=8)
+[OTS] f=120 calls=2 n0=27 n1=18 prims=1041 bb=-320,2240,-274,754
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=111 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=120 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=180 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=240 calls=1 n0=27 n1=18 prims=1320 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=120 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=240 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=300 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=360 calls=1 n0=27 n1=18 prims=1314 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=117 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=1 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=1
+[GPU] frame=360 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=420 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=480 calls=1 n0=27 n1=18 prims=1320 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=120 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=1 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=1
+[GPU] frame=480 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=540 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[SH-XBOX] vblank 600
+[MEM] tick: used=9012KB arena=11131KB
+[OTS] f=600 calls=1 n0=27 n1=18 prims=1320 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=120 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=1 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=1
+[GPU] frame=600 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=660 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[SH-XBOX] GameState -> 2 (step 0)
+[BOOT0/TIM] PostLoadTim file=1799 'BG_ETC.TIM' ss=0x7906 img.u=0 img.v=0 tPage=0,12 clutX=192 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x8145fe78 caddr=0x8145fd14 paddr=0x8145fe80 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(768,0 32x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(192,0 16x11)
+[BOOT0/TIM] PostLoadTim done
+[OTS] f=720 calls=2 n0=23 n1=18 prims=1077 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=118 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=720 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=780 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[MCRD] card_info chan=19 -> IOE (n=256)
+[OTS] f=840 calls=1 n0=23 n1=18 prims=840 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=120 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=840 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=900 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=960 calls=1 n0=23 n1=18 prims=840 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=120 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=960 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[VIB] vibrationEnabled = 128 (0 = off; Options 'Vibration' row)
+[GPU] frame=1020 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=1080 calls=1 n0=23 n1=18 prims=811 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=113 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=1080 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=1140 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[SH-XBOX] vblank 1200
+[MEM] tick: used=9266KB arena=13499KB
+[OTS] f=1200 calls=1 n0=23 n1=18 prims=840 bb=0,1280,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=120 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=0 texUs=0 emitUs=0 submitUs=0 otherUs=0 prims=1 usPerPrim=0
+[GPU] frame=1200 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=1260 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[BOOT0/TIM] PostLoadTim file=1980 'TITLE_E.TIM' ss=0x90b7 img.u=32 img.v=0 tPage=1,13 clutX=224 clutY=15
+[BOOT0/TIM] post ReadTIM: prect=0x8142ff18 caddr=0x8142fd14 paddr=0x8142ff20 mode=9
+[BOOT0/TIM] pre pixel LoadImage rect=(864,0 160x480)
+[BOOT0/TIM] pre CLUT LoadImage rect=(224,15 256x1)
+[BOOT0/TIM] PostLoadTim done
+[SH-XBOX] GameState -> 6 (step 0)
+[SH] open_main: playing FMV (file=2053 frames=0)
+[GPU] frame=1320 prims=0 verts=0 draws=0 texbind=0 blend=0 scissor=0 ready=1
+[FMV] stub: movie 2053 skipped, no 360 decoder yet
+[SH] open_main: FMV_Play returned
+[OTS] f=1320 calls=2 n0=2048 n1=18 prims=744 bb=-320,2240,-274,754
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=107 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=12 texUs=0 emitUs=0 submitUs=0 otherUs=12 prims=1 usPerPrim=12
+[SH-XBOX] GameState -> 7 (step 0)
+[BOOT-STEP] GameStartup step=0 qlen=0
+[TRANSITION] GameStartup step=0: processFlags=0x20 (BootDemo) sizeof(s_WorldGfxWork)=zu
+[BOOT-STEP] GameStartup step=1 qlen=0
+[GPU] frame=1380 prims=67 verts=402 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=1440 calls=2 n0=2056 n1=271 prims=30542 bb=-320,2240,-274,1028
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=17 q=0 lines=0 unk=0 oversize=17761
+[OTT] walkUs=34 texUs=0 emitUs=2 submitUs=0 otherUs=32 prims=39 usPerPrim=0
+[GPU] frame=1440 prims=39 verts=234 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=1500 prims=41 verts=246 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=1560 calls=2 n0=2056 n1=271 prims=31560 bb=0,834,248,600
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=0 q=0 lines=0 unk=0 oversize=21507
+[OTT] walkUs=35 texUs=0 emitUs=2 submitUs=0 otherUs=32 prims=42 usPerPrim=0
+[GPU] frame=1560 prims=42 verts=252 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[MCRD] card_info chan=19 -> IOE (n=512)
+[GPU] frame=1620 prims=42 verts=252 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[OTS] f=1680 calls=2 n0=2056 n1=271 prims=31560 bb=0,834,248,600
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=0 q=0 lines=0 unk=0 oversize=21494
+[OTT] walkUs=35 texUs=0 emitUs=2 submitUs=0 otherUs=32 prims=43 usPerPrim=0
+[GPU] frame=1680 prims=43 verts=258 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=1740 prims=43 verts=258 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[SH-XBOX] vblank 1800
+[MEM] tick: used=17802KB arena=23507KB
+[OTS] f=1800 calls=2 n0=2056 n1=271 prims=31560 bb=0,834,248,574
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=0 q=0 lines=0 unk=0 oversize=21410
+[OTT] walkUs=34 texUs=0 emitUs=2 submitUs=0 otherUs=31 prims=38 usPerPrim=0
+[GPU] frame=1800 prims=38 verts=228 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[GPU] frame=1860 prims=38 verts=228 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[PAD] buttons=FF7F
+[PAD] buttons=FF3F
+[SFX] Sd_PlaySfx: sfxId=1307 (Sfx_Base+27) vol=0
+[RESPOOL] reserved 34/34 slabs (1088KB pixels + 272KB cluts), free=20656KB
+[CHARA-TEX] charaId=1 matCount=1 modelCount=23
+[CHARA-TEX] mat[0] name='HERO' field_C=1 E=0x3b F=0x3b clut=0x782e UV=0x0000 tex=0x0
+[CHARA-TEX] prim0: f0=0x5b13(UV0) f2=0xb830(clut) f4=0x5116(UV1) f6=0x3b00(tpage) f8=0x5112(UV2) fA=0x0000(UV3)
+[CHARA-TEX] texDesc: tPage=[0,27] u=0 v=0 clutXY=(736,480)
+[AUTO-EQUIP-CHECK] mapIdx=0 processFlags=0x4 inventorySlotCount=8 equippedWeapon=0
+[MAP-LOAD] GameBoot_MapLoad mapIdx=0 (map0_s00) fileIdx=1995 linked=1 procFlags=0x4
+[MAP-LOAD] MapRegistry_Load(0)=map0_s00 linked=1 header=80553474
+[MEM] after map-load: used=20657KB arena=26543KB
+[LANG] USA disc-patch skipped on Xbox (compiled text kept)
+[PAD] buttons=FFBF
+[SFX] Sd_PlaySfx: sfxId=1281 (Sfx_Base+1) vol=0
+[OTS] f=1920 calls=2 n0=2056 n1=271 prims=28137 bb=-320,2240,-17,600
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=0 add=0 sub=2 q=0 lines=0 unk=0 oversize=19492
+[OTT] walkUs=638 texUs=0 emitUs=1 submitUs=0 otherUs=636 prims=28 usPerPrim=22
+[GPU] frame=1920 prims=28 verts=168 draws=2 texbind=0 blend=2 scissor=0 ready=1
+[SFX] Sd_SfxStop: sfxId=1300 (Sfx_Base+20)
+[SFX] Sd_SfxStop: sfxId=1302 (Sfx_Base+22)
+[SFX] Sd_SfxStop: sfxId=1301 (Sfx_Base+21)
+[SFX] Sd_SfxStop: sfxId=1303 (Sfx_Base+23)
+[SH-XBOX] GameState -> 9 (step 0)
+[SH] open_main: playing FMV (file=2055 frames=0)
+[FMV] stub: movie 2055 skipped, no 360 decoder yet
+[SH] open_main: FMV_Play returned
+[SH-XBOX] GameState -> 10 (step 0)
+[COORD] non-canonical super=0x815a0590 on coord=0x9ddffa28 — treating as root
+[COORD] non-canonical rootCoord=0x815994a8 — identity
+[BOOT-STEP] GameStartup step=0 qlen=0
+[TRANSITION] GameStartup step=0: processFlags=0x4 (Unknown) sizeof(s_WorldGfxWork)=zu
+[BOOT-STEP] GameStartup step=3 qlen=0
+[BOOT-STEP] GameStartup step=4 qlen=0
+[BOOT-STEP] GameStartup step=5 qlen=0
+[BOOT-STEP] GameStartup step=7 qlen=0
+[TRANSITION] GameStartup step=7: processFlags=0x4 playerPos=(-25395,819,657408) func_80039F90=0x0
+[IPD-INIT] Ipd_MapFileInfoSet: mapTag='THR' activeIpdCount=4 isExterior=1 plmIdx=1370 ipdFileIdx=0 textureFileIdx=0 curSize=0 willRebuildGrid=1
+[MEM] after chunk-buffers: used=22594KB arena=28655KB
+[TRANSITION] GameStartup step=7 post-init: playerPos=(-25395,819,657408) mapTag='THR'
+[BOOT-STEP] GameStartup step=8 qlen=7
+[BOOT0/TIM] PostLoadTim file=1073 'THR0001F.TIM' ss=0x45d8 img.u=0 img.v=0 tPage=0,8 clutX=0 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x81469dd8 caddr=0x81469d14 paddr=0x81469de0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(0,0 16x6)
+[BOOT0/TIM] PostLoadTim done
+[POOLSTOMP] upload (512,0 64x256) hits PINNED pool slot 0 'THR0001F' (512,0)
+[BOOT0/TIM] PostLoadTim file=1077 'THR0003F.TIM' ss=0x4625 img.u=0 img.v=0 tPage=0,9 clutX=16 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x81469ed8 caddr=0x81469d14 paddr=0x81469ee0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(576,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(16,0 16x14)
+[BOOT0/TIM] PostLoadTim done
+[POOLSTOMP] upload (576,0 64x256) hits PINNED pool slot 1 'THR0003F' (576,0)
+[BOOT0/TIM] PostLoadTim file=1075 'THR0002F.TIM' ss=0x45fe img.u=0 img.v=0 tPage=0,10 clutX=32 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x81469e58 caddr=0x81469d14 paddr=0x81469e60 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(640,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(32,0 16x10)
+[BOOT0/TIM] PostLoadTim done
+[POOLSTOMP] upload (640,0 64x256) hits PINNED pool slot 2 'THR0002F' (640,0)
+[BOOT0/TIM] PostLoadTim file=1079 'THR0004F.TIM' ss=0x4644 img.u=0 img.v=0 tPage=0,21 clutX=48 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x81469f18 caddr=0x81469d14 paddr=0x81469f20 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(320,256 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(48,0 16x16)
+[BOOT0/TIM] PostLoadTim done
+[POOLSTOMP] upload (320,256 64x256) hits PINNED pool slot 3 'THR0004F' (320,256)
+[BOOT0/TIM] PostLoadTim file=1193 'THR5901F.TIM' ss=0x4d8e img.u=0 img.v=0 tPage=0,8 clutX=0 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469ef8 caddr=0x81469d14 paddr=0x81469f00 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(0,512 16x15)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1261 'THRB401F.TIM' ss=0x517a img.u=0 img.v=0 tPage=0,8 clutX=16 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469e38 caddr=0x81469d14 paddr=0x81469e40 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(16,512 16x9)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1265 'THRB701F.TIM' ss=0x51b6 img.u=0 img.v=0 tPage=0,8 clutX=32 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469e78 caddr=0x81469d14 paddr=0x81469e80 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(32,512 16x11)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR0001F' tPage=[0,8] clutXY=(0,0) uv=(0,0)
+[TEXVRAM] 'THR0003F' tPage=[0,9] clutXY=(16,0) uv=(0,0)
+[TEXVRAM] 'THR0002F' tPage=[0,10] clutXY=(32,0) uv=(0,0)
+[TEXVRAM] 'THR0004F' tPage=[0,21] clutXY=(48,0) uv=(0,0)
+[TEXVRAM] 'THR5901F' tPage=[0,8] clutXY=(0,512) uv=(0,0)
+[TEXVRAM] 'THRB401F' tPage=[0,8] clutXY=(16,512) uv=(0,0)
+[TEXVRAM] 'THRB701F' tPage=[0,8] clutXY=(32,512) uv=(0,0)
+[PAD] buttons=FF3F
+[BOOT-STEP] GameStartup step=9 qlen=0
+[PAD] buttons=FF7F
+[PAD] buttons=FFFF
+[BOOT-STEP] GameStartup step=10 qlen=0
+[SH_AMB] Sd_AmbientSfxSet idx=2 -> loadCmd=170
+[SH_AMB] Sd_VabLoad ambient cmd=170 type=2 dedup=0
+[BOOT-STEP] GameStartup step=11 qlen=0
+[GPU] frame=1980 prims=0 verts=0 draws=0 texbind=0 blend=0 scissor=0 ready=1
+[SFX] Sd_SfxStop: sfxId=1360 (Sfx_Base+80)
+[SFX] Sd_SfxStop: sfxId=1321 (Sfx_Base+41)
+[SFX] Sd_SfxStop: sfxId=1322 (Sfx_Base+42)
+[BOOT0/TIM] PostLoadTim file=1505 'TIM00.TIM' ss=0x5dcb img.u=0 img.v=0 tPage=0,15 clutX=176 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x8145ff18 caddr=0x8145fd14 paddr=0x8145ff20 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(960,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(176,0 16x16)
+[BOOT0/TIM] PostLoadTim done
+[BOOT-STEP] GameStartup step=12 qlen=1
+[SH-XBOX] GameState -> 11 (step 0)
+[GP-STATE-TXN] Gameplay -> sysState=10 (param=2)
+[BOOT0/TIM] PostLoadTim file=1514 'TIM07.TIM' ss=0x5e64 img.u=32 img.v=0 tPage=0,13 clutX=240 clutY=0
+[BOOT0/TIM] post ReadTIM: prect=0x8145fe18 caddr=0x8145fd14 paddr=0x8145fe20 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(864,0 32x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(240,0 16x8)
+[BOOT0/TIM] PostLoadTim done
+[SYSSTATE] dispatch sysState=10 mapEventData=0x80552d6c
+[SFX] Sd_PlaySfx: sfxId=1361 (Sfx_Base+81) vol=144
+[BGM] ChannelSet bgmIdx=3 cmd=770
+[MEM] dms-load: used=22618KB arena=28719KB
+[COLL-MISS] cell(-2,3) pos(-72,152) activeCount=4
+[COLL-MISS]   slot cell(-1,3) qIdx=19 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-1,4) qIdx=20 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(0,4) qIdx=21 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(0,0) qIdx=-1 loadState=0 isLoaded=0
+[BOOT0/TIM] PostLoadTim file=1459 'SRL.TIM' ss=0x5b60 img.u=0 img.v=0 tPage=0,28 clutX=704 clutY=464
+[BOOT0/TIM] post ReadTIM: prect=0x8145fe58 caddr=0x8145fd14 paddr=0x8145fe60 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(768,256 64x128)
+[BOOT0/TIM] pre CLUT LoadImage rect=(704,464 16x10)
+[BOOT0/TIM] PostLoadTim done
+[IPD-DRAW] VOID playerCellDrawn=0 total=4 loaded=0 cellMatch=0 mapCell=(-2,4) tag=THR
+[IPD-DRAW]   slot=0 cell=(-1,3) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=1 cell=(-1,4) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=2 cell=(-2,3) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=3 cell=(-3,3) loadState=2 qState=2 isLoaded=1
+[BOOT0/TIM] PostLoadTim file=1191 'THR5801F.TIM' ss=0x4d74 img.u=0 img.v=0 tPage=0,8 clutX=48 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469f18 caddr=0x81469d14 paddr=0x81469f20 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(48,512 16x16)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1192 'THR5802H.TIM' ss=0x4d85 img.u=0 img.v=0 tPage=0,26 clutX=0 clutY=560
+[BOOT0/TIM] post ReadTIM: prect=0x81469d98 caddr=0x81469d14 paddr=0x81469da0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(640,256 32x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(0,560 16x4)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1189 'THR5701F.TIM' ss=0x4d5a img.u=0 img.v=0 tPage=0,8 clutX=64 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469d98 caddr=0x81469d14 paddr=0x81469da0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(64,512 16x4)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1190 'THR5702H.TIM' ss=0x4d6b img.u=0 img.v=0 tPage=0,26 clutX=16 clutY=560
+[BOOT0/TIM] post ReadTIM: prect=0x81469db8 caddr=0x81469d14 paddr=0x81469dc0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(640,256 32x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(16,560 16x5)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR5801F' tPage=[0,8] clutXY=(48,512) uv=(0,0)
+[TEXVRAM] 'THR5802H' tPage=[0,26] clutXY=(0,560) uv=(0,0)
+[TEXVRAM] 'THR5701F' tPage=[0,8] clutXY=(64,512) uv=(0,0)
+[TEXVRAM] 'THR5702H' tPage=[0,26] clutXY=(16,560) uv=(0,0)
+[BOOT0/TIM] PostLoadTim file=1153 'THR2501F.TIM' ss=0x4b36 img.u=0 img.v=0 tPage=0,8 clutX=80 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469dd8 caddr=0x81469d14 paddr=0x81469de0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(80,512 16x6)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR2501F' tPage=[0,8] clutXY=(80,512) uv=(0,0)
+[BOOT0/TIM] PostLoadTim file=1154 'THR2601F.TIM' ss=0x4b47 img.u=0 img.v=0 tPage=0,8 clutX=96 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469f18 caddr=0x81469d14 paddr=0x81469f20 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(96,512 16x16)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR2601F' tPage=[0,8] clutXY=(96,512) uv=(0,0)
+[BOOT0/TIM] PostLoadTim file=1152 'THR2401F.TIM' ss=0x4b25 img.u=0 img.v=0 tPage=0,8 clutX=112 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469e58 caddr=0x81469d14 paddr=0x81469e60 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(112,512 16x10)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR2401F' tPage=[0,8] clutXY=(112,512) uv=(0,0)
+[BOOT0/TIM] PostLoadTim file=1155 'THR2701F.TIM' ss=0x4b58 img.u=0 img.v=0 tPage=0,8 clutX=128 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469d98 caddr=0x81469d14 paddr=0x81469da0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(128,512 16x4)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR2701F' tPage=[0,8] clutXY=(128,512) uv=(0,0)
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=49 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=41 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=47 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=45 loadState=2 isLoaded=1
+[BOOT0/TIM] PostLoadTim file=1150 'THR2301F.TIM' ss=0x4b0b img.u=0 img.v=0 tPage=0,8 clutX=144 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469df8 caddr=0x81469d14 paddr=0x81469e00 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(144,512 16x7)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1151 'THR2301H.TIM' ss=0x4b1c img.u=0 img.v=0 tPage=0,26 clutX=32 clutY=560
+[BOOT0/TIM] post ReadTIM: prect=0x81469e18 caddr=0x81469d14 paddr=0x81469e20 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(640,256 32x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(32,560 16x8)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR2301H' tPage=[0,26] clutXY=(32,560) uv=(0,0)
+[TEXVRAM] 'THR2301F' tPage=[0,8] clutXY=(144,512) uv=(0,0)
+[BOOT0/TIM] PostLoadTim file=1156 'THR2801F.TIM' ss=0x4b69 img.u=0 img.v=0 tPage=0,8 clutX=160 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469e38 caddr=0x81469d14 paddr=0x81469e40 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(160,512 16x9)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR2801F' tPage=[0,8] clutXY=(160,512) uv=(0,0)
+[IPD-DRAW] VOID playerCellDrawn=0 total=4 loaded=0 cellMatch=0 mapCell=(-2,6) tag=THR
+[IPD-DRAW]   slot=0 cell=(-3,2) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=1 cell=(-2,2) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=2 cell=(-3,6) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=3 cell=(-2,1) loadState=2 qState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=57 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=45 loadState=2 isLoaded=1
+[BOOT0/TIM] PostLoadTim file=1361 'THRWAY1.TIM' ss=0x58a4 img.u=0 img.v=0 tPage=0,8 clutX=176 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469d78 caddr=0x81469d14 paddr=0x81469d80 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(176,512 16x3)
+[BOOT0/TIM] PostLoadTim done
+[BOOT0/TIM] PostLoadTim file=1363 'THRWAY2F.TIM' ss=0x58c6 img.u=0 img.v=0 tPage=0,8 clutX=192 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469e18 caddr=0x81469d14 paddr=0x81469e20 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(192,512 16x8)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THRWAY1' tPage=[0,8] clutXY=(176,512) uv=(0,0)
+[TEXVRAM] 'THRWAY2F' tPage=[0,8] clutXY=(192,512) uv=(0,0)
+[OTS] f=2040 calls=4 n0=2049 n1=13 prims=3773 bb=-320,2240,-274,1028
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=32 add=0 sub=52 q=0 lines=0 unk=0 oversize=2498
+[OTT] walkUs=9 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=9
+[GPU] frame=2040 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[BOOT0/TIM] PostLoadTim file=1362 'THRWAY2B.TIM' ss=0x58b5 img.u=0 img.v=0 tPage=0,8 clutX=208 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469dd8 caddr=0x81469d14 paddr=0x81469de0 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(208,512 16x6)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THRWAY2B' tPage=[0,8] clutXY=(208,512) uv=(0,0)
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=57 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=60 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=57 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=60 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,3) qIdx=62 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,3) qIdx=63 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,3) qIdx=62 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,3) qIdx=63 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,3) qIdx=62 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,3) qIdx=63 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,3) qIdx=62 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=54 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=55 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=66 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=67 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=66 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=67 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=66 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=67 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=66 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=67 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=66 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=67 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=66 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=67 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=65 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,0) qIdx=66 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=67 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,-1) qIdx=68 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[BOOT0/TIM] PostLoadTim file=1174 'THR4301F.TIM' ss=0x4c7b img.u=0 img.v=0 tPage=0,8 clutX=224 clutY=512
+[BOOT0/TIM] post ReadTIM: prect=0x81469e78 caddr=0x81469d14 paddr=0x81469e80 mode=8
+[BOOT0/TIM] pre pixel LoadImage rect=(512,0 64x256)
+[BOOT0/TIM] pre CLUT LoadImage rect=(224,512 16x11)
+[BOOT0/TIM] PostLoadTim done
+[TEXVRAM] 'THR4301F' tPage=[0,8] clutXY=(224,512) uv=(0,0)
+[COLL-MISS] cell(0,0) pos(0,0) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,1) qIdx=70 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=64 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,3) qIdx=73 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,3) qIdx=74 loadState=2 isLoaded=1
+[IPD-DRAW] VOID playerCellDrawn=0 total=4 loaded=0 cellMatch=0 mapCell=(-2,4) tag=THR
+[IPD-DRAW]   slot=0 cell=(-3,2) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=1 cell=(-2,2) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=2 cell=(-2,3) loadState=2 qState=2 isLoaded=1
+[IPD-DRAW]   slot=3 cell=(-3,3) loadState=2 qState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[GPU] frame=2100 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,5) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(1,-1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,0) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,0) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[OTS] f=2160 calls=2 n0=2049 n1=59 prims=2636 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=853
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=10 prims=1 usPerPrim=10
+[GPU] frame=2160 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,0) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[GPU] frame=2220 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,4) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-2,-1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[OTS] f=2280 calls=2 n0=2049 n1=41 prims=2762 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=959
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=10 prims=1 usPerPrim=10
+[GPU] frame=2280 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,6) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,2) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,6) qIdx=76 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,5) qIdx=75 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-3,2) qIdx=71 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,2) qIdx=72 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,3) qIdx=77 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,3) qIdx=78 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-3,1) qIdx=81 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2340 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-1,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(1,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[SH-XBOX] vblank 2400
+[MEM] tick: used=22806KB arena=30279KB
+[OTS] f=2400 calls=2 n0=2049 n1=65 prims=4471 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=1867
+[OTT] walkUs=11 texUs=0 emitUs=0 submitUs=0 otherUs=11 prims=1 usPerPrim=11
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2400 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(1,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2460 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=2520 calls=2 n0=2049 n1=13 prims=3828 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=1692
+[OTT] walkUs=9 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=9
+[COLL-MISS] cell(0,0) pos(3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2520 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2580 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[CHNK] n=4 s0=-2,-1,st2 s1=-3,0,st3 s2=-2,1,st3 s3=-2,0,st3
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-2,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=2640 calls=2 n0=2049 n1=27 prims=792 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=311
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=10 prims=1 usPerPrim=10
+[COLL-MISS] cell(-1,0) pos(-1,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2640 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-1,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(5,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2700 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[CHARA-TEX] charaId=28 matCount=1 modelCount=20
+[CHARA-TEX] mat[0] name='SRL' field_C=1 E=0x5c F=0x5c clut=0x742c UV=0x0000 tex=0x0
+[CHARA-TEX] prim0: f0=0xb72b(UV0) f2=0xf42c(clut) f4=0xb72f(UV1) f6=0x5c00(tpage) f8=0xab2b(UV2) fA=0xab2f(UV3)
+[CHARA-TEX] texDesc: tPage=[0,28] u=0 v=0 clutXY=(704,464)
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=2760 calls=2 n0=2049 n1=13 prims=1057 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=119 add=0 sub=0 q=0 lines=0 unk=0 oversize=436
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2760 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2820 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=2880 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[GPU] frame=2880 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=2940 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[SH-XBOX] vblank 3000
+[MEM] tick: used=23064KB arena=32679KB
+[OTS] f=3000 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[GPU] frame=3000 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3060 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=3120 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[GPU] frame=3120 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,3) pos(-30,128) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3180 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[CHNK] n=4 s0=-2,-1,st2 s1=-3,0,st3 s2=-2,1,st3 s3=-2,0,st3
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-2,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-2,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=3240 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[GPU] frame=3240 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,3) pos(-30,128) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3300 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=3360 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[GPU] frame=3360 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3420 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-2,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=3480 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[COLL-MISS] cell(0,0) pos(2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3480 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-1,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3540 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-1,-2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,3) pos(-30,128) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[SH-XBOX] vblank 3600
+[MEM] tick: used=23322KB arena=35079KB
+[OTS] f=3600 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[GPU] frame=3600 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,3) pos(-30,128) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3660 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-4,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(4,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=3720 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3720 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-4,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(3,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3780 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,3) pos(-30,128) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[CHNK] n=4 s0=-2,-1,st2 s1=-3,0,st3 s2=-2,1,st3 s3=-2,0,st3
+[COLL-MISS] cell(-1,0) pos(-3,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[OTS] f=3840 calls=2 n0=2049 n1=16 prims=120 bb=-20,660,-17,497
+[FOGPAD] gt=0 fogged=0 padMin=-1 padMax=-1
+[ABR] avg=120 add=0 sub=0 q=0 lines=0 unk=0 oversize=0
+[OTT] walkUs=10 texUs=0 emitUs=0 submitUs=0 otherUs=9 prims=1 usPerPrim=10
+[GPU] frame=3840 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-1,-2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,-1) pos(-2,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-3,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,0) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-5,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(1,-1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-1,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[GPU] frame=3900 prims=1 verts=6 draws=1 texbind=0 blend=0 scissor=0 ready=1
+[COLL-MISS] cell(0,0) pos(0,5) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,6) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,7) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,-1) pos(0,-3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,2) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(1,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,4) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(0,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(-1,0) pos(-4,3) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1
+[COLL-MISS] cell(0,0) pos(2,1) activeCount=4
+[COLL-MISS]   slot cell(-2,-1) qIdx=83 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-3,0) qIdx=82 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,1) qIdx=79 loadState=2 isLoaded=1
+[COLL-MISS]   slot cell(-2,0) qIdx=80 loadState=2 isLoaded=1

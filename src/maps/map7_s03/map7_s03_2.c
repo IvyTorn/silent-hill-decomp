@@ -1901,7 +1901,12 @@ void func_800D9114(s_800F3D48* arg0) // 0x800D9114
  * with stale entries whose buffer was reused by cutscene TIM loads, leaving
  * wild pointers -> func_800D88E8 / field_48 AV (CutsceneGlitch.log: map7_s03
  * +0xEAB5 reading 0xffff...). Drop any entry that fails a canonical check. */
-#ifdef SH_XBOX_PORT
+#if defined(SH_XBOX360_PORT)
+/* Tested BEFORE SH_XBOX_PORT, which the 360 also defines: libXenon maps all RAM
+ * at 0x80000000, so the Original Xbox "< 128MB" bound below would reject every
+ * valid pointer and declare every pool entry corrupt. */
+#define SH_F3D48_PTR_OK(p) ((uintptr_t)(p) >= 0x80000000u && (uintptr_t)(p) < 0xA0000000u)
+#elif defined(SH_XBOX_PORT)
 /* 32-bit: the 64-bit canonical bound below folds to compile-time TRUE, passing
  * any garbage >= 0x10000. Code/data pointers on Xbox all live < 128MB. */
 #define SH_F3D48_PTR_OK(p) ((uintptr_t)(p) >= 0x10000 && (uintptr_t)(p) < 0x08000000)

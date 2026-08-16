@@ -3242,7 +3242,17 @@ void MainLoop(void) // 0x80032EE0
                      * it the new chain terminator instead of just zeroing its
                      * length (the old behaviour left cur->addr pointing at the
                      * wild target, so DrawOTag would still chase it). */
-#ifdef SH_XBOX_PORT
+#if defined(SH_XBOX360_PORT)
+/* Tested BEFORE SH_XBOX_PORT, which the 360 also defines. The Original Xbox
+ * value below says "statics and g_PsxRam live under 128MB"; on libXenon they do
+ * not -- all 512MB of RAM is mapped at 0x80000000, so every static, the PSX RAM
+ * block and the packet arenas alike sit at 0x8xxxxxxx. Under the 0x08000000 cap
+ * none of them satisfy the magnitude term, leaving them to be rescued only if
+ * they happen to land in a runtime pkt/ot/sub window -- and any valid chain
+ * outside those windows gets spliced to its terminator. The whole cached-RAM
+ * window is the correct magnitude term here. */
+#define SH_OT_PTR_MAX ((uintptr_t)0xA0000000)
+#elif defined(SH_XBOX_PORT)
 /* 32-bit: (uintptr_t)0x7FFFFFFFFFFF truncates to 0xFFFFFFFF, degrading these
  * wild-pointer guards to "< 0x1000" only. Statics + g_PsxRam sit < 128MB, but
  * nxdk's MALLOC HEAP DOES NOT — the 2MB packet arenas holding every world
