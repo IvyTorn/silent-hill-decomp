@@ -109,7 +109,17 @@ static s32 g_PrevVBlanks = 0;
  * arena is enlarged and the whole-map submit budget (bodyprog_80040B74.c) is
  * sized well under it — the old 1.2MB budget was throttling the draw set to ~19
  * chunks. 16MB fits ~400 chunks; normal play still uses <2MB. */
-#ifdef SH_XBOX_PORT
+#if defined(SH_N64_PORT)
+/* N64: 256KB. TWO are calloc'd, so the Xbox's 2MB would be 4MB of a machine
+ * that has 8MB total and about 1MB of heap left after the static image — the
+ * calloc simply fails, and since the result is unchecked below, NULL +
+ * PC_PKTBUF_SIZE became a write to 0x00200000 and the first boot died there.
+ * The PSX original was 128KB (TEMP_MEMORY_ADDR + (idx << 17)); the PC port
+ * enlarged it because its primitives carry 8-byte pointers, which is not true
+ * here, so double the PSX figure covers the remaining struct growth. Against
+ * the Xbox's measured ~29KB/frame this is still an 8x margin. */
+#define PC_PKTBUF_SIZE (256 * 1024)
+#elif defined(SH_XBOX_PORT)
 /* Xbox: 2MB. TWO arenas are calloc'd (double-buffered), so PC's 16MB costs 32MB
  * of a 64MB console — it took free RAM at boot from ~33MB to 4.4MB, which left
  * the texture cache 0 of 96 slots and rendered the whole game untextured white.
@@ -2140,6 +2150,16 @@ void MainLoop(void) // 0x80032EE0
         if (!s_PcPacketBufs[0]) {
             s_PcPacketBufs[0] = (PACKET*)calloc(1, PC_PKTBUF_SIZE + PC_CANARY_SIZE);
             s_PcPacketBufs[1] = (PACKET*)calloc(1, PC_PKTBUF_SIZE + PC_CANARY_SIZE);
+            /* An unchecked failure here does not fault at the calloc, it faults
+             * PC_PKTBUF_SIZE bytes past NULL in the canary memset two lines
+             * down, which reads as a wild write to a constant address with no
+             * obvious owner. That is exactly how the first N64 boot died. */
+            if (!s_PcPacketBufs[0] || !s_PcPacketBufs[1])
+            {
+                SH_DBG("[FATAL] packet arena calloc failed (%d bytes x2) — out of heap",
+                       (int)(PC_PKTBUF_SIZE + PC_CANARY_SIZE));
+                for (;;) { }
+            }
             s_PcPacketBufEnds[0] = s_PcPacketBufs[0] + PC_PKTBUF_SIZE;
             s_PcPacketBufEnds[1] = s_PcPacketBufs[1] + PC_PKTBUF_SIZE;
             memset(s_PcPacketBufEnds[0], PC_CANARY_VAL, PC_CANARY_SIZE);

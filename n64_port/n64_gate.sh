@@ -22,6 +22,9 @@ DECOMP="$(cd "$SCRIPT_DIR/.." && pwd)"
 PCPORT="$DECOMP/pc_port"
 PSYCROSS="$PCPORT/PsyCross"
 LIBDRAGON="${LIBDRAGON:-/libdragon}"
+# The INSTALLED headers, not $LIBDRAGON/include: only the install has the
+# vendored trees (libcart/, fatfs/) laid out where libdragon.h expects them.
+N64_INC="${N64_INST:-/n64_inst}/mips64-elf/include"
 
 CC="${CC:-mips64-elf-gcc}"
 CXX="${CXX:-mips64-elf-g++}"
@@ -66,8 +69,12 @@ INCS="-I$SCRIPT_DIR/include -I$PCPORT/include -I$PCPORT/include/psyq_compat -I$P
       -I$DECOMP/include -I$DECOMP/include/decomp
       -I$PSYCROSS/include/psx -I$PSYCROSS/include
       -I$DECOMP/xbox_port/include"
-HAL_INCS="-I$LIBDRAGON/include/newlib_overrides -I$LIBDRAGON/include -include ktls.h
+# xbox_port/include carries gpu_nv2a.h (the ShVertex/GpuNv2a_* interface every
+# console backend implements) and the declaration-only SDL_* shims. Neither
+# pulls psyq, so they are safe on the libdragon side of the firewall.
+HAL_INCS="-I$N64_INC/newlib_overrides -I$N64_INC -include ktls.h
       -I$SCRIPT_DIR/include -I$PCPORT/include -I$PCPORT/include/psyq_compat
+      -I$DECOMP/xbox_port/include
       -I$DECOMP/include -I$DECOMP/include/decomp
       -I$PSYCROSS/include/psx -I$PSYCROSS/include"
 
@@ -90,10 +97,19 @@ WARN="-Wno-implicit-function-declaration -Wno-implicit-int
 #   -falign-functions=32 : required by libdragon's backtrace().
 TARGETFLAGS="-march=vr4300 -mtune=vr4300 -mabi=o64 -falign-functions=32"
 TARGETFLAGS="$TARGETFLAGS -ffunction-sections -fdata-sections -std=gnu17"
-# PsyCross declares helpers like fst_min/fst_max as plain `inline`. Under C99
-# semantics that emits NO out-of-line definition, so they link as undefined;
-# gnu89 semantics (what the PC and Xbox builds effectively use) emit one.
-TARGETFLAGS="$TARGETFLAGS -fgnu89-inline"
+# -g is what turns libdragon's on-screen exception backtrace from a list of
+# function names into file:line. It costs nothing in the ROM: n64sym extracts
+# the symbol table to a side file and the ELF is stripped before packaging.
+# libdragon's own n64.mk passes it for the same reason.
+TARGETFLAGS="$TARGETFLAGS -g"
+# -G0: put nothing in .sdata/.sbss. Those are addressed GP-relative through a
+# SIGNED 16-BIT offset, so the whole small-data area has to fit in a 64 KB
+# window around $gp -- and this game's static footprint is megabytes. Without
+# this the link dies on "relocation truncated to fit", which reads like a
+# linker-script problem and is actually just the game being too big for the
+# default -G8 heuristic. libdragon sets -G0 for its DSO builds for the same
+# reason; a static image this size needs it too.
+TARGETFLAGS="$TARGETFLAGS -G0"
 
 # Optimisation is an OVERRIDE with no default, deliberately: a warning-harvest
 # run must not be able to change what ships. With it empty the compiler runs at
@@ -139,7 +155,14 @@ collect_srcs() {
             crash_xbox.c|dbg_overlay_xbox.c|dsound_bridge.c|dsound_xbox.c|\
             gpu_nv2a.c|net_xbox.c|pad_xbox.c|ra_badge_xbox.c|sdl_compat_xbox.c|\
             sh_log_xbox.c|xa_xbox.c|cd_xbox.c|fs_xbox.c|main_xbox.c|\
-            ra_xbox.c|msvc_compat.c|fmv_xbox.c) ;;
+            ra_xbox.c|msvc_compat.c|fmv_xbox.c|\
+            map_xbox.c) ;;
+            # map_xbox.c: a static MAP_XBOX_HEADERS table naming all 42 map
+            # overlay headers, which is what a console with the RAM to link
+            # every map at once wants. N64 does not have it and goes back to
+            # the PSX's one-resident-at-a-time model via libdragon DSO, so this
+            # table would only ever demand 42 symbols that will never be
+            # statically present.
             *) echo "$f" ;;
         esac
     done
@@ -159,15 +182,27 @@ while IFS= read -r f; do
         */maps/map0_s00/*|*map0_s00_extracted_data.c) EXTRA="-DMAP0_S00 -DSH_MAP_NAME=map0_s00" ;;
         *) EXTRA="" ;;
     esac
+    # -fgnu89-inline is a GAME-TU flag only. PsyCross declares helpers like
+    # fst_min/fst_max as plain `inline`, which under C99 emits NO out-of-line
+    # definition and links as undefined; gnu89 semantics emit one. But
+    # libdragon's fmath.h declares its whole vector/quaternion library the same
+    # way, and gnu89 semantics there emit a copy of every one of them in EVERY
+    # HAL TU that includes libdragon.h -- "multiple definition of fm_lerp"
+    # across gpu_rdp.o, cd_n64.o and main_n64.o.
+    # n64_port/src/game/ is the port's own code that sits on the GAME side of
+    # the include firewall: it needs decomp/psyq types (s_MapOverlayHdr and the
+    # like) and must NOT see libdragon, whose kernel.h collides with psyq's.
+    # Everything else under n64_port/src is HAL and gets the opposite set.
     case "$f" in
-        "$SCRIPT_DIR"/src/*) USE_INCS="$HAL_INCS" ;;
-        *)                   USE_INCS="$INCS" ;;
+        "$SCRIPT_DIR"/src/game/*) USE_INCS="$INCS";     INLINEFLAG="-fgnu89-inline" ;;
+        "$SCRIPT_DIR"/src/*)      USE_INCS="$HAL_INCS"; INLINEFLAG="" ;;
+        *)                        USE_INCS="$INCS";     INLINEFLAG="-fgnu89-inline" ;;
     esac
     case "$f" in
         *.cpp) TOOL="$CXX"; FLAGS="$CXXFLAGS"; LANGDEFS="" ;;
         *)     TOOL="$CC";  FLAGS="$TARGETFLAGS"; LANGDEFS="$CDEFS" ;;
     esac
-    if err=$("$TOOL" $FLAGS $DEFS $LANGDEFS $USE_INCS $WARN $EXTRA -c "$f" -o "$obj" 2>&1); then
+    if err=$("$TOOL" $FLAGS $INLINEFLAG $DEFS $LANGDEFS $USE_INCS $WARN $EXTRA -c "$f" -o "$obj" 2>&1); then
         pass=$((pass+1))
         # Warnings from a SUCCESSFUL compile are kept: a green gate that threw
         # them away is how an uninitialised blob reached Xbox hardware twice.

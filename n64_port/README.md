@@ -9,11 +9,20 @@ answers.
 | Milestone | State |
 |---|---|
 | 0 — toolchain + repo | done |
-| 1 — VR4300 compile gate | **green, 192/192** |
-| 2 — link a `.z64`, boot to a cleared framebuffer | not started |
+| 1 — VR4300 compile gate | **green, 199/199** |
+| 2 — link a `.z64`, reach `MainLoop` | **done — boots in ares, runs one frame** |
 | 3 — RDP renderer | not started |
-| 4 — asset pipeline (TIM→CI4/CI8, VAG→VADPCM, STR→MPEG-1) | not started |
+| 4 — storage: SD card via `fat.h` | **next, and it is what MainLoop is blocked on** |
 | 5 — map overlays via libdragon DSO | not started |
+
+Where it stops today: the ROM boots, `main` brings the HAL up, `MainLoop` runs
+exactly one frame, and then blocks. That is the honest consequence of `cd_n64.c`
+reporting failure on every read — there is no disc, so the first load never
+completes. Milestone 4 is the unblock, and it is deliberately ahead of the
+renderer: there is nothing to draw until something can be read.
+
+Measured image: text 833 KB, data 516 KB, bss 5.0 MB, **6.63 MB total**,
+against 8 MB. ROM 1.28 MB.
 
 ## Base: the Xbox 360 port
 

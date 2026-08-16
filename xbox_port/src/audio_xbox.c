@@ -43,7 +43,18 @@ void xbox_log(const char* fmt, ...)
 #define SPU_VOICES      24
 #define OUT_HZ          48000          /* AC97/DirectSound output rate */
 #define SRC_HZ          44100          /* PSX VAG native rate at pitch=4096 */
+#if defined(SH_N64_PORT)
+/* 24 voices x this many shorts is a whole-VAG decode cache held in RAM, which
+ * is 3 MB at the Xbox's cap -- more than a third of an Expansion Pak N64's
+ * entire memory, for a decode strategy the N64 is not going to use. Output
+ * here is libdragon's RSP mixer streaming VADPCM, so nothing will ever want a
+ * fully decoded voice resident. Kept nonzero rather than removed so the decode
+ * path stays compiled and honest (decodeVag takes the cap and truncates); it
+ * gets deleted when the mixer lands, not before. */
+#define VOICE_PCM_CAP   0x800          /* 24 x 4 KB = 96 KB */
+#else
 #define VOICE_PCM_CAP   0x10000        /* max decoded samples per voice (~1.49s) */
+#endif
 #define SPU_ALLOC_BASE  0x1010         /* PSX reserves 0..0x100F */
 
 static unsigned char  s_spuRam[SPU_RAM_SIZE];

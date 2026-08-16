@@ -1476,7 +1476,15 @@ static int s_fbLastDrainMs = 0;            /* ms in the GPU drain of the last re
 static int s_fbConsumerFrame = -1000;      /* frame id a framebuffer consumer was last seen */
 static int s_fbRestrict[4];                /* requester's VRAM bbox: only overlapping pages load */
 static int s_fbRestrictOn;
+#if defined(SH_N64_PORT)
+/* Sized to the N64's actual framebuffer rather than the Xbox's widest credits
+ * page: 640x448 would be 573 KB of RDRAM reserved for a resolution this port
+ * cannot produce. 320x240 is what gpu_rdp.c allocates and therefore the most
+ * that can ever be read back. */
+static unsigned short s_fbReadbackBuf[320 * 240];
+#else
 static unsigned short s_fbReadbackBuf[640 * 448]; /* one page image (max 640-wide credits) */
+#endif
 
 /* PSX framebuffer page rects for the CURRENT display env (see block comment).
  * Returns the page count (1 or 2); pages share w/h. */

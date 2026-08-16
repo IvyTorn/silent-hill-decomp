@@ -16,7 +16,16 @@
  * at 0x1EBE00) and the loaded file may exceed the remaining space.
  * On PSX this wraps around; on PC it would corrupt adjacent memory.
  * Extra 1MB prevents stack/heap corruption from these overflows. */
+#if defined(SH_N64_PORT)
+/* The guard stays -- it is protecting against a real overflow, not padding --
+ * but 1 MB of it is an eighth of an Expansion Pak N64's entire memory. 256 KB
+ * still covers a file overrunning FS_BUFFER_16 (0x1EBE00, 82 KB short of the
+ * 2 MB boundary) by three times the gap. Anything that overruns further was
+ * always going to wrap on real hardware anyway. */
+#define PSX_RAM_SIZE (2 * 1024 * 1024 + 256 * 1024)
+#else
 #define PSX_RAM_SIZE (3 * 1024 * 1024)
+#endif
 uint8_t g_PsxRam[PSX_RAM_SIZE];
 
 /* PSX Scratchpad RAM emulation.

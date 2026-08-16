@@ -689,11 +689,18 @@ int write(int handle, void* buf, int bytes)
     return bytes;
 }
 
+#if !defined(SH_N64_PORT)
 int ioctl(int fd, int req, int arg)
 {
     (void)fd; (void)req; (void)arg;
     return 0;
 }
+#endif
+/* SH_N64_PORT: libdragonsys defines a real ioctl() for its own filesystem
+ * layer, and two definitions is a link error. This one is a no-op returning 0,
+ * so ceding the name costs nothing -- and the memory-card path that calls it is
+ * not wired on N64 at all (XboxFs_ResolveSaveDir reports no save location),
+ * so no caller reaches libdragon's with a PSX fd and gets a surprise. */
 
 /* ----- Directory enumeration ----- */
 
