@@ -11,15 +11,38 @@ answers.
 | 0 — toolchain + repo | done |
 | 1 — VR4300 compile gate | **green, 199/199** |
 | 2 — link a `.z64`, reach `MainLoop` | **done** |
-| 4 — storage (SD card + ROM pack) | **done — reads the disc, past the Konami logo** |
-| 3 — RDP renderer | **next** |
-| 5 — map overlays via libdragon DSO | not started |
+| 4 — storage (SD card + ROM pack) | **done — reads the disc** |
+| 3 — RDP renderer | **geometry done; textures in, not yet seen on screen** |
+| 5 — map overlays via libdragon DSO | **next** |
 
-Where it is today: the ROM boots, mounts a disc source, reads it, gets through
-the Konami logo and runs the OT walk with real primitives (`prims=11`, 6
-submitted per frame). Nothing appears on screen because `GpuNv2a_EmitTris`
-counts and discards — that is milestone 3, and it is the only thing between
-here and a picture.
+Where it is today: the ROM boots, mounts a disc source, reads it, draws the
+Konami logo, fades it, walks on through the TIM loads and holds 60 VPS. The
+renderer draws real geometry. Textures are implemented but have not yet been
+*seen* — nothing in the boot sequence so far puts a small-enough textured
+triangle where a screenshot proves it, so treat that as written-but-unverified
+until a map renders.
+
+## Renderer
+
+No Z-buffer, and that is correctness rather than economy: the PSX had none,
+ordering is painter's from an OT that arrives already sorted, and a depth test
+would start rejecting fragments the PSX drew — particularly among the
+semitransparent draws that lean hardest on submission order.
+
+`ShVertex` is `{pos[4], col[4], tex[2], spec[4]}`, which is exactly
+`rdpq_triangle`'s layout, so untextured triangles are passed through as
+`const float*` with no conversion. Textured ones stage through a 9-float array,
+because rdpq wants S,T,W contiguous and `ShVertex` keeps W up in `pos[3]`.
+
+**TMEM is the whole problem.** 4 KB total, and a 256-entry TLUT takes half,
+leaving 2048 bytes of texels against a PSX that sampled a 1 MB VRAM freely. So
+each triangle uploads its own UV bounding box, and 64×32 is the largest tile
+that fits. Anything larger draws flat-shaded and increments `big=` in the
+`[GPU]` census rather than drawing with wrong texels.
+
+That counter is the number to watch next: if it is high, the fix is splitting
+oversized triangles or dropping to CI4, not raising the tile size — there is
+nowhere for it to go.
 
 Measured image: text 911 KB, data 521 KB, bss 5.0 MB, **6.6 MB total**, against
 8 MB. ROM 1.3 MB without a pack, 37 MB with the default one.
