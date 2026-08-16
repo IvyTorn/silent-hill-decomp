@@ -23,6 +23,11 @@ bash "$SCRIPT_DIR/ppc_gate.sh"
 
 ls "$GATE"/*.o >/dev/null 2>&1 || { echo "no objects to link"; exit 1; }
 
+echo
+echo "=== map overlays ==="
+bash "$SCRIPT_DIR/build_maps.sh" || exit 1
+MAPLIBS=$(ls "$SCRIPT_DIR"/build/maps/*.a 2>/dev/null | tr '\n' ' ')
+
 # -L.../xenon/lib/32 belongs to MACHDEP, not LDFLAGS. Drop it and the linker
 # finds the 64-bit newlib, reports "skipping incompatible libc.a" and then
 # "cannot find -lc".
@@ -30,7 +35,11 @@ MACHDEP="-DXENON -m32 -maltivec -fno-pic -mpowerpc64 -mhard-float -L$DK/xenon/li
 
 echo
 echo "=== link ($(ls "$GATE"/*.o | wc -l) objects) ==="
+# --whole-archive for the map overlays: some map objects are reached only
+# through constructors and data tables, never by a symbol the linker is already
+# looking for, so lazy archive semantics would silently drop them.
 if ! xenon-gcc $MACHDEP -n -T "$DK/app.lds" "$GATE"/*.o \
+        -Wl,--whole-archive $MAPLIBS -Wl,--no-whole-archive \
         -L"$DK/usr/lib" -lfat -lxenon -lm \
         -Wl,-Map,"$OUT/xenon.map" -o "$OUT/xenon.debug.elf" 2> "$SCRIPT_DIR/build/link.log"; then
     echo "LINK FAILED - undefined symbols by count:"

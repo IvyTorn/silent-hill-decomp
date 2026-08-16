@@ -41,14 +41,16 @@ extern void SH_DebugLogFlush(void); /* sh_log_xbox.c (not declared in sh_log.h) 
 /* map0_s00 is linked unprefixed (Makefile.nxdk MAP_SRCS). */
 extern s_MapOverlayHdr g_MapOverlayHeader_map0_s00;
 
-/* The 360 build compiles map0_s00 only: the per-map objcopy symbol-prefixing
- * pass (Makefile.nxdk) is not ported yet, so none of the prefixed symbols exist
- * to declare. Leaving the other slots NULL is the mechanism this file already
- * has for an unlinked overlay -- MapXbox_OverlayIsLinked() refuses the
- * transition and MapXbox_LogUnlinkedOverlay() reports it. Fabricating zeroed
- * headers to satisfy the linker instead would make IsLinked() answer TRUE and
- * crash on the first load, which is a worse failure than a refused transition. */
-#ifndef SH_XBOX360_PORT
+/* The 360 now HAS the prefixing pass too (xbox360_port/build_maps.sh), so it
+ * takes the full registry below rather than the map0_s00-only stub it used
+ * while that was missing.
+ *
+ * That stub was not merely incomplete, it stopped the game rendering: with only
+ * map0_s00 linked, MapXbox_OverlayIsLinked() refused every transition, and the
+ * attract demo wants map2_s00 / map1_s01 / map1_s02. No world was ever loaded,
+ * so there was no world geometry in the ordering table -- which looks exactly
+ * like a broken renderer while the renderer is simply being handed nothing.
+ * (Diagnosed first on the PS3 port, which hit the identical wall.) */
 
 /* All other maps are symbol-prefixed by the build (see Makefile.nxdk):
  * g_MapOverlayHeader_<name> -> <name>_g_MapOverlayHeader_<name>. */
@@ -95,7 +97,6 @@ extern s_MapOverlayHdr map7_s01_g_MapOverlayHeader_map7_s01;
 extern s_MapOverlayHdr map7_s02_g_MapOverlayHeader_map7_s02;
 extern s_MapOverlayHdr map7_s03_g_MapOverlayHeader_map7_s03;
 
-#endif /* !SH_XBOX360_PORT */
 
 s_MapOverlayHdr* g_pMapOverlayHeader = &g_MapOverlayHeader_map0_s00;
 
@@ -114,13 +115,6 @@ static const char* const MAP_XBOX_NAMES[MAP_XBOX_COUNT] = {
 };
 
 /* mapx_s00 (idx 43) has no sources in the decomp -> NULL, guard refuses it. */
-#ifdef SH_XBOX360_PORT
-/* Only slot 0 is populated; C zero-fills the rest, which is exactly the "not
- * linked" state OverlayIsLinked() tests for. */
-static s_MapOverlayHdr* const MAP_XBOX_HEADERS[MAP_XBOX_COUNT] = {
-    &g_MapOverlayHeader_map0_s00,
-};
-#else
 static s_MapOverlayHdr* const MAP_XBOX_HEADERS[MAP_XBOX_COUNT] = {
     &g_MapOverlayHeader_map0_s00,
     &map0_s01_g_MapOverlayHeader_map0_s01,
@@ -167,7 +161,6 @@ static s_MapOverlayHdr* const MAP_XBOX_HEADERS[MAP_XBOX_COUNT] = {
     &map7_s03_g_MapOverlayHeader_map7_s03,
     NULL, /* mapx_s00 */
 };
-#endif /* SH_XBOX360_PORT */
 
 /* PC map_registry.c's g_CurrentMapIdx equivalent. */
 static int s_currentMapIdx = 0; /* MapIdx_MAP0_S00 */

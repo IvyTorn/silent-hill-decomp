@@ -178,12 +178,28 @@ sh_scr D_800EC53C[45] = {
 };
 
 /* Offset aliases into the single pool array (exact, no padding).
- * 12B sh_scr entries on i386: [9]=108, [18]=216, [27]=324, [36]=432.
- * Raw names carry the i386 cdecl '_' prefix. */
-__asm__(".global _D_800EC5A8\n.set _D_800EC5A8, _D_800EC53C+108\n");
-__asm__(".global _D_800EC614\n.set _D_800EC614, _D_800EC53C+216\n");
-__asm__(".global _D_800EC680\n.set _D_800EC680, _D_800EC53C+324\n");
-__asm__(".global _D_800EC6EC\n.set _D_800EC6EC, _D_800EC53C+432\n");
+ * 12B sh_scr entries: [9]=108, [18]=216, [27]=324, [36]=432.
+ *
+ * The assembler-level symbol name is ABI-dependent. i386 cdecl prefixes C
+ * symbols with '_'; PowerPC ELF does not. Hardcoding the underscore defined
+ * _D_800EC680 while the C code referenced D_800EC680, so the 360 link failed on
+ * exactly these four (and only these four -- everything else in the port goes
+ * through the compiler, which applies the right convention itself). */
+#if defined(__i386__) || defined(__i386) || defined(_M_IX86)
+#define SH_ASM_SYM "_"
+#else
+#define SH_ASM_SYM ""
+#endif
+
+/* The offsets are element strides baked into text, so a change in entry size
+ * would silently alias the wrong rows. That is already guarded at the top of
+ * this file: _Static_assert(sizeof(sh_scr) == 12). It holds on PPC32 too --
+ * {int, void*, int} is 12 bytes on any 32-bit ABI. */
+
+__asm__(".global " SH_ASM_SYM "D_800EC5A8\n.set " SH_ASM_SYM "D_800EC5A8, " SH_ASM_SYM "D_800EC53C+108\n");
+__asm__(".global " SH_ASM_SYM "D_800EC614\n.set " SH_ASM_SYM "D_800EC614, " SH_ASM_SYM "D_800EC53C+216\n");
+__asm__(".global " SH_ASM_SYM "D_800EC680\n.set " SH_ASM_SYM "D_800EC680, " SH_ASM_SYM "D_800EC53C+324\n");
+__asm__(".global " SH_ASM_SYM "D_800EC6EC\n.set " SH_ASM_SYM "D_800EC6EC, " SH_ASM_SYM "D_800EC53C+432\n");
 
 /* The 3 boss-attack script entry points (func_800DA9F8 copies these into a
  * local and assigns ptr->ptr_0 = D_800CAE30[arg1]). PSX rodata held
