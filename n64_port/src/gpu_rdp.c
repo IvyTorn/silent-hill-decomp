@@ -32,6 +32,9 @@
  */
 #include <libdragon.h>
 
+#include <math.h>
+#include <stdlib.h>
+
 #include "gpu_nv2a.h"
 #include "sh_log.h"
 #include "sh_log_n64.h"
@@ -69,9 +72,34 @@ static int s_curBlend = -1;
 static int s_texEnabled;
 static int s_modeDirty = 1;
 
+/* --------------------------------------------------------------- texture */
+
+/* psx_vram.c hands out exactly what the RDP's TLUT hardware wants: a 256x256
+ * page of 8-bit indices (CI8) and a 256-entry A8R8G8B8 palette. The only
+ * conversion needed is the palette to RGBA16, once per bind.
+ *
+ * TMEM IS 4 KB, and a 256-entry TLUT occupies half of it, so a CI8 tile gets
+ * 2048 bytes. That is the whole difficulty of this port's renderer: the PSX
+ * sampled a 1 MB VRAM freely, and here every primitive's texture has to be
+ * DMA'd in as a sub-rectangle small enough to fit. 64x32 is the largest tile
+ * that fits, so a triangle whose UV span exceeds it falls back to flat shade
+ * rather than drawing with wrong texels -- an honest miss is easier to see and
+ * to count than a subtly wrong picture. */
+#define TEX_PAGE_DIM  256
+#define TEX_TILE_W    64
+#define TEX_TILE_H    32
+
+static const uint8_t*  s_texPage;
+static const uint32_t* s_texPal;
+static uint16_t        s_tlut[256];
+static int             s_tlutDirty;
+static surface_t       s_pageSurf;
+
 /* Census, so a frame that draws nothing can say why. */
 static int s_cnTris;
 static int s_cnDropped;
+static int s_cnTexTris;
+static int s_cnTexTooBig;
 
 static const rdpq_trifmt_t TRIFMT_SH_SHADE = {
     .pos_offset   = 0,
@@ -87,7 +115,16 @@ static void ApplyMode(void)
     s_modeDirty = 0;
 
     rdpq_set_mode_standard();
-    rdpq_mode_combiner(s_texEnabled ? RDPQ_COMBINER_TEX_SHADE : RDPQ_COMBINER_SHADE);
+    if (s_texEnabled && s_texPage != NULL)
+    {
+        rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+        rdpq_mode_tlut(TLUT_RGBA16);
+    }
+    else
+    {
+        rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+        rdpq_mode_tlut(TLUT_NONE);
+    }
 
     switch (s_curBlend)
     {
@@ -108,6 +145,96 @@ static void ApplyMode(void)
     }
 }
 
+static void BuildTlut(void)
+{
+    int i;
+
+    for (i = 0; i < 256; i++)
+    {
+        uint32_t c = s_texPal[i];             /* A8R8G8B8 */
+        s_tlut[i] = (uint16_t)((((c >> 16) & 0xF8) << 8) |
+                               (((c >> 8)  & 0xF8) << 3) |
+                               (((c)       & 0xF8) >> 2) |
+                               ((c >> 31) & 1));
+    }
+}
+
+/* rdpq wants S, T and W contiguous, and ShVertex keeps W up in pos[3], so a
+ * textured vertex cannot be passed through the way an untextured one is. Ten
+ * floats: X Y R G B A S T W. */
+static void StageTexVert(float* out, const ShVertex* v)
+{
+    out[0] = v->pos[0];
+    out[1] = v->pos[1];
+    out[2] = v->col[0];
+    out[3] = v->col[1];
+    out[4] = v->col[2];
+    out[5] = v->col[3];
+    /* UVs arrive normalised: gpu_xbox.c pre-multiplies by PAL_UV_SCALE (1/256)
+     * for the NV2A, which wants 0..1. The RDP wants texels. */
+    out[6] = v->tex[0] * (float)TEX_PAGE_DIM;
+    out[7] = v->tex[1] * (float)TEX_PAGE_DIM;
+    out[8] = v->pos[3];
+}
+
+static const rdpq_trifmt_t TRIFMT_SH_TEX = {
+    .pos_offset   = 0,
+    .shade_offset = 2,
+    .tex_offset   = 6,
+    .tex_tile     = TILE0,
+    .z_offset     = -1,
+};
+
+static void DrawTexturedTri(const ShVertex* a, const ShVertex* b, const ShVertex* c)
+{
+    float va[9], vb[9], vc[9];
+    int   s0, t0, s1, t1;
+
+    StageTexVert(va, a);
+    StageTexVert(vb, b);
+    StageTexVert(vc, c);
+
+    /* The sub-rectangle this triangle actually samples. Floor/ceil rather than
+     * round: a bilinear tap reaches one texel past the corner, and a tile that
+     * is one short shows as a bright seam along the edge. */
+    s0 = (int)floorf(fminf(va[6], fminf(vb[6], vc[6])));
+    t0 = (int)floorf(fminf(va[7], fminf(vb[7], vc[7])));
+    s1 = (int)ceilf (fmaxf(va[6], fmaxf(vb[6], vc[6]))) + 1;
+    t1 = (int)ceilf (fmaxf(va[7], fmaxf(vb[7], vc[7]))) + 1;
+
+    if (s0 < 0) s0 = 0;
+    if (t0 < 0) t0 = 0;
+    if (s1 > TEX_PAGE_DIM) s1 = TEX_PAGE_DIM;
+    if (t1 > TEX_PAGE_DIM) t1 = TEX_PAGE_DIM;
+
+    if (s1 <= s0 || t1 <= t0)
+        return;
+
+    if ((s1 - s0) > TEX_TILE_W || (t1 - t0) > TEX_TILE_H)
+    {
+        /* Does not fit TMEM. Draw it flat rather than with wrong texels: a
+         * missing texture is visible and countable, a wrong one is neither.
+         *
+         * The mode is restored IMMEDIATELY, not deferred through s_modeDirty:
+         * ApplyMode only runs at the top of a flush, so a deferred restore
+         * would leave every following triangle in the same run drawing
+         * untextured too. */
+        s_cnTexTooBig++;
+        rdpq_mode_tlut(TLUT_NONE);
+        rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+        rdpq_triangle(&TRIFMT_SH_SHADE, (const float*)a, (const float*)b, (const float*)c);
+        rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+        rdpq_mode_tlut(TLUT_RGBA16);
+        s_cnTris++;
+        return;
+    }
+
+    rdpq_tex_upload_sub(TILE0, &s_pageSurf, NULL, s0, t0, s1, t1);
+    rdpq_triangle(&TRIFMT_SH_TEX, va, vb, vc);
+    s_cnTris++;
+    s_cnTexTris++;
+}
+
 /* Draw everything accumulated since the last flush under the state that was
  * current while it was written. */
 void GpuNv2a_FlushBatch(void)
@@ -122,16 +249,28 @@ void GpuNv2a_FlushBatch(void)
 
     ApplyMode();
 
-    /* Untextured only for now. Texture binding is recorded but nothing is
-     * uploaded to TMEM yet, so a textured run draws with its shade colour --
-     * flat-lit geometry rather than an invisible one. */
-    for (i = s_runStart; i + 2 < s_batchUsed; i += 3)
+    if (s_texEnabled && s_texPage != NULL)
     {
-        rdpq_triangle(&TRIFMT_SH_SHADE,
-                      (const float*)&s_batch[i],
-                      (const float*)&s_batch[i + 1],
-                      (const float*)&s_batch[i + 2]);
-        s_cnTris++;
+        if (s_tlutDirty)
+        {
+            BuildTlut();
+            rdpq_tex_upload_tlut(s_tlut, 0, 256);
+            s_tlutDirty = 0;
+        }
+
+        for (i = s_runStart; i + 2 < s_batchUsed; i += 3)
+            DrawTexturedTri(&s_batch[i], &s_batch[i + 1], &s_batch[i + 2]);
+    }
+    else
+    {
+        for (i = s_runStart; i + 2 < s_batchUsed; i += 3)
+        {
+            rdpq_triangle(&TRIFMT_SH_SHADE,
+                          (const float*)&s_batch[i],
+                          (const float*)&s_batch[i + 1],
+                          (const float*)&s_batch[i + 2]);
+            s_cnTris++;
+        }
     }
 
     s_runStart = s_batchUsed;
@@ -207,6 +346,8 @@ void GpuNv2a_FrameBegin(void)
     s_runStart   = 0;
     s_cnTris     = 0;
     s_cnDropped  = 0;
+    s_cnTexTris  = 0;
+    s_cnTexTooBig = 0;
     s_modeDirty  = 1;
 
     s_fb = display_get();
@@ -257,8 +398,8 @@ void GpuNv2a_FrameEnd(void)
     g_Nv2aDrawCycles = (int)(get_ticks() - s_frameStart);
 
     if ((g_Nv2aFrameCount & 63) == 0)
-        SH_DBG("[GPU] f%d tris=%d drop=%d %dus",
-               g_Nv2aFrameCount, s_cnTris, s_cnDropped,
+        SH_DBG("[GPU] f%d tris=%d tex=%d big=%d drop=%d %dus",
+               g_Nv2aFrameCount, s_cnTris, s_cnTexTris, s_cnTexTooBig, s_cnDropped,
                (int)TICKS_TO_US((unsigned)g_Nv2aDrawCycles));
 }
 
@@ -292,28 +433,49 @@ void GpuNv2a_BindWhite(void)
         return;
     GpuNv2a_FlushBatch();
     s_texEnabled = 0;
+    s_texPage    = NULL;
+    s_texPal     = NULL;
     s_modeDirty  = 1;
 }
 
-/* Texture binding is RECORDED but nothing reaches TMEM yet. TMEM is 4 KB
- * against the PSX's 1 MB VRAM, so every texture change is a DMA and this needs
- * a real cache plus an OT sort by texture -- the next piece of work, and too
- * big to fake here. Flushing on the change keeps the run boundaries correct so
- * that when uploads land, the batching around them is already right. */
+/* The paletted path, which is where almost everything the game draws arrives:
+ * psx_vram.c decodes a PSX tpage into a 256x256 CI8 index page plus a 256-entry
+ * A8R8G8B8 palette, and those map onto the RDP's own CI8 + TLUT with no
+ * repacking. */
+void GpuNv2a_BindPaletted(const void* page, const void* pal)
+{
+    if (page == s_texPage && pal == s_texPal && s_texEnabled)
+        return;
+
+    GpuNv2a_FlushBatch();
+
+    if (page == NULL || pal == NULL)
+    {
+        s_texEnabled = 0;
+        s_texPage    = NULL;
+        s_texPal     = NULL;
+    }
+    else
+    {
+        if (pal != s_texPal)
+            s_tlutDirty = 1;
+        s_texPage    = (const uint8_t*)page;
+        s_texPal     = (const uint32_t*)pal;
+        s_pageSurf   = surface_make_linear((void*)page, FMT_CI8, TEX_PAGE_DIM, TEX_PAGE_DIM);
+        s_texEnabled = 1;
+    }
+    s_modeDirty = 1;
+}
+
+/* The NON-paletted path: gpu_xbox.c's pre-decoded RGBA images (the minimap and
+ * the hi-res chunk pool). Not wired -- those are 32-bit and would need a
+ * different TMEM budget again, and nothing on the critical path uses them.
+ * Reverting to untextured is honest; drawing them with the previous page's
+ * texels would not be. */
 void GpuNv2a_BindTexture(const void* addr, int w, int h)
 {
     (void)addr; (void)w; (void)h;
-    if (s_texEnabled)
-        return;
-    GpuNv2a_FlushBatch();
-    s_texEnabled = 0;   /* stays off until TMEM upload exists */
-    s_modeDirty  = 1;
-}
-
-void GpuNv2a_BindPaletted(const void* page, const void* pal)
-{
-    (void)page; (void)pal;
-    GpuNv2a_BindTexture(NULL, 0, 0);
+    GpuNv2a_BindPaletted(NULL, NULL);
 }
 
 void GpuNv2a_SetPaletteDmaVariant(int variant) { (void)variant; }
@@ -331,9 +493,17 @@ void GpuNv2a_SetScissor(int x, int y, int w, int h)
     rdpq_set_scissor(x, y, x + w, y + h);
 }
 
-/* Texture memory. Returns NULL rather than a heap block: a caller that gets a
- * pointer here will fill it and expect the texture to appear. */
-void* GpuNv2a_AllocTexMem(int bytes) { (void)bytes; return NULL; }
+/* Decoded-page and palette storage for psx_vram.c's cache. 8-byte aligned: the
+ * RDP's texture DMA wants it, and an unaligned page would make every
+ * rdpq_tex_upload_sub of it a slow path. Sized by PAGE_N/PAL_N over there,
+ * which this port cuts to 4 pages and 16 palettes -- the Xbox's 64 pages is
+ * 4 MB, which is half this machine. */
+void* GpuNv2a_AllocTexMem(int bytes)
+{
+    if (bytes <= 0)
+        return NULL;
+    return memalign(8, (size_t)bytes);
+}
 
 /* Screen freeze and framebuffer readback (pause/save backgrounds, air-screamer
  * distortion, StoreImage). The N64 framebuffer IS in RDRAM and directly

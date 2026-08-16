@@ -84,23 +84,30 @@ int g_XboxLogDiag = 0;
 /* The Xbox gate drops the per-frame probes by fmt PREFIX. fmt is always a
  * compile-time literal at the call site, so a dropped line costs a pointer
  * compare and never formats. */
+/* Every one of these fires once or more PER FRAME. On the 360's HDD they cost a
+ * flush in the render loop; here they cost the on-screen ring, which is only 22
+ * lines deep -- four per-frame probes bury anything useful within one frame,
+ * and the [GPU] census this port depends on never survives to be read. */
+static const char* const s_mutedPrefixes[] = {
+    "[UPD", "[FT]", "[MEM", "[OTS", "[OTT", "[ABR", "[FOGPAD", "[BIDI", "[UIDIAG", "[MCFSM",
+};
+
 int Sh_LogAllow(const char* fmt)
 {
+    unsigned i;
+
     if (g_XboxLogDiag)
         return 1;
-
     if (fmt == NULL)
         return 1;
 
-    if (fmt[0] == '[')
+    for (i = 0; i < sizeof(s_mutedPrefixes) / sizeof(s_mutedPrefixes[0]); i++)
     {
-        switch (fmt[1])
-        {
-            case 'U': if (fmt[2] == 'P') return 0; break;   /* [UPD] */
-            case 'F': if (fmt[2] == 'T') return 0; break;   /* [FT]  */
-            case 'M': if (fmt[2] == 'E') return 0; break;   /* [MEM] */
-            default: break;
-        }
+        const char* p = s_mutedPrefixes[i];
+        const char* f = fmt;
+        while (*p != '\0' && *p == *f) { p++; f++; }
+        if (*p == '\0')
+            return 0;
     }
     return 1;
 }

@@ -63,8 +63,18 @@ typedef struct {
  * would hit the very partial-line eviction cost that made vertex staging slow
  * (7c62ad599). 16-bit direct pages cannot be palettized and still use the ARGB
  * cache below; they are the rare framebuffer-feedback textures. */
+#if defined(SH_N64_PORT)
+/* An N64 has 8 MB in total and roughly 900 KB of heap left after the static
+ * image, so the Xbox's 4 MB of index pages is not a tuning choice here, it is
+ * the whole machine twice over. Four pages is 256 KB and still holds the
+ * working set of a single room's tpages; the LRU in this file was written to
+ * thrash gracefully and now gets to prove it. */
+#define PAGE_N      4                         /* 4 * 64KB = 256KB of index pages */
+#define PAL_N       16                        /* 16 * 1KB  = 16KB of palettes */
+#else
 #define PAGE_N      64                        /* 64 * 64KB = 4MB of index pages */
 #define PAL_N       128                       /* 128 * 1KB  = 128KB of palettes */
+#endif
 #define PAGE_BYTES  (TEX_DIM * TEX_DIM)
 #define PAL_ENTRIES 256
 
