@@ -24,6 +24,7 @@
 
 #include "gpu_nv2a.h"
 #include "sh_log.h"
+#include "sh_log_n64.h"
 
 /* Matches display_init below. The README's memory budget assumes this: at
  * 16bpp double-buffered plus a Z buffer it is ~450 KB of RDRAM, and raising it
@@ -85,7 +86,25 @@ void GpuNv2a_FrameEnd(void)
     if (!s_inited || s_fb == NULL)
         return;
 
-    rdpq_detach_show();
+    if (ShLogN64_ScreenEnabled())
+    {
+        /* detach_WAIT, not detach_show: graphics_draw_text is an immediate CPU
+         * write into the surface while the frame's fills and triangles are
+         * QUEUED RDP commands. Painting before the queue drains puts the text
+         * underneath whatever runs next. */
+        int rows = ShLogN64_Rows();
+        int i;
+
+        rdpq_detach_wait();
+        graphics_set_color(0xFFFFFFFF, 0);
+        for (i = 0; i < rows; i++)
+            graphics_draw_text(s_fb, 4, 4 + (i * 9), ShLogN64_Row(i));
+        display_show(s_fb);
+    }
+    else
+    {
+        rdpq_detach_show();
+    }
     s_fb = NULL;
 
     g_Nv2aFrameCount++;

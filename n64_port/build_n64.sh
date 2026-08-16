@@ -55,9 +55,23 @@ echo "=== rom ==="
 cp "$OUT/sh.elf" "$OUT/sh.elf.stripped"
 mips64-elf-strip -s "$OUT/sh.elf.stripped"
 "$I/bin/n64elfcompress" -o "$OUT" -c 1 "$OUT/sh.elf.stripped"
+# A DragonFS image, when n64_port/filesystem has anything in it. That directory
+# is gitignored and holds disc data, which is not ours to redistribute -- the
+# ROM builds fine without it and simply finds no disc, which is what a build
+# machine should do. Its reason to exist is that an emulator has no flashcart
+# SD card, so rom:/ is the ONLY disc source ares can see. On hardware the SD
+# card wins anyway (see the probe order in cd_n64.c).
+DFS=""
+if [ -d "$SCRIPT_DIR/filesystem" ] && [ -n "$(ls -A "$SCRIPT_DIR/filesystem" 2>/dev/null)" ]; then
+    echo "    [DFS] $(du -sh "$SCRIPT_DIR/filesystem" | cut -f1)"
+    "$I/bin/mkdfs" "$SCRIPT_DIR/build/sh.dfs" "$SCRIPT_DIR/filesystem" >/dev/null
+    DFS="$SCRIPT_DIR/build/sh.dfs"
+fi
+
 rm -f "$OUT/sh.z64"
 "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh.z64" \
-    --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"
+    --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym" \
+    ${DFS:+--align 4096 "$DFS"}
 
 ls -l "$OUT/sh.z64"
 echo
