@@ -127,24 +127,45 @@ static void* LoadFile(const char* path, int* sizeOut)
     return buf;
 }
 
-/* Cheap existence probe, run before Xe is brought up. */
+/* Where the shaders were actually found, so LoadShaders does not have to repeat
+ * the search and the log can name the exact directory. */
+static char s_shaderDir[SH360_PATH_MAX * 2];
+
+static int FileExists(const char* path)
+{
+    FILE* f = fopen(path, "rb");
+    if (!f)
+        return 0;
+    fclose(f);
+    return 1;
+}
+
+/* Probe before Xe is brought up, and say EXACTLY which paths were tried.
+ * "no shaders" previously printed one sentence with no paths in it, which is
+ * useless when the question is whether the files landed in the right folder --
+ * the data root is discovered at runtime, so it is not obvious from the outside
+ * where the game is even looking. */
 static int ShadersPresent(void)
 {
-    char  path[SH360_PATH_MAX * 2];
-    FILE* f;
-    int   ok = 0;
+    /* Beside the disc image first, then the volume root: a stick root is the
+     * other place someone would reasonably drop them. */
+    static const char* const kDirs[2] = { NULL, "uda:/" };
+    char  vs[SH360_PATH_MAX * 2], ps[SH360_PATH_MAX * 2];
+    int   i;
 
-    snprintf(path, sizeof(path), "%svs.vsu", Sh360Fs_DataRoot());
-    f = fopen(path, "rb");
-    if (f) { fclose(f); ok = 1; }
-    if (!ok)
-        return 0;
-
-    ok = 0;
-    snprintf(path, sizeof(path), "%sps.psu", Sh360Fs_DataRoot());
-    f = fopen(path, "rb");
-    if (f) { fclose(f); ok = 1; }
-    return ok;
+    for (i = 0; i < 2; i++) {
+        const char* dir = kDirs[i] ? kDirs[i] : Sh360Fs_DataRoot();
+        snprintf(vs, sizeof(vs), "%svs.vsu", dir);
+        snprintf(ps, sizeof(ps), "%sps.psu", dir);
+        if (FileExists(vs) && FileExists(ps)) {
+            snprintf(s_shaderDir, sizeof(s_shaderDir), "%s", dir);
+            SH_DBG("[GPU] shaders found in '%s'", s_shaderDir);
+            return 1;
+        }
+        SH_DBG("[GPU] no shaders in '%s' (vs=%d ps=%d)",
+               dir, FileExists(vs), FileExists(ps));
+    }
+    return 0;
 }
 
 static int LoadShaders(void)
@@ -153,13 +174,26 @@ static int LoadShaders(void)
     void* vsBlob;
     void* psBlob;
 
-    snprintf(path, sizeof(path), "%svs.vsu", Sh360Fs_DataRoot());
+    snprintf(path, sizeof(path), "%svs.vsu", s_shaderDir);
     vsBlob = LoadFile(path, NULL);
     if (!vsBlob) { SH_DBG("[GPU] no vertex shader at '%s'", path); return 0; }
 
-    snprintf(path, sizeof(path), "%sps.psu", Sh360Fs_DataRoot());
+    snprintf(path, sizeof(path), "%sps.psu", s_shaderDir);
     psBlob = LoadFile(path, NULL);
     if (!psBlob) { SH_DBG("[GPU] no pixel shader at '%s'", path); free(vsBlob); return 0; }
+
+    /* libXenon does not RETURN an error for a bad blob -- Xe_LoadShaderFromMemory
+     * calls Xe_Fatal, which never comes back. Check the magic ourselves so a
+     * wrong or truncated file is a log line rather than a silent lockup. */
+    {
+        const unsigned char* v = (const unsigned char*)vsBlob;
+        const unsigned char* p = (const unsigned char*)psBlob;
+        if (v[0] != 0x10 || v[1] != 0x2a || p[0] != 0x10 || p[1] != 0x2a) {
+            SH_DBG("[GPU] shader magic bad: vs=%02x%02x ps=%02x%02x (want 102a) - not loading",
+                   v[0], v[1], p[0], p[1]);
+            return 0;
+        }
+    }
 
     s_ps = Xe_LoadShaderFromMemory(s_xe, psBlob);
     s_vs = Xe_LoadShaderFromMemory(s_xe, vsBlob);
@@ -278,11 +312,29 @@ static void FlushBatch(void)
             vp[3] =  1.0f;
             Xe_SetVertexShaderConstantF(s_xe, 0, vp, 1);
             Xe_SetVertexShaderConstantF(s_xe, 1, s_texScale, 1);
-            Xe_SetPixelShaderConstantF(s_xe, 0, s_blendConst, 1);
+
+            /* Output alpha = texel.a * x + y. ABR0 on a TEXTURED primitive must
+             * use the texel's own alpha, because psx_vram encodes the PSX STP
+             * bit as 0x80 vs 0xFF and that reproduces per-texel semi-
+             * transparency exactly. Untextured has no such alpha (white is 1.0),
+             * so the weight comes from the constant instead. */
+            {
+                float blend[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
+                int   textured = (s_curTex && s_curTex != s_white);
+                if (s_blendMode == 1) {
+                    if (textured) { blend[0] = 1.0f;  blend[1] = 0.0f;  }
+                    else          { blend[0] = 0.0f;  blend[1] = 0.5f;  }
+                } else if (s_blendMode == 4) {
+                    blend[0] = 0.0f; blend[1] = 0.25f;
+                }
+                Xe_SetPixelShaderConstantF(s_xe, 0, blend, 1);
+            }
         }
         Xe_SetShader(s_xe, SHADER_TYPE_PIXEL,  s_ps, 0);
         Xe_SetShader(s_xe, SHADER_TYPE_VERTEX, s_vs, 0);
-        Xe_SetStreamSource(s_xe, 0, vb, 0, (int)sizeof(ShVertex));
+        /* Stride is in DWORDS, not bytes -- libXenon's own cube example passes
+         * 12 for a 48-byte vertex. Passing sizeof() here drew garbage. */
+        Xe_SetStreamSource(s_xe, 0, vb, 0, (int)(sizeof(ShVertex) / 4));
         Xe_SetTexture(s_xe, 0, s_curTex ? s_curTex : s_white);
         Xe_DrawPrimitive(s_xe, XE_PRIMTYPE_TRIANGLELIST, 0, count / 3);
         s_drawsThisFrame++;
