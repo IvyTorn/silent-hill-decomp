@@ -253,9 +253,30 @@ static void MapXbox_SanitizeHeader(int id, s_MapOverlayHdr* header)
     unsigned nulled = 0;
     unsigned i;
 
+    /* The upper bound is what makes this safe on the 360, and it is not a
+     * heuristic: PSX RAM is 2MB, so a genuine 0x800XXXXX leftover is ALWAYS
+     * below 0x80200000. The old test was the top byte alone, which is fine
+     * where no host pointer starts with 0x80 -- true on PC (64-bit pointers
+     * exceed 0xFFFFFFFF anyway) and true on the Original Xbox (everything sits
+     * under 128MB). It is emphatically NOT true on libXenon, which maps all RAM
+     * at 0x80000000: .text begins at 0x80000000 and .bss ends near 0x819A7A64,
+     * so EVERY linked pointer in a statically-linked overlay header matched and
+     * was zeroed. map2_s00 lost 57 of its 58 pointers, 41 of them function
+     * pointers, and the first call through one of them ended the run.
+     *
+     * Measured over all 43 linked headers: 2708 words matched the old test,
+     * 376 match this one, so 2332 live pointers were being destroyed. The 376
+     * survivors are provably the real thing -- they fall into consecutive,
+     * non-overlapping ascending per-map ranges that end exactly at the 2MB
+     * boundary (map0_s00 0x801120f0.., map0_s01 0x8016a4ec.., ... map1_s04
+     * ..0x801fff7c), which is the PSX data layout and nothing else.
+     *
+     * Narrowing is safe on the other ports rather than merely harmless: a value
+     * they used to null that is >= 0x80200000 could not have been a PSX address
+     * in the first place. */
     for (i = 0; i < count; i++)
     {
-        if ((fields[i] & 0xFF000000) == 0x80000000)
+        if ((fields[i] & 0xFF000000) == 0x80000000 && fields[i] < 0x80200000)
         {
             fields[i] = 0;
             nulled++;
