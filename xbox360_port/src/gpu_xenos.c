@@ -74,6 +74,19 @@ static int         s_texW, s_texH;
 static int         s_blendMode;                  /* 0 = opaque, 1..4 = PSX ABR */
 static int         s_scX, s_scY, s_scW, s_scH;
 
+/* psx_vram hands us a plain ARGB8888 CPU buffer, not a GPU surface, so the
+ * pixels have to be copied into one. A single scratch texture is reused for
+ * every bind: PSX pages are at most 256x256 and batches flush on each bind, so
+ * the previous contents are already drawn by the time it is overwritten. */
+#define GPU_TEX_MAX 256
+static struct XenosSurface* s_tex;
+static struct XenosSurface* s_white;             /* 1x1 opaque, for untextured prims */
+static struct XenosSurface* s_curTex;
+static float                s_texScale[4] = { 1.0f, 1.0f, 0.0f, 0.0f };
+/* Source alpha the current PSX blend mode needs -- see the shader contract in
+ * SetBlendMode. Kept beside the blend state so the two cannot drift. */
+static float                s_blendConst[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+
 int                g_Nv2aFrameCount;
 int                g_Nv2aContentX = 0;
 int                g_Nv2aContentW = 640;
@@ -196,8 +209,34 @@ void GpuNv2a_Init(void)
     SH_DBG("[GPU] Xe up: framebuffer %dx%d", s_fb->width, s_fb->height);
 
     s_ready = LoadShaders();
-    if (!s_ready)
+    if (!s_ready) {
         SH_DBG("[GPU] shaders present but failed to load - count-only mode");
+        return;
+    }
+
+    s_tex   = Xe_CreateTexture(s_xe, GPU_TEX_MAX, GPU_TEX_MAX, 1,
+                               XE_FMT_8888 | XE_FMT_ARGB, 0);
+    s_white = Xe_CreateTexture(s_xe, 1, 1, 1, XE_FMT_8888 | XE_FMT_ARGB, 0);
+    if (!s_tex || !s_white) {
+        SH_DBG("[GPU] texture creation FAILED (tex=%p white=%p)",
+               (void*)s_tex, (void*)s_white);
+        s_ready = 0;
+        return;
+    }
+    {   /* Untextured primitives sample this instead of whatever happened to be
+         * bound, so their vertex colour comes through unmodified. */
+        unsigned* px = (unsigned*)Xe_Surface_LockRect(s_xe, s_white, 0, 0, 1, 1, XE_LOCK_WRITE);
+        if (px)
+            px[0] = 0xFFFFFFFFu;
+        Xe_Surface_Unlock(s_xe, s_white);
+    }
+    s_curTex = s_white;
+
+    /* Depth comes from the ordering table (painter order), not a Z test. */
+    Xe_SetZEnable(s_xe, 0);
+    Xe_SetZWrite(s_xe, 0);
+    Xe_SetCullMode(s_xe, XE_CULL_NONE);
+    SH_DBG("[GPU] textures ready, renderer ARMED");
     SH_DBG("[GPU] xenos backend: %d-vertex pool, %d B/vertex",
            GPU_POOL_VERTS, (int)sizeof(ShVertex));
 }
@@ -229,11 +268,22 @@ static void FlushBatch(void)
         memcpy(dst, &s_pool[s_flushStart], (size_t)count * sizeof(ShVertex));
         Xe_VB_Unlock(s_xe, vb);
 
+        {   /* Screen pixels -> clip space. Y is negated because PSX screen Y
+             * grows downward. Recomputed per flush so a scissor/content-rect
+             * change cannot leave a stale mapping behind. */
+            float vp[4];
+            vp[0] =  2.0f / (float)g_Nv2aContentW;
+            vp[1] = -2.0f / (float)g_Nv2aContentH;
+            vp[2] = -1.0f;
+            vp[3] =  1.0f;
+            Xe_SetVertexShaderConstantF(s_xe, 0, vp, 1);
+            Xe_SetVertexShaderConstantF(s_xe, 1, s_texScale, 1);
+            Xe_SetPixelShaderConstantF(s_xe, 0, s_blendConst, 1);
+        }
         Xe_SetShader(s_xe, SHADER_TYPE_PIXEL,  s_ps, 0);
         Xe_SetShader(s_xe, SHADER_TYPE_VERTEX, s_vs, 0);
         Xe_SetStreamSource(s_xe, 0, vb, 0, (int)sizeof(ShVertex));
-        if (s_texAddr)
-            Xe_SetTexture(s_xe, 0, (struct XenosSurface*)s_texAddr);
+        Xe_SetTexture(s_xe, 0, s_curTex ? s_curTex : s_white);
         Xe_DrawPrimitive(s_xe, XE_PRIMTYPE_TRIANGLELIST, 0, count / 3);
         s_drawsThisFrame++;
     }
@@ -352,14 +402,51 @@ void GpuNv2a_BindTexture(const void* addr, int w, int h)
     s_texW = w;
     s_texH = h;
     s_texBindsThisFrame++;
+
+    if (!s_ready || !addr || w <= 0 || h <= 0) {
+        s_curTex = s_white;
+        return;
+    }
+    if (w > GPU_TEX_MAX || h > GPU_TEX_MAX) {
+        /* Never silently sample a wrong-sized page: fall back to white so the
+         * geometry still shows, and say so once. */
+        static int s_told;
+        if (!s_told) { s_told = 1; SH_DBG("[GPU] texture %dx%d exceeds %d, using white",
+                                          w, h, GPU_TEX_MAX); }
+        s_curTex = s_white;
+        return;
+    }
+
+    {   /* The scratch surface is GPU_TEX_MAX wide, so copy row by row rather
+         * than in one memcpy -- the source is tightly packed at w, the
+         * destination is not. */
+        unsigned* dst = (unsigned*)Xe_Surface_LockRect(s_xe, s_tex, 0, 0, w, h, XE_LOCK_WRITE);
+        if (dst) {
+            const unsigned* src = (const unsigned*)addr;
+            int   pitch = s_tex->wpitch / 4;
+            int   y;
+            for (y = 0; y < h; y++)
+                memcpy(dst + (size_t)y * pitch, src + (size_t)y * w, (size_t)w * 4);
+        }
+        Xe_Surface_Unlock(s_xe, s_tex);
+    }
+    /* UVs arrive in TEXELS, and the shader normalises them against the surface's
+     * real width -- GPU_TEX_MAX, not w, because that is the surface we sample. */
+    s_texScale[0] = 1.0f / (float)GPU_TEX_MAX;
+    s_texScale[1] = 1.0f / (float)GPU_TEX_MAX;
+    s_curTex = s_tex;
 }
 
 void GpuNv2a_BindWhite(void)
 {
-    if (!s_texAddr)
+    if (!s_texAddr && s_curTex == s_white)
         return;
     FlushBatch();
     s_texAddr = NULL;
+    s_curTex  = s_white;
+    /* A 1x1 white page: any UV lands on the single texel. */
+    s_texScale[0] = 0.0f;
+    s_texScale[1] = 0.0f;
 }
 
 /* psx_vram.c really uses this memory, so it must be a genuine allocation.
@@ -387,6 +474,11 @@ void GpuNv2a_SetBlendMode(int mode)
     FlushBatch();
     s_blendMode = mode;
     s_blendChanges++;
+
+    /* Set the shader's output alpha in the SAME place as the blend state, so the
+     * contract below cannot be half-applied. mode 1 needs 0.5, mode 4 needs
+     * 0.25; everything else is opaque as far as alpha is concerned. */
+    s_blendConst[0] = (mode == 1) ? 0.5f : (mode == 4) ? 0.25f : 1.0f;
 
     if (!s_xe)
         return;
