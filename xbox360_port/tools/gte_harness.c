@@ -66,12 +66,21 @@ int main(void)
         for (i = 0; i < 8; i++)
             printf(" [%d]=%08x", i, (unsigned)gteRegs.CP2C.p[i].d);
         printf("\n");
+        /* R33 (p[4]) and H (p[26]) are LONE 16-bit registers and must be read as
+         * .sd, not .sw.l. PAIR aliases a register as a word and as halfwords
+         * whose names encode position, which only holds little-endian; the BE
+         * fix flips the byte views and deliberately leaves the halfword views
+         * alone, so .sw.l on a lone register reads the empty half and prints 0.
+         * Reading these two as .sw.l made the harness report R33=0 H=0 on BE
+         * while RotTransPers was returning the correct answer from the same
+         * registers -- a contradiction that was the diagnostic's fault, not the
+         * GTE's. The paired entries below genuinely are halfword pairs. */
         printf("matrix as GTE sees it: %d %d %d / %d %d %d / %d %d %d\n",
                gteRegs.CP2C.p[0].sw.l, gteRegs.CP2C.p[0].sw.h, gteRegs.CP2C.p[1].sw.l,
                gteRegs.CP2C.p[1].sw.h, gteRegs.CP2C.p[2].sw.l, gteRegs.CP2C.p[2].sw.h,
-               gteRegs.CP2C.p[3].sw.l, gteRegs.CP2C.p[3].sw.h, gteRegs.CP2C.p[4].sw.l);
+               gteRegs.CP2C.p[3].sw.l, gteRegs.CP2C.p[3].sw.h, (int)gteRegs.CP2C.p[4].sd);
         printf("OFX=%d OFY=%d H=%d (expect 320<<16, 240<<16, 256)\n",
-               gteRegs.CP2C.p[24].sd, gteRegs.CP2C.p[25].sd, gteRegs.CP2C.p[26].sw.l);
+               gteRegs.CP2C.p[24].sd, gteRegs.CP2C.p[25].sd, (int)gteRegs.CP2C.p[26].sd);
     }
 
     sz = RotTransPers(&v, &sxy, &p, &flag);
