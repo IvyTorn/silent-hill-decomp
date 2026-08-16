@@ -167,6 +167,20 @@ int main(void)
     SH_DBG("[CFG] config file: %s", cfgPath);
     PcConfig_Load(cfgPath);
 
+    /* MUST run after PcConfig_Load, which is why it is here and not earlier: it
+     * pins the settings whose PC defaults are sized for a desktop
+     * (texpackCacheMb 2048, texpackBudgetMb 6144, globalCharaPool, preloadChunks,
+     * wholeMapExteriors) and the frame cap / PGXP / log gate. Omitting it left
+     * every one of those at its PC value silently -- nothing errors, the console
+     * just tries to behave like a machine with gigabytes.
+     *
+     * The 360 has 512 MB against the Xbox's 64 MB, so some of these pins are
+     * more conservative than this console needs. Relaxing them is a deliberate
+     * later step with its own test, not something to leave un-applied by
+     * accident. */
+    { extern void XboxConfig_ApplyOverrides(void);   /* xbox_compat_globals.c */
+      XboxConfig_ApplyOverrides(); }
+
     /* Fixed-point/GTE sanity before anything depends on it. On a new
      * architecture this is the single most likely thing to be silently wrong,
      * and every transform in the game rides on it. */
