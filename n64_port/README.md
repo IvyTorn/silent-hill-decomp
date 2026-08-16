@@ -10,19 +10,74 @@ answers.
 |---|---|
 | 0 — toolchain + repo | done |
 | 1 — VR4300 compile gate | **green, 199/199** |
-| 2 — link a `.z64`, reach `MainLoop` | **done — boots in ares, runs one frame** |
-| 3 — RDP renderer | not started |
-| 4 — storage: SD card via `fat.h` | **next, and it is what MainLoop is blocked on** |
+| 2 — link a `.z64`, reach `MainLoop` | **done** |
+| 4 — storage (SD card + ROM pack) | **done — reads the disc, past the Konami logo** |
+| 3 — RDP renderer | **next** |
 | 5 — map overlays via libdragon DSO | not started |
 
-Where it stops today: the ROM boots, `main` brings the HAL up, `MainLoop` runs
-exactly one frame, and then blocks. That is the honest consequence of `cd_n64.c`
-reporting failure on every read — there is no disc, so the first load never
-completes. Milestone 4 is the unblock, and it is deliberately ahead of the
-renderer: there is nothing to draw until something can be read.
+Where it is today: the ROM boots, mounts a disc source, reads it, gets through
+the Konami logo and runs the OT walk with real primitives (`prims=11`, 6
+submitted per frame). Nothing appears on screen because `GpuNv2a_EmitTris`
+counts and discards — that is milestone 3, and it is the only thing between
+here and a picture.
 
-Measured image: text 833 KB, data 516 KB, bss 5.0 MB, **6.63 MB total**,
-against 8 MB. ROM 1.28 MB.
+Measured image: text 911 KB, data 521 KB, bss 5.0 MB, **6.6 MB total**, against
+8 MB. ROM 1.3 MB without a pack, 37 MB with the default one.
+
+## Storage
+
+`cd_n64.c` probes two sources, in this order:
+
+| Source | What it is | Limit |
+|---|---|---|
+| `sd:/` | flashcart SD via libdragon's FAT | none in practice — put the 616 MB BIN on it |
+| `rom:/` | DragonFS in the cartridge | 64 MB address window |
+
+SD is probed **first** so a card always beats whatever is baked into the ROM.
+Otherwise a trimmed test image silently shadows the real disc, and the symptom
+is missing files rather than an obvious error.
+
+The disc does not fit a cartridge, and truncating it does not work either —
+`VIN/MAP0_S00.BIN` is at LBA 37551 while `1ST/` starts at 64, so what boot needs
+is spread across the whole thing. `tools/mkdiscpack.py` instead builds a sparse
+pack holding only the sectors the chosen directories occupy, cooked to 2048
+bytes, with an index that preserves the original LBAs so the file table still
+resolves:
+
+```
+python n64_port/tools/mkdiscpack.py "Silent Hill (USA).bin" \
+    n64_port/filesystem/disc.shpak --dirs 1ST,ANIM,TIM,SND,MISC
+```
+
+| `--dirs` | cooked size |
+|---|---|
+| `1ST,ANIM` | 7.8 MB — fast iteration |
+| `1ST,ANIM,TIM,SND,MISC` | 34.1 MB — default; boot, title, audio banks |
+| everything except XA | 77.8 MB — SD only |
+
+XA cannot be packed: Mode-2 Form-2 payloads do not survive the cooked form.
+Streaming audio needs the raw BIN on SD, or the VADPCM conversion that milestone
+6 will do anyway.
+
+`n64_port/filesystem/` is gitignored. It holds disc data, which is not ours to
+redistribute; the ROM builds fine without it and simply finds no disc.
+
+## Debugging
+
+There is no log file on a cartridge, and ares surfaces IS-Viewer only in a GUI
+window a headless run never sees. `g_ShDebugLog` is therefore a `funopen` stream
+that fans out to libdragon's stderr (IS-Viewer, and USB back to `sc64deployer`)
+**and** a ring buffer painted over the frame. `ShLogN64_ScreenEnable(0)` turns
+the on-screen half off once there is a picture worth looking at.
+
+Two things that cost real time and will again:
+
+- **rdpq calls are queued; `graphics_*` are immediate CPU writes.** Painting text
+  before the queue drains puts it underneath whatever runs next. Use
+  `rdpq_detach_wait()`, never `rdpq_detach_show()`, if the CPU is drawing too.
+- **Build with `-g`** or libdragon's on-screen exception handler gives function
+  names with no line numbers, and the frame that matters is usually the inlined
+  one.
 
 ## Base: the Xbox 360 port
 
