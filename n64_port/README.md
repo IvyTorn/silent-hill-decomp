@@ -12,8 +12,12 @@ answers.
 | 1 — VR4300 compile gate | **green, 199/199** |
 | 2 — link a `.z64`, reach `MainLoop` | **done** |
 | 4 — storage (SD card + ROM pack) | **done — reads the disc** |
-| 3 — RDP renderer | **geometry done; textures in, not yet seen on screen** |
-| 5 — map overlays via libdragon DSO | **next** |
+| 3 — RDP renderer | geometry done; **textures all miss TMEM, see below** |
+| 5 — map overlays via libdragon DSO | **done — all 42 build, 2.3 MB** |
+| 6 — save device | **done — SD, or a RAM device (sav:/) as fallback** |
+
+Boot now runs Konami → KCET → AutoLoad → MovieIntro and draws 12 triangles a
+frame.
 
 Where it is today: the ROM boots, mounts a disc source, reads it, draws the
 Konami logo, fades it, walks on through the TIM loads and holds 60 VPS. The
@@ -40,9 +44,42 @@ each triangle uploads its own UV bounding box, and 64×32 is the largest tile
 that fits. Anything larger draws flat-shaded and increments `big=` in the
 `[GPU]` census rather than drawing with wrong texels.
 
-That counter is the number to watch next: if it is high, the fix is splitting
-oversized triangles or dropping to CI4, not raising the tile size — there is
-nowhere for it to go.
+That counter is the number to watch, and it is now measured: **`tris=12 tex=0
+big=8`**. Every textured triangle the boot screens submit exceeds 64×32, so
+nothing has yet been drawn with a texture. That is the next piece of work, and
+the fix is splitting oversized triangles or dropping to CI4 — *not* raising the
+tile size, because there is nowhere for it to go.
+
+### Open
+
+- **`g_Nv2aFrameCount` reads 0 in the census every frame.** Ruled out: guard
+  words either side of it survive (so it is not a ranged wild write), `s_inited`
+  in the same file persists (so the GPU is not re-initialising), and nothing in
+  the tree assigns to it. It matters because `psx_vram.c` keys its page LRU on
+  it. A VR4300 `WatchLo` write-watch never fired — ares appears not to implement
+  the Watch exception, so catching this may need hardware.
+- **124 ms/frame** as measured, but the census is almost certainly measuring the
+  debug overlay rather than the game: 22 rows × 39 characters of
+  `graphics_draw_text` is ~55k CPU-blitted pixels per frame on a 93 MHz CPU.
+  Measure again with `ShLogN64_ScreenEnable(0)` before drawing any conclusion
+  about renderer cost.
+
+### A bug class this target has and no other
+
+A PSX RAM address such as `0x80191834` is **also a valid N64 KSEG0 address**.
+On PC, Xbox or PSP a missed `PSX_ADDR()` remap writes to an unmapped pointer and
+faults immediately; here it lands silently in our `.bss`. Anything that looks
+like memory corrupting itself for no reason should be suspected of this first.
+
+## Save device
+
+`XboxFs_ResolveSaveDir` prefers `sd:/silenthill` (persistent) and falls back to
+`sav:/`, a RAM filesystem in `savefs_n64.c`. Saving works for the session there
+and the data is gone at power-off, which the log says at mount time.
+
+This is not optional. `GameState_KcetLogo_MemCardCheck` loops on "rerun me next
+frame" until the cards report ready, so **with no save location at all the boot
+wedges on the KCET logo forever** and never reaches the title screen.
 
 Measured image: text 911 KB, data 521 KB, bss 5.0 MB, **6.6 MB total**, against
 8 MB. ROM 1.3 MB without a pack, 37 MB with the default one.
