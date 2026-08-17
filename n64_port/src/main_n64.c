@@ -46,6 +46,7 @@ extern void Cd_N64Init(void);        /* cd_n64.c */
 extern void SH_DebugLogInit(void);   /* sh_log_n64.c */
 extern void SH_DebugLogFlush(void);
 extern void Xbox_MemReport(const char* tag);
+extern void Mcard_XboxInit(void);   /* xbox_port/src/mcard_xbox.c */
 
 /* ------------------------------------------------------------- screen */
 
@@ -115,6 +116,15 @@ int main(void)
 
     Sh_Say("cd");
     Cd_N64Init();
+
+    /* PSX kernel events + memory card. NOT optional and not obvious: it is what
+     * resolves the save location, and without it mcard_xbox.c reports no card,
+     * every _card_info delivers EvSpTIMOUT, and GameState_KcetLogo's
+     * MemCardCheck loops on "rerun me next frame" forever. The boot wedges on
+     * the KCET logo and never reaches the title screen. main_psp.c calls this;
+     * omitting it here cost a session. */
+    Sh_Say("memory card");
+    Mcard_XboxInit();
 
     Sh_Say("file table (USA)");
     Fs_InitFileTableForRegion(0 /* Region_USA */);

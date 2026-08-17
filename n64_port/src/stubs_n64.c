@@ -12,7 +12,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <sys/stat.h>
+
 #include "sh_log.h"
+#include "savefs_n64.h"
 
 /* --------------------------------------------------------------- memory */
 
@@ -55,12 +58,43 @@ void Xbox_QuitToDashboard(void)
 
 /* --------------------------------------------------------------- save dir */
 
-/* Not available yet. Saves belong on the Controller Pak (libdragon's cpakfs)
- * or the SD card, and neither is a path. Returning 0 makes the caller's
- * "could not resolve a save location" branch run, which is the truth. */
+/* THIS RETURNING 0 WEDGES THE BOOT, which is not obvious and cost a session to
+ * find. mcard_xbox.c sets s_cardOk from it; with no card every _card_info
+ * delivers EvSpTIMOUT, and GameState_KcetLogo_MemCardCheck loops on "rerun me
+ * next frame" forever waiting for cards that will never report ready. The game
+ * never reaches its title screen.
+ *
+ * So there is always a location. SD first, because saves there survive a power
+ * cycle and can be copied off the card. The RAM device is the fallback, and on
+ * an emulator it is the only one -- ares has no flashcart SD. */
 int XboxFs_ResolveSaveDir(char* out, int outSize)
 {
-    (void)out; (void)outSize;
+    if (!out || outSize <= 0)
+        return 0;
+
+    /* mkdir failing with EEXIST is success; any other failure means the card is
+     * absent or read-only, and the probe below is what actually settles it. */
+    mkdir("sd:/silenthill", 0777);
+    {
+        FILE* probe = fopen("sd:/silenthill/.wtest", "wb");
+        if (probe != NULL)
+        {
+            fclose(probe);
+            remove("sd:/silenthill/.wtest");
+            snprintf(out, (size_t)outSize, "sd:/silenthill");
+            SH_DBG("[MCRD] save location: %s (persistent)", out);
+            return 1;
+        }
+    }
+
+    if (SaveFs_N64Init())
+    {
+        snprintf(out, (size_t)outSize, "sav:");
+        SH_DBG("[MCRD] save location: %s (RAM - saves LOST at power-off)", out);
+        return 1;
+    }
+
+    SH_DBG("[MCRD] NO save location; the KCET-logo card check will not complete");
     return 0;
 }
 
@@ -88,10 +122,18 @@ void Xa_VoiceGapHold(int frames) { (void)frames; }
 /* Not available yet, but decided: libdragon ships an MPEG-1 decoder (mpeg2.h
  * plus RSP YUV blitting in yuv.h), so the STR files get transcoded rather than
  * a codec getting written. Returning without playing lets the game continue to
- * the scene after the movie instead of waiting on a stream that never ends. */
-int FMV_Play(const char* path)
+ * the scene after the movie instead of waiting on a stream that never ends.
+ *
+ * The signature is (int file_idx, int max_frames) -- pc_port/src/fmv/fmv_player.h.
+ * An earlier version here declared it taking a const char* and printed it with
+ * %s, so the FIRST movie the game reached did strlen() on a file index and
+ * died. Nothing warned: the gate suppresses implicit declarations for the
+ * decomp's sake, so a HAL stub whose prototype disagrees with its caller is
+ * only found by running it. */
+int FMV_Play(int file_idx, int max_frames)
 {
-    SH_DBG("[FMV] skipped (no decoder wired yet): %s", path ? path : "?");
+    SH_DBG("[FMV] skipped (no decoder wired yet): file=%d frames=%d",
+           file_idx, max_frames);
     return 0;
 }
 

@@ -346,6 +346,13 @@ void GpuNv2a_FrameBegin(void)
     if (!s_inited)
         GpuNv2a_Init();
 
+    /* Incremented HERE, not in FrameEnd: gpu_xbox.c documents the contract as
+     * "incremented each GpuNv2a_FrameBegin" and psx_vram.c keys its whole
+     * page/palette LRU on it (lastUse == thisFrame decides what may be
+     * evicted). A counter that moves at the wrong end of the frame makes the
+     * cache think every page was touched in the frame it is about to draw. */
+    g_Nv2aFrameCount++;
+
     s_frameStart = get_ticks();
     s_batchUsed  = 0;
     s_runStart   = 0;
@@ -407,8 +414,8 @@ void GpuNv2a_FrameEnd(void)
     }
     s_fb = NULL;
 
-    g_Nv2aFrameCount++;
     g_Nv2aDrawCycles = (int)(get_ticks() - s_frameStart);
+
 
     if ((g_Nv2aFrameCount & 63) == 0)
         SH_DBG("[GPU] f%d tris=%d tex=%d big=%d drop=%d %dus",
