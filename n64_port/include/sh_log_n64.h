@@ -8,7 +8,8 @@
 #ifndef SH_LOG_N64_H
 #define SH_LOG_N64_H
 
-void        ShLogN64_Push(const char* line);
+void        ShLogN64_Push(const char* line);        /* one 39-col row */
+void        ShLogN64_PushWrapped(const char* line); /* a whole line; filtered + wrapped */
 int         ShLogN64_Rows(void);
 const char* ShLogN64_Row(int i);   /* oldest first */
 

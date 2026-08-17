@@ -23,6 +23,10 @@ int   g_ShDebugEchoStdout = 0;
 void (*g_ShOverlayPushLine)(const char*) = NULL;
 void (*g_ShOverlayToastLine)(const char*) = NULL;
 
+/* Log-volume gate; see Sh_LogAllow. Declared here because the ring filter
+ * below also honours it. */
+int g_XboxLogDiag = 0;
+
 /* ------------------------------------------------------- on-screen log */
 
 /* Every other port can read its log back off a disk. This one cannot, and the
@@ -41,6 +45,57 @@ static char s_rows[SH_LOG_ROWS][SH_LOG_COLS];
 static int  s_head;                 /* next row to write */
 static int  s_filled;
 static int  s_screenLog = 1;
+
+/* Dropped from the ON-SCREEN ring only; every one still reaches stderr, so
+ * IS-Viewer and the USB capture keep full fidelity. These are the high-volume
+ * per-load and per-frame lines, and the ring is 22 rows -- three TIM loads bury
+ * the boot summary, the heap report, and the [DSO]/[MAP-LOAD] lines that say
+ * whether an overlay actually came in.
+ *
+ * This lives here rather than in Sh_LogAllow because half of them never go
+ * through SH_DBG at all: fsqueue_3.c writes "[BOOT0/TIM]" with a bare
+ * fprintf(g_ShDebugLog, ...), which no gate on the format string can see. That
+ * is why muting them there had no effect. */
+static const char* const s_ringMuted[] = {
+    "[OTS", "[OTT", "[ABR", "[FOGPAD", "[BIDI", "[UIDIAG",
+    "[MCFSM", "[MCRD", "[BOOT0", "[FSQ", "[UPD", "[FT]",
+};
+
+static int ShLog_RingMuted(const char* line)
+{
+    unsigned i;
+
+    for (i = 0; i < sizeof(s_ringMuted) / sizeof(s_ringMuted[0]); i++)
+    {
+        const char* p = s_ringMuted[i];
+        const char* f = line;
+        while (*p != '\0' && *p == *f) { p++; f++; }
+        if (*p == '\0')
+            return 1;
+    }
+    return 0;
+}
+
+/* One logical line: filtered as a whole, then wrapped across as many 39-column
+ * rows as it needs. */
+void ShLogN64_PushWrapped(const char* line)
+{
+    int len, off;
+
+    if (line == NULL)
+        return;
+    if (!g_XboxLogDiag && ShLog_RingMuted(line))
+        return;
+
+    len = 0;
+    while (line[len] != '\0')
+        len++;
+
+    for (off = 0; off < len; off += SH_LOG_COLS - 1)
+        ShLogN64_Push(line + off);
+    if (len == 0)
+        ShLogN64_Push("");
+}
 
 void ShLogN64_Push(const char* line)
 {
@@ -79,35 +134,32 @@ const char* ShLogN64_Row(int i)
  * HDD's: IS-Viewer and USB are slow enough that a chatty frame shows up as a
  * hitch. Defaults OFF; the essential boot/CD/FS/error lines are not in the
  * gated set, so they log regardless. */
-int g_XboxLogDiag = 0;
 
 /* The Xbox gate drops the per-frame probes by fmt PREFIX. fmt is always a
  * compile-time literal at the call site, so a dropped line costs a pointer
- * compare and never formats. */
-/* Every one of these fires once or more PER FRAME. On the 360's HDD they cost a
- * flush in the render loop; here they cost the on-screen ring, which is only 22
- * lines deep -- four per-frame probes bury anything useful within one frame,
- * and the [GPU] census this port depends on never survives to be read. */
-static const char* const s_mutedPrefixes[] = {
-    "[UPD", "[FT]", "[MEM", "[OTS", "[OTT", "[ABR", "[FOGPAD", "[BIDI", "[UIDIAG", "[MCFSM",
-};
-
+ * compare and never formats.
+ *
+ * Kept SMALL and unchanged from the Xbox's set: anything dropped here is never
+ * emitted at all, on any channel. Choosing what the 22-line SCREEN shows is a
+ * different question, and it is the ring filter's (ShLog_RingMuted) -- which
+ * also catches the lines that never reach this function, because half the
+ * chatty ones write straight to g_ShDebugLog with a bare fprintf. */
 int Sh_LogAllow(const char* fmt)
 {
-    unsigned i;
-
     if (g_XboxLogDiag)
         return 1;
     if (fmt == NULL)
         return 1;
 
-    for (i = 0; i < sizeof(s_mutedPrefixes) / sizeof(s_mutedPrefixes[0]); i++)
+    if (fmt[0] == '[')
     {
-        const char* p = s_mutedPrefixes[i];
-        const char* f = fmt;
-        while (*p != '\0' && *p == *f) { p++; f++; }
-        if (*p == '\0')
-            return 0;
+        switch (fmt[1])
+        {
+            case 'U': if (fmt[2] == 'P') return 0; break;   /* [UPD] */
+            case 'F': if (fmt[2] == 'T') return 0; break;   /* [FT]  */
+            case 'M': if (fmt[2] == 'E' && fmt[3] == 'M' && fmt[4] == ']') return 0; break;
+            default: break;
+        }
     }
     return 1;
 }
@@ -117,7 +169,12 @@ int Sh_LogAllow(const char* fmt)
  * destinations get everything; neither knows about the other. */
 static int ShLog_Write(void* cookie, const char* buf, int len)
 {
-    static char line[SH_LOG_COLS];
+    /* A WHOLE logical line, not a 39-char screen row. The ring filter matches on
+     * a prefix, so it has to see the start of the line -- and a long [OTS] line
+     * chopped into three rows only carries its prefix on the first, which let
+     * every continuation through and buried the screen in exactly the noise the
+     * filter existed to remove. Decide once per line, then wrap for display. */
+    static char line[256];
     static int  n;
     int         i;
 
@@ -125,19 +182,19 @@ static int ShLog_Write(void* cookie, const char* buf, int len)
 
     for (i = 0; i < len; i++)
     {
-        if (buf[i] == '\n' || n == SH_LOG_COLS - 1)
-        {
-            line[n] = '\0';
-            if (n > 0)
-                ShLogN64_Push(line);
-            n = 0;
-            if (buf[i] != '\n')
-                line[n++] = buf[i];
-        }
-        else
+        if (buf[i] != '\n' && n < (int)sizeof(line) - 1)
         {
             line[n++] = buf[i];
+            continue;
         }
+
+        if (buf[i] != '\n')
+            line[n++] = buf[i];
+        line[n] = '\0';
+
+        if (n > 0)
+            ShLogN64_PushWrapped(line);
+        n = 0;
     }
 
     fwrite(buf, 1, (size_t)len, stderr);

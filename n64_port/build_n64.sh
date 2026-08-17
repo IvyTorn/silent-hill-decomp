@@ -22,6 +22,19 @@ SH_OPT="${SH_OPT:--Os -fno-strict-aliasing -fwrapv}" bash "$SCRIPT_DIR/n64_gate.
 
 ls "$GATE"/*.o >/dev/null 2>&1 || { echo "no objects to link"; exit 1; }
 
+# The DSO externs list. n64dso-extern reads the overlays and emits a linker
+# script of EXTERN() directives naming every symbol they import, which forces
+# the main link to KEEP those symbols -- without it --gc-sections strips
+# anything the main executable does not itself call, and the map that needed it
+# fails to bind at dlopen time with no hint as to why.
+DSOS=$(ls "$SCRIPT_DIR"/filesystem/maps/*.dso 2>/dev/null | tr '\n' ' ')
+EXTERNS=""
+if [ -n "$DSOS" ]; then
+    echo "=== dso externs ($(echo $DSOS | wc -w) overlays) ==="
+    "$I/bin/n64dso-extern" -o "$SCRIPT_DIR/build/main.externs" $DSOS
+    EXTERNS="$SCRIPT_DIR/build/main.externs"
+fi
+
 echo
 echo "=== link ($(ls "$GATE"/*.o | wc -l) objects) ==="
 # g++ drives the link even though almost everything is C: libdragon's n64.mk
@@ -30,6 +43,7 @@ echo "=== link ($(ls "$GATE"/*.o | wc -l) objects) ==="
 if ! mips64-elf-g++ -o "$OUT/sh.elf" "$GATE"/*.o -lc -mabi=o64 \
         -Wl,-L"$I/mips64-elf/lib" -Wl,-ldragon -Wl,-lm -Wl,-ldragonsys \
         -Wl,-T"$I/mips64-elf/lib/n64.ld" \
+        ${EXTERNS:+-Wl,-T"$EXTERNS"} \
         -Wl,--gc-sections -Wl,--wrap,__do_global_ctors \
         -Wl,-Map="$SCRIPT_DIR/build/sh.map",--cref 2> "$SCRIPT_DIR/build/link.log"; then
     echo "LINK FAILED"
@@ -52,6 +66,14 @@ mips64-elf-size -G "$OUT/sh.elf"
 echo
 echo "=== rom ==="
 "$I/bin/n64sym" "$OUT/sh.elf" "$OUT/sh.elf.sym"
+# The main symbol table the DSO loader binds overlay imports against. Without it
+# every dlopen resolves nothing and the overlay's first call to shared game code
+# goes to address 0.
+MSYM=""
+if [ -n "$DSOS" ]; then
+    "$I/bin/n64dso-msym" "$OUT/sh.elf" "$OUT/sh.msym"
+    MSYM="$OUT/sh.msym"
+fi
 cp "$OUT/sh.elf" "$OUT/sh.elf.stripped"
 mips64-elf-strip -s "$OUT/sh.elf.stripped"
 "$I/bin/n64elfcompress" -o "$OUT" -c 1 "$OUT/sh.elf.stripped"
@@ -71,6 +93,7 @@ fi
 rm -f "$OUT/sh.z64"
 "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh.z64" \
     --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym" \
+    ${MSYM:+"$MSYM"} \
     ${DFS:+--align 4096 "$DFS"}
 
 ls -l "$OUT/sh.z64"

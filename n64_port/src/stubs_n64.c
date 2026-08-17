@@ -16,19 +16,30 @@
 
 /* --------------------------------------------------------------- memory */
 
-/* Real. get_memory_size() reports 4 MB or 8 MB depending on the Expansion Pak;
- * the free figure is what malloc has left of it after the static image. */
+/* Real, and the numbers that matter most on this port: the heap is whatever is
+ * left of RDRAM after a ~7 MB static image, and everything that fails quietly
+ * on N64 -- the texture cache, the packet arenas, an overlay -- fails by not
+ * getting any. sys_get_heap_stats is libdragon's own accounting rather than an
+ * sbrk guess, which is what the first version of this was and it was wrong.
+ *
+ * Note the [MEMN64] tag: Sh_LogAllow mutes "[MEM", and these lines are the ones
+ * worth never losing. */
 unsigned Xbox_MemFreeKB(void)
 {
-    return (unsigned)(get_memory_size() / 1024) - (unsigned)(((char*)sbrk(0) - (char*)0x80000000) / 1024);
+    heap_stats_t h;
+    sys_get_heap_stats(&h);
+    return (unsigned)((h.total - h.used) / 1024);
 }
 
 void Xbox_MemReport(const char* tag)
 {
-    SH_DBG("[MEM] %s: rdram=%u KB heap_used=%u KB",
+    heap_stats_t h;
+    sys_get_heap_stats(&h);
+    SH_DBG("[MEMN64] %s: rdram=%u KB heap %u/%u KB used, %u KB free",
            tag ? tag : "?",
            (unsigned)(get_memory_size() / 1024),
-           (unsigned)(((char*)sbrk(0) - (char*)0x80000000) / 1024));
+           (unsigned)(h.used / 1024), (unsigned)(h.total / 1024),
+           (unsigned)((h.total - h.used) / 1024));
 }
 
 /* Not available. There is no dashboard, no XMB and no OS to return to: a

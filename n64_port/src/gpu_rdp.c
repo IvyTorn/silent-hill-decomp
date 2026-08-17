@@ -39,6 +39,11 @@
 #include "sh_log.h"
 #include "sh_log_n64.h"
 
+/* 0 while the port has nothing worth looking at. The on-screen log is the only
+ * diagnostic channel a TV or a headless emulator run has, and geometry starts
+ * appearing long before the game reaches anything worth seeing. */
+#define SH_N64_LOG_HIDE_ON_FIRST_TRI 0
+
 /* Matches display_init below. The README's memory budget assumes this. */
 #define SCR_W 320
 #define SCR_H 240
@@ -371,7 +376,15 @@ void GpuNv2a_FrameEnd(void)
     /* The on-screen log exists for when nothing is drawing. The moment the
      * renderer produces a triangle it has done its job and is only in the way,
      * so it stands down permanently -- SH_DBG still reaches IS-Viewer and USB. */
-    if (s_cnTris > 0 && ShLogN64_ScreenEnabled())
+    /* The on-screen log used to stand down as soon as the first triangle was
+     * drawn, on the reasoning that it exists for when nothing is drawing. That
+     * was wrong for this port's actual state: geometry appears long before the
+     * game reaches anything worth looking at, and hiding the log took away the
+     * only diagnostic channel a headless emulator run or a TV has.
+     *
+     * It stays up until something explicitly turns it off. Flip this when there
+     * is a picture worth seeing. */
+    if (SH_N64_LOG_HIDE_ON_FIRST_TRI && s_cnTris > 0 && ShLogN64_ScreenEnabled())
     {
         ShLogN64_ScreenEnable(0);
         SH_DBG("[GPU] first geometry drawn; on-screen log off");

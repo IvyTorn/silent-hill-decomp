@@ -9,11 +9,12 @@
  * 42 map overlays statically because they have the RAM; that is what makes the
  * PSP image 17.7 MB. The N64 does not have it and goes back to what the PSX
  * actually did -- one overlay resident at a time -- through libdragon's DSO
- * loader (dlfcn.h / n64dso). Until that lands, map0_s00 is the only resident
- * one and every other transition is REFUSED rather than followed into a NULL
- * header. A refused transition leaves the player standing still, which is
- * obvious; a followed one dereferences NULL function pointers somewhere far
- * from here.
+ * loader (dso_n64.c, across the include firewall).
+ *
+ * A transition to an overlay that will not load is still REFUSED rather than
+ * followed into a NULL header: a refused transition leaves the player standing
+ * still, which is obvious, while a followed one dereferences NULL function
+ * pointers somewhere far from here.
  */
 #include <string.h>
 
@@ -21,6 +22,7 @@
 #include "bodyprog/bodyprog.h"
 #include "bodyprog/map/map.h"
 #include "sh_log.h"
+#include "map_dso_n64.h"
 
 extern s_MapOverlayHdr g_MapOverlayHeader_map0_s00;
 
@@ -40,14 +42,37 @@ static const char* const MAP_N64_NAMES[MAP_N64_COUNT] = {
     "mapx_s00",
 };
 
-/* Index 0 is the statically linked map0_s00. The rest become entries as the
- * DSO loader fills them in at runtime, which is why this is not const. */
+/* Index 0 is the statically linked map0_s00. The rest are filled in by the DSO
+ * loader at runtime, which is why this is not const. */
 static s_MapOverlayHdr* s_mapHeaders[MAP_N64_COUNT] = {
     &g_MapOverlayHeader_map0_s00,
     /* remainder NULL */
 };
 
 static int s_currentMapIdx = 0; /* MapIdx_MAP0_S00 */
+
+/* Bring an overlay in. Only ONE non-static overlay is resident at a time --
+ * MapDso_Open closes the previous one -- so every other entry has to be
+ * forgotten here, or the registry would keep handing out a header whose code
+ * and data have just been unmapped. That is the PSX's own arrangement; the
+ * ports that keep all 42 resident are the ones doing something unusual. */
+static void MapN64_Open(int id)
+{
+    void* hdr;
+    int   i;
+
+    if (id <= 0 || id >= MAP_N64_COUNT)
+        return;                                  /* 0 is static, never loaded */
+
+    hdr = MapDso_Open(MAP_N64_NAMES[id]);
+    if (hdr == NULL)
+        return;
+
+    for (i = 1; i < MAP_N64_COUNT; i++)
+        s_mapHeaders[i] = NULL;
+
+    s_mapHeaders[id] = (s_MapOverlayHdr*)hdr;
+}
 
 int MapXbox_OverlayIsLinked(int mapIdx)
 {
@@ -113,9 +138,18 @@ void MapRegistry_Load(int id)
 {
     s_MapOverlayHdr* header;
 
-    if (!MapXbox_OverlayIsLinked(id))
+    if (id < 0 || id >= MAP_N64_COUNT)
     {
-        SH_DBG("[MAP-LOAD] MapRegistry_Load(%d)=%s resident=0 - REFUSED (header stays %s)",
+        SH_DBG("[MAP-LOAD] MapRegistry_Load(%d) out of range", id);
+        return;
+    }
+
+    if (s_mapHeaders[id] == NULL)
+        MapN64_Open(id);
+
+    if (s_mapHeaders[id] == NULL)
+    {
+        SH_DBG("[MAP-LOAD] MapRegistry_Load(%d)=%s NOT RESIDENT - REFUSED (header stays %s)",
                id, MapRegistry_GetName(id), MapRegistry_GetName(s_currentMapIdx));
         return;
     }
@@ -124,6 +158,6 @@ void MapRegistry_Load(int id)
     g_pMapOverlayHeader = header;
     s_currentMapIdx     = id;
 
-    SH_DBG("[MAP-LOAD] MapRegistry_Load(%d)=%s resident=1 header=%08x",
+    SH_DBG("[MAP-LOAD] MapRegistry_Load(%d)=%s header=%08x",
            id, MapRegistry_GetName(id), (unsigned)header);
 }

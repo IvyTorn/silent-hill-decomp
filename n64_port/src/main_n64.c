@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "sh_log.h"
+#include "sh_log_n64.h"
 #include "psx_memory.h"   /* PSX_ADDR, PsxMemory_Init -- includes only <stdint.h> */
 
 /* --------------------------------------------------------------- game */
@@ -43,16 +45,22 @@ extern void GpuNv2a_Init(void);      /* gpu_rdp.c -- owns display_init */
 extern void Cd_N64Init(void);        /* cd_n64.c */
 extern void SH_DebugLogInit(void);   /* sh_log_n64.c */
 extern void SH_DebugLogFlush(void);
+extern void Xbox_MemReport(const char* tag);
 
 /* ------------------------------------------------------------- screen */
 
-static int s_line = 0;
-
+/* Paints the whole SH_DBG ring, not just this one message. A hang during boot
+ * happens BEFORE the frame loop exists, so gpu_rdp.c's per-frame painter never
+ * runs and the screen freezes on whatever was last drawn -- one bare line,
+ * which says where we stopped but nothing about why. The ring carries every
+ * SH_DBG the subsystems emitted on the way in, which is the actual evidence. */
 static void Sh_Say(const char* msg)
 {
     surface_t* d;
+    int        rows, i;
 
-    debugf("%s\n", msg);
+    if (msg != NULL)
+        SH_DBG("[BOOT] %s", msg);
 
     d = display_try_get();
     if (d == NULL)
@@ -60,12 +68,12 @@ static void Sh_Say(const char* msg)
 
     graphics_fill_screen(d, graphics_make_color(0x10, 0x00, 0x14, 0xFF));
     graphics_set_color(graphics_make_color(0xC8, 0xC8, 0xD0, 0xFF), 0);
-    graphics_draw_text(d, 8, 8, "SILENT HILL / N64");
-    graphics_draw_text(d, 8, 24 + (s_line * 10), msg);
-    display_show(d);
 
-    if (++s_line > 18)
-        s_line = 0;
+    rows = ShLogN64_Rows();
+    for (i = 0; i < rows; i++)
+        graphics_draw_text(d, 4, 4 + (i * 9), ShLogN64_Row(i));
+
+    display_show(d);
 }
 
 /* --------------------------------------------------------------- data */
@@ -100,6 +108,7 @@ int main(void)
      * two display_get() holders and a frame that never shows. */
     GpuNv2a_Init();
 
+    Xbox_MemReport("after HAL init");
     Sh_Say("boot");
     Sh_Say("psx ram + runtime data");
     Sh_InitGameData();
@@ -120,6 +129,7 @@ int main(void)
     Sh_Say("fs queue");
     Fs_QueueInitialize();
 
+    Xbox_MemReport("before MainLoop");
     Sh_Say("entering MainLoop");
     MainLoop();
 
