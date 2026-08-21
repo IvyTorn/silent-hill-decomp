@@ -44,11 +44,28 @@ extern void PGXP_StoreAddr(void* addr, int slot);
 #undef gte_ldtr_0
 #define gte_ldtr_0() do { CTC2(0, 5); CTC2(0, 6); CTC2(0, 7); } while(0)
 
+/* Packed GTE words are (y<<16)|x -- the PSX convention, equal to a raw word
+ * read of {s16 x,y} ONLY on little-endian. On BE the raw read swapped x/y
+ * into the GTE (and half-swapped rotation rows), which transformed the whole
+ * world to garbage: every screenZ came out ~0 and the depth cull ate all of
+ * it. Composing from fields is value-identical on LE, correct everywhere.
+ * OUTPUT arrays (screenXy_0 etc) STAY in word convention -- FetchScreen
+ * stores the raw value, and the ~87 word-read consumers stand untouched.
+ * Only FIELD access into them uses SH_SXY_VX/VY (5 sites). */
+#define SH_GTE_PAIR16(lo, hi) (((unsigned int)(unsigned short)(hi) << 16) | (unsigned short)(lo))
+#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define SH_SXY_VX(dv) ((dv).vy)
+#define SH_SXY_VY(dv) ((dv).vx)
+#else
+#define SH_SXY_VX(dv) ((dv).vx)
+#define SH_SXY_VY(dv) ((dv).vy)
+#endif
+
 /* gte_SetLightSVector - Load SVECTOR into light matrix rows */
 #undef gte_SetLightSVector
 #define gte_SetLightSVector(p) do { \
     SVECTOR *_sv = (SVECTOR*)(p); \
-    unsigned int _xy = *(unsigned int*)&_sv->vx; \
+    unsigned int _xy = SH_GTE_PAIR16(_sv->vx, _sv->vy); \
     /* MIPS original uses lhu: vz is ZERO-extended so L21 stays 0 even for
      * negative vz (sign-extending put -1 into L21). */ \
     unsigned int _z = (unsigned int)(unsigned short)_sv->vz; \
@@ -75,7 +92,7 @@ static inline unsigned int gte_stIR1_func(void) { return MFC2(9); }
 #undef gte_SetVector0
 #define gte_SetVector0(p) do { \
     SVECTOR *_sv = (SVECTOR*)(p); \
-    unsigned int _xy = *(unsigned int*)&_sv->vx; \
+    unsigned int _xy = SH_GTE_PAIR16(_sv->vx, _sv->vy); \
     unsigned int _z = (unsigned int)_sv->vz; \
     MTC2(_xy, 0); \
     MTC2(_z, 1); \
@@ -100,28 +117,28 @@ static inline unsigned int gte_stIR1_func(void) { return MFC2(9); }
 /* gte_SetRotMatrix_Row0_1 - Load rotation matrix rows 0 and 1 */
 #undef gte_SetRotMatrix_Row0_1
 #define gte_SetRotMatrix_Row0_1(r0) do { \
-    unsigned int *_p = (unsigned int*)(r0); \
-    CTC2(_p[0], 0); \
-    CTC2(_p[1], 1); \
-    CTC2(_p[2], 2); \
+    short *_m = (short*)(r0); \
+    CTC2(SH_GTE_PAIR16(_m[0], _m[1]), 0); \
+    CTC2(SH_GTE_PAIR16(_m[2], _m[3]), 1); \
+    CTC2(SH_GTE_PAIR16(_m[4], _m[5]), 2); \
 } while(0)
 
 /* gte_SetRotMatrix_Row2 - Load rotation matrix row 2 */
 #undef gte_SetRotMatrix_Row2
 #define gte_SetRotMatrix_Row2(r0) do { \
-    unsigned int *_p = (unsigned int*)(r0); \
-    CTC2(_p[3], 3); \
-    CTC2(_p[4], 4); \
+    short *_m = (short*)(r0); \
+    CTC2(SH_GTE_PAIR16(_m[6], _m[7]), 3); \
+    CTC2((unsigned int)(unsigned short)_m[8], 4); \
 } while(0)
 
 /* gte_LoadVector0_1_2_XYZ - Load 3 vectors from xy/z arrays */
 #undef gte_LoadVector0_1_2_XYZ
 #define gte_LoadVector0_1_2_XYZ(xy, z) do { \
-    unsigned int *_xy = (unsigned int*)(xy); \
+    DVECTOR *_dv = (DVECTOR*)(xy); \
     unsigned short *_z = (unsigned short*)(z); \
-    MTC2(_xy[0], 0); MTC2((unsigned int)_z[0], 1); \
-    MTC2(_xy[1], 2); MTC2((unsigned int)_z[1], 3); \
-    MTC2(_xy[2], 4); MTC2((unsigned int)_z[2], 5); \
+    MTC2(SH_GTE_PAIR16(_dv[0].vx, _dv[0].vy), 0); MTC2((unsigned int)_z[0], 1); \
+    MTC2(SH_GTE_PAIR16(_dv[1].vx, _dv[1].vy), 2); MTC2((unsigned int)_z[1], 3); \
+    MTC2(SH_GTE_PAIR16(_dv[2].vx, _dv[2].vy), 4); MTC2((unsigned int)_z[2], 5); \
 } while(0)
 
 /* gte_FetchScreen0_1_2_XYZ - Fetch 3 screen vertices and Z values */
