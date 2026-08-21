@@ -4122,6 +4122,24 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
 #ifdef SH_PC_PORT
                 _dbgPrimDepthFail++;
 #endif
+#ifdef SH_N64_PORT
+                /* TEMP diagnostic: what depth actually failed? */
+                {
+                    static int s_zLog = 0;
+                    if (s_zLog < 4)
+                    {
+                        s_zLog++;
+                        SH_DBG("[MESHD] z=%d,%d,%d avg=%d t9=%d idx=%d,%d,%d",
+                               (int)scratchData->screenZ_168[scratchData->u.s_1.field_0],
+                               (int)scratchData->screenZ_168[scratchData->u.s_1.field_1],
+                               (int)scratchData->screenZ_168[scratchData->u.s_1.field_2],
+                               (int)temp_t4, (int)var_t9,
+                               (int)scratchData->u.s_1.field_0,
+                               (int)scratchData->u.s_1.field_1,
+                               (int)scratchData->u.s_1.field_2);
+                    }
+                }
+#endif
                 continue;
             }
 
@@ -4320,6 +4338,24 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
     }
 #endif
 
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: the per-call counters above were never reported. The
+     * world draws nothing while four chunks sit loaded; these partition the
+     * question: never-called / depth-culled / OOB-culled / passed. */
+    {
+        static int s_accTot, s_accPass, s_accDepth, s_accOob, s_accCalls;
+        s_accTot   += _dbgPrimTotal;
+        s_accPass  += _dbgPrimPass;
+        s_accDepth += _dbgPrimDepthFail;
+        s_accOob   += _dbgPrimOobFail;
+        if ((++s_accCalls & 255) == 0)
+        {
+            SH_DBG("[MESH] calls=%d tot=%d pass=%d depth=%d oob=%d",
+                   s_accCalls, s_accTot, s_accPass, s_accDepth, s_accOob);
+            s_accTot = s_accPass = s_accDepth = s_accOob = 0;
+        }
+    }
+#endif
     GsOUT_PACKET_P = poly.packet;
 }
 
