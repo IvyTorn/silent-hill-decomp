@@ -1,4 +1,5 @@
 #include "game.h"
+#include <stdio.h>
 #include "inline_no_dmpsx.h"
 #ifdef SH_PC_PORT
 #include "pc_config.h"
@@ -337,6 +338,23 @@ void vbSetWorldScreenMatrix(GsCOORDINATE2* coord) // 0x800497E4
     Vw_CoordHierarchyMatrixCompute(coord, &D_800C3868);
     TransposeMatrix(&D_800C3868, &work);
     MulMatrix0(&work, &GsIDMATRIX2, &VbWvsMatrix);
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: latch each stage for the [WVS] census - a nonzero
+     * latch with a zero census read means a later stomp, a zero latch points
+     * at the stage that produced it. hier==4096 identity means COORD_PTR_OK
+     * rejected the coord chain. */
+    {
+        extern int g_N64CamProbe[4];
+        extern int g_N64VbSnap[6];
+        g_N64CamProbe[0]++;
+        g_N64VbSnap[0] = D_800C3868.m[0][0];
+        g_N64VbSnap[1] = D_800C3868.m[2][2];
+        g_N64VbSnap[2] = work.m[0][0];
+        g_N64VbSnap[3] = GsIDMATRIX2.m[0][0];
+        g_N64VbSnap[4] = VbWvsMatrix.m[0][0];
+        g_N64VbSnap[5] = (int)(coord->super != NULL);
+    }
+#endif
 
     VbWvsMatrix.t[2] = Q8(0.0f);
     VbWvsMatrix.t[1] = Q8(0.0f);
@@ -566,6 +584,24 @@ void Vw_CoordToWorldAndViewMatrices(GsCOORDINATE2* rootCoord, MATRIX* worldMat, 
     worldMat->t[2] -= D_800C3868.t[2];
 
     Vw_MultiplyAndTransformMatrix(&VbWvsMatrix, worldMat, viewMat);
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: camera vs composition -- which one is zero? */
+    {
+        static int s_cmLog = 0;
+        if ((s_cmLog++ & 8191) == 0)
+        {
+            extern FILE* g_ShDebugLog;
+            if (g_ShDebugLog)
+                fprintf(g_ShDebugLog,
+                        "[CAM] wvs=%d,%d,%d wvsT2=%d world=%d,%d view=%d,%d vT2=%d\n",
+                        (int)VbWvsMatrix.m[0][0], (int)VbWvsMatrix.m[1][1],
+                        (int)VbWvsMatrix.m[2][2], (int)VbWvsMatrix.t[2],
+                        (int)worldMat->m[0][0], (int)worldMat->m[2][2],
+                        (int)viewMat->m[0][0], (int)viewMat->m[2][2],
+                        (int)viewMat->t[2]);
+        }
+    }
+#endif
     worldMat->t[0] += D_800C3868.t[0];
     worldMat->t[1] += D_800C3868.t[1];
     worldMat->t[2] += D_800C3868.t[2];

@@ -3151,6 +3151,19 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                         modelCoord.workm.t[0] += cellBoundX;
                         modelCoord.workm.t[2] += cellBoundZ;
                         Vw_CoordToWorldAndViewMatrices(&modelCoord, &worldMat, &viewMat);
+#ifdef SH_N64_PORT
+                        /* TEMP diagnostic: where does the zero matrix enter? */
+                        {
+                            static int s_vmLog = 0;
+                            if ((s_vmLog++ & 4095) == 0)
+                                SH_DBG("[VMAT] inst=%d,%d,%d world=%d view=%d vt2=%d",
+                                       (int)modelCoord.workm.m[0][0],
+                                       (int)modelCoord.workm.m[1][1],
+                                       (int)modelCoord.workm.m[2][2],
+                                       (int)worldMat.m[0][0],
+                                       (int)viewMat.m[0][0], (int)viewMat.t[2]);
+                        }
+#endif
                         func_80057090(&modelInfo, ot, arg4, &viewMat, &worldMat, 0);
                     }
                 }

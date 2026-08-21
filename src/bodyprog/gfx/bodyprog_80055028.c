@@ -2022,8 +2022,8 @@ void func_80057658(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
 
         end = &var_t0[scratchData->field_3A0.count];
 
-        mat->m[2][0] = scratchData->screenXy_0[*var_t0].vx - scratchData->field_3AC.vx;
-        mat->m[2][1] = scratchData->screenXy_0[*var_t0].vy - scratchData->field_3AC.vy;
+        mat->m[2][0] = SH_SXY_VX(scratchData->screenXy_0[*var_t0]) - scratchData->field_3AC.vx; /* word-convention array */
+        mat->m[2][1] = SH_SXY_VY(scratchData->screenXy_0[*var_t0]) - scratchData->field_3AC.vy;
         mat->m[2][2] = scratchData->field_18C[*var_t0] - scratchData->field_3AC.vz;
         gte_SetRotMatrix_Row2(mat->m);
 
@@ -2034,8 +2034,8 @@ void func_80057658(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
 
         while (++var_t0 < end)
         {
-            mat->m[2][0] = scratchData->screenXy_0[*var_t0].vx - scratchData->field_3AC.vx;
-            mat->m[2][1] = scratchData->screenXy_0[*var_t0].vy - scratchData->field_3AC.vy;
+            mat->m[2][0] = SH_SXY_VX(scratchData->screenXy_0[*var_t0]) - scratchData->field_3AC.vx; /* word-convention array */
+            mat->m[2][1] = SH_SXY_VY(scratchData->screenXy_0[*var_t0]) - scratchData->field_3AC.vy;
             mat->m[2][2] = scratchData->field_18C[*var_t0] - scratchData->field_3AC.vz;
 
             gte_SetRotMatrix_Row2(mat->m);
@@ -3617,7 +3617,7 @@ void func_80059E34(u32 arg0, s_MeshHeader* meshHdr, s_GteScratchData* scratchDat
         temp_t1 = temp_t0 * 2;
         x0 = temp;
 
-        if (scratchData->screenXy_0[scratchData->field_380.s_0.field_10].vx + temp_t0 >= temp_t1 &&
+        if (SH_SXY_VX(scratchData->screenXy_0[scratchData->field_380.s_0.field_10]) + temp_t0 >= temp_t1 &&
             (s16)x1 + temp_t0 >= temp_t1 &&
             (s16)x2 + temp_t0 >= temp_t1 &&
             (s16)x3 + temp_t0 >= temp_t1)
@@ -3923,6 +3923,18 @@ void func_8005A900(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
 
     if (meshHdr->vertexCount == 0)
     {
+#ifdef SH_N64_PORT
+        /* TEMP diagnostic: vertexCount==0 with primitives is a half-parsed
+         * mesh header -- log the counts to confirm the shape of the damage. */
+        {
+            static int s_evLog = 0;
+            if ((s_evLog++ & 4095) == 0)
+                SH_DBG("[XF0] vc=0 pc=%d nc=%d u3=%d prims=%p xy=%p z=%p",
+                       (int)meshHdr->primitiveCount, (int)meshHdr->normalCount,
+                       (int)meshHdr->unkCount_3, (void*)meshHdr->primitives,
+                       (void*)meshHdr->verticesXy, (void*)meshHdr->verticesZ);
+        }
+#endif
         return;
     }
 
@@ -3947,6 +3959,24 @@ void func_8005A900(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
         inXy  += 3;
         inZ   += 3;
     }
+
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: is this transform even running, and with what? */
+    {
+        static int s_xfLog = 0;
+        if ((s_xfLog++ & 2047) == 0)
+        {
+            SH_DBG("[XF] vc=%d in=(%d,%d,%d) m00=%d m22=%d tz=%d out z=%d,%d xy=%08x",
+                   (int)meshHdr->vertexCount,
+                   (int)meshHdr->verticesXy[0].vx, (int)meshHdr->verticesXy[0].vy,
+                   (int)meshHdr->verticesZ[0],
+                   (int)mat->m[0][0], (int)mat->m[2][2], (int)mat->t[2],
+                   (int)scratchData->screenZ_168[offset],
+                   (int)scratchData->screenZ_168[offset + 1],
+                   (unsigned)*(u32*)&scratchData->screenXy_0[offset]);
+        }
+    }
+#endif
 }
 
 u8 func_8005AA08(s_MeshHeader* meshHdr, s32 arg1, s_GteScratchData2* scratchData) // 0x8005AA08
@@ -4126,9 +4156,8 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                 /* TEMP diagnostic: what depth actually failed? */
                 {
                     static int s_zLog = 0;
-                    if (s_zLog < 4)
+                    if ((s_zLog++ & 2047) == 0)
                     {
-                        s_zLog++;
                         SH_DBG("[MESHD] z=%d,%d,%d avg=%d t9=%d idx=%d,%d,%d",
                                (int)scratchData->screenZ_168[scratchData->u.s_1.field_0],
                                (int)scratchData->screenZ_168[scratchData->u.s_1.field_1],

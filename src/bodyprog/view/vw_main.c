@@ -116,6 +116,10 @@ static inline void Math_MatrixToPosition(VECTOR3* pos, MATRIX* mat)
 
 void vwSetViewInfo(void) // 0x80048D48
 {
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic */
+    { extern int g_N64CamProbe[4]; g_N64CamProbe[1]++; }
+#endif
     vbSetRefView(&vwViewPointInfo.rview);
     Math_MatrixToPosition(&vwViewPointInfo.worldpos, &vwViewPointInfo.vwcoord.workm);
     vwMatrixToAngleYXZ(&vwViewPointInfo.worldang, &vwViewPointInfo.vwcoord.workm);

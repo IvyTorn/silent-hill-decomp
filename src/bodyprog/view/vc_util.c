@@ -15,6 +15,10 @@ extern s32 g_VBlanks;
 
 void vcInitCamera(struct _MapOverlayHdr* map_overlay_ptr, const VECTOR3* chr_pos) // 0x8004004C
 {
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic */
+    { extern int g_N64CamProbe[4]; g_N64CamProbe[3]++; }
+#endif
     g_WorldGfxWork.vcCameraInternalInfo.mv_smooth   = VC_MV_CHASE;
     g_WorldGfxWork.vcCameraInternalInfo.ev_cam_rate = Q12(0.0f);
     g_WorldGfxWork.vcCameraInternalInfo.mode        = 0;
@@ -84,6 +88,10 @@ void Vc_UpdateLookAtPointSetAlt(void) // 0x800401CC
 
 void vcMoveAndSetCamera(bool in_connect_f, bool change_debug_mode, bool for_f, bool back_f, bool right_f, bool left_f, bool up_f, bool down_f) // 0x800401EC
 {
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic */
+    { extern int g_N64CamProbe[4]; g_N64CamProbe[2]++; }
+#endif
     VECTOR3         first_cam_pos; // Q19.12
     VECTOR3         hr_head_pos;   // Q19.12
     s_CollisionSurface     coll;

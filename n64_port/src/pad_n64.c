@@ -89,7 +89,7 @@ void Pad_Poll(void)
 /* 1 = the emulator drives a New Game itself (no human input path in ares).
  * MUST be 0 for hardware: the injector mashes START/CROSS forever, which
  * in-game means constant pausing and dialogue skipping. */
-#define SH_N64_AUTOSTART 0
+#define SH_N64_AUTOSTART 1
 #if SH_N64_AUTOSTART
     /* TEMP diagnostic: drive a real New Game with no human. The emulator runs
      * ~7 game-frames a second, so from ~100 s in, mash START then CROSS on a

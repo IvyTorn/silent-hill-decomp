@@ -42,7 +42,7 @@
 /* 0 while the port has nothing worth looking at. The on-screen log is the only
  * diagnostic channel a TV or a headless emulator run has, and geometry starts
  * appearing long before the game reaches anything worth seeing. */
-#define SH_N64_LOG_HIDE_ON_FIRST_TRI 1
+#define SH_N64_LOG_HIDE_ON_FIRST_TRI 0
 
 /* Matches display_init below. The README's memory budget assumes this. */
 #define SCR_W 320
@@ -552,6 +552,22 @@ void GpuNv2a_FrameEnd(void)
          * see README), and pacing on it makes this line flood every frame. */
         static int s_censusTick = 0;
         if ((s_censusTick++ & 63) == 0)
+        {
+            /* TEMP diagnostic: the camera matrix, from the frame loop so no
+             * game-side sampling phase can hide it. MATRIX is {s16 m[3][3];
+             * s16 pad; s32 t[3]} = 32 bytes; HAL cannot include game.h, so
+             * read it as raw halves/words. */
+            extern short VbWvsMatrix[];
+            extern int   g_N64CamProbe[4]; /* vb,vw,mv,ic call counts */
+            extern int   g_N64VbSnap[6];   /* hier00,hier22,work00,id200,wvs00,super */
+            SH_DBG("[WVS] m00=%d t2=%d cam=%d,%d,%d,%d vb=%d,%d,%d,%d,%d,%d",
+                   (int)VbWvsMatrix[0],
+                   (int)((int*)((char*)VbWvsMatrix + 20))[2],
+                   g_N64CamProbe[0], g_N64CamProbe[1], g_N64CamProbe[2], g_N64CamProbe[3],
+                   g_N64VbSnap[0], g_N64VbSnap[1], g_N64VbSnap[2],
+                   g_N64VbSnap[3], g_N64VbSnap[4], g_N64VbSnap[5]);
+        }
+        if (((s_censusTick - 1) & 63) == 0)
         SH_DBG("[GPU] f%d tris=%d tex=%d split=%d big=%d drop=%d %dus",
                g_Nv2aFrameCount, s_cnTris, s_cnTexTris, s_cnTexSplit, s_cnTexTooBig, s_cnDropped,
                (int)TICKS_TO_US((unsigned)g_Nv2aDrawCycles));
