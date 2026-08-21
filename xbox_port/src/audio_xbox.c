@@ -453,19 +453,33 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
      * network and master maths even with zero live voices, and on this port it
      * runs on the game's own CPU: measured ~100ms per pump in the emulator
      * mixing nothing at all. No live voice, no XA stream and a dry reverb
-     * bus means the output is exactly zeros, so say so and return. Skipped
-     * when reverb is on: the comb/allpass tails keep ringing after the last
-     * voice dies and cutting them would click. XA needs no term here - this
-     * port's Xa_XboxMixInto is a no-op stub. */
+     * bus means the output is exactly zeros, so say so and return.
+     * The game turns reverb ON at SdInit and leaves it on, so a plain
+     * !s_reverbOn test never fires (measured: 63ms pumps at the Konami
+     * logo mixing pure silence). Reverb only matters while its tails still
+     * ring, so track a 2-second tail window from the last live voice: while
+     * any voice is live the window stays pinned; after it drains the wet
+     * network is exactly silent and the pump is a memset. A zero wet mix
+     * skips the window entirely. XA needs no term here - this port's
+     * Xa_XboxMixInto is a no-op stub. */
     {
+        static int s_revTailFrames;
         int live = 0;
         for (i = 0; i < SPU_VOICES; i++)
             if (s_v[i].active) { live = 1; break; }
-        if (!live && !s_reverbOn) {
-            memset(out, 0, (size_t)frames * 4);
-            if (rear)   memset(rear,   0, (size_t)frames * 4);
-            if (cenLfe) memset(cenLfe, 0, (size_t)frames * 4);
-            return;
+        if (live) {
+            s_revTailFrames = OUT_HZ * 2;
+        } else {
+            int revAudible = s_reverbOn && s_wet > 0.0f && s_revTailFrames > 0;
+            if (!revAudible) {
+                memset(out, 0, (size_t)frames * 4);
+                if (rear)   memset(rear,   0, (size_t)frames * 4);
+                if (cenLfe) memset(cenLfe, 0, (size_t)frames * 4);
+                return;
+            }
+            s_revTailFrames -= frames;
+            if (s_revTailFrames < 0)
+                s_revTailFrames = 0;
         }
     }
 #endif
