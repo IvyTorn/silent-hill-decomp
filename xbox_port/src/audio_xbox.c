@@ -41,7 +41,13 @@ void xbox_log(const char* fmt, ...)
 
 #define SPU_RAM_SIZE    0x80000        /* 512 KB PSX SPU RAM */
 #define SPU_VOICES      24
+#if defined(SH_N64_PORT)
+#define OUT_HZ          22050          /* AI rate; halves the CPU mix cost, and
+                                        * every pitch/ADSR step derives from it
+                                        * so time stays correct */
+#else
 #define OUT_HZ          48000          /* AC97/DirectSound output rate */
+#endif
 #define SRC_HZ          44100          /* PSX VAG native rate at pitch=4096 */
 #if defined(SH_N64_PORT)
 /* 24 voices x this many shorts is a whole-VAG decode cache held in RAM, which

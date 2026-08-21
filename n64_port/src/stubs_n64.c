@@ -21,6 +21,12 @@
  * game_main.c, printed by the pad watchdog. */
 const char* g_MlTraceTag = "pre-loop";
 
+/* TEMP diagnostic: camera-ladder call counts, printed by the [WVS] census.
+ * [0]=vbSetWorldScreenMatrix [1]=vwSetViewInfo [2]=vcMoveAndSetCamera
+ * [3]=vcInitCamera */
+int g_N64CamProbe[4];
+int g_N64VbSnap[6];
+
 /* --------------------------------------------------------------- memory */
 
 /* Real, and the numbers that matter most on this port: the heap is whatever is
@@ -104,18 +110,20 @@ int XboxFs_ResolveSaveDir(char* out, int outSize)
 
 /* --------------------------------------------------------------- audio */
 
-/* Not available yet. The N64 has no SPU: mixing is the RSP's job through
- * libdragon's mixer, and the PSX VAG banks have to be transcoded to VADPCM
- * offline before any of it plays. Pumping nothing is honest; the game's own
- * mixer state still advances because SpuInit and the sequencer are shared code
- * that runs regardless. */
-void Audio_XboxPump(void) { }
-
+/* Audio_XboxPump is REAL now - audio_n64.c. What is still missing here is the
+ * XA layer: BGM and cutscene voice are XA streams off the disc image, and no
+ * decoder is wired, so these honestly do nothing yet. */
 void XaPlayer_Play(int fileIdx, int channel, int loop)
 {
     (void)fileIdx; (void)channel; (void)loop;
 }
 void XaPlayer_Stop(void) { }
+/* Per-sample mix hook the SPU mixer calls for the XA stream; adds nothing
+ * until a decoder exists. Signature: xa_xbox.c:433. */
+void Xa_XboxMixInto(int* accL, int* accR, int* accC)
+{
+    (void)accL; (void)accR; (void)accC;
+}
 void XaPlayer_Update(void) { }
 void XaPlayer_SetVolume(int vol) { (void)vol; }
 int  Xa_IsVoiceAudioDraining(void) { return 0; }
