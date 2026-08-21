@@ -3636,10 +3636,20 @@ void func_80059E34(u32 arg0, s_MeshHeader* meshHdr, s_GteScratchData* scratchDat
 #endif
 
         PSX_ST_RGBC(poly, packedColor);
-        *(s32*)&poly->u0 = *(s32*)&prim->field_0;
-        *(s32*)&poly->u1 = ((*(u32*)&prim->field_4 & 0x1FFFFF) | (var_a2 << 16)); // Maybe `field_4` is bitfield
-        *(u16*)&poly->u2 = prim->field_8;
-        *(u16*)&poly->u3 = prim->field_A;
+        /* Was four packed stores -- the last unconverted site of the class that
+         * broke the title fog and the glyphs, and the reason the WORLD drew
+         * nothing: on BE they trap or scramble, and this is the mesh emit for
+         * every map chunk and character. The LE-packed words are rebuilt from
+         * the (now native-endian) prim fields and decomposed by the portable
+         * writers. The original & 0x1FFFFF kept only field_6's low 5 bits,
+         * which on LE is field_6_0's low 5 bits -- a full byte, aligned
+         * identically on both ends. */
+        setUV0ClutWord(poly, (u32)prim->field_0 | ((u32)prim->field_2 << 16));
+        setUV1TPageWord(poly, (u32)prim->field_4
+                              | (((u32)prim->field_6.bits.field_6_0 & 0x1F) << 16)
+                              | ((u32)var_a2 << 16));
+        setUV2Word(poly, prim->field_8);
+        setUV3Word(poly, prim->field_A);
 
         setlen(poly, 9);
 
