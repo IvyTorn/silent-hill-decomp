@@ -4204,6 +4204,19 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                 {
 #ifdef SH_N64_PORT
                     _dbgPrimBackFail++;
+                    /* TEMP diagnostic: r4=0 means degenerate/identical SXY
+                     * (transform collapse); r4<0 for ALL prims means winding
+                     * mirrored somewhere in the projection. */
+                    {
+                        static int s_bfLog = 0;
+                        if ((s_bfLog++ & 2047) == 0)
+                            SH_DBG("[BF] r4=%d xy=%08x,%08x,%08x z=%d",
+                                   (int)r4,
+                                   (unsigned)*(u32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0],
+                                   (unsigned)*(u32*)&scratchData->screenXy_0[scratchData->u.s_1.field_1],
+                                   (unsigned)*(u32*)&scratchData->screenXy_0[scratchData->u.s_1.field_2],
+                                   (int)scratchData->screenZ_168[scratchData->u.s_1.field_0]);
+                    }
 #endif
                     continue;
                 }
