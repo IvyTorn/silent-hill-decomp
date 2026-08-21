@@ -2408,7 +2408,8 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
     {
         if (g_WorldEnvWork.isFogEnabled != 0)
         {
-            if (*(s32*)&scratchData->field_380.s_0.field_C & 0xFFFFFF)
+            /* "any of r,g,b nonzero" -- the raw word read tested g,b,cd on BE. */
+            if (PSX_LD_CVEC(&scratchData->field_380.s_0.field_C) & 0xFFFFFF)
             {
                 poly3 = GsOUT_PACKET_P;
                 poly1  = poly3 + 1;
@@ -2599,10 +2600,10 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
                         gte_dpcl();
                         PSX_ST_RGB(poly3, r3, MFC2(22));
 
-                        *(s32*)&poly3->u0 = *(s32*)&prim->field_0;
-                        *(s32*)&poly3->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
-                        *(u16*)&poly3->u2 = prim->field_8;
-                        *(u16*)&poly3->u3 = prim->field_A;
+                        setUV0ClutWord(poly3, (u32)prim->field_0 | ((u32)prim->field_2 << 16));
+                        setUV1TPageWord(poly3, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16)) & 0xFFFFFF);
+                        setUV2Word(poly3, prim->field_8);
+                        setUV3Word(poly3, prim->field_A);
 
                         setlen(poly3, 12);
                         setlen(poly1, 8);
@@ -2800,10 +2801,10 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
                     gte_dpcl();
                     PSX_ST_RGB(poly3, r3, MFC2(22));
 
-                    *(s32*)&poly3->u0 = *(s32*)&prim->field_0;
-                    *(s32*)&poly3->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
-                    *(u16*)&poly3->u2 = prim->field_8;
-                    *(u16*)&poly3->u3 = prim->field_A;
+                    setUV0ClutWord(poly3, (u32)prim->field_0 | ((u32)prim->field_2 << 16));
+                    setUV1TPageWord(poly3, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16)) & 0xFFFFFF);
+                    setUV2Word(poly3, prim->field_8);
+                    setUV3Word(poly3, prim->field_A);
 
                     setlen(poly3, 12);
 #ifdef SH_PC_PORT
@@ -3010,10 +3011,10 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
                 gte_dpcs();
                 PSX_ST_RGB(poly3, r3, MFC2(22));
 
-                *(s32*)&poly3->u0 = *(s32*)&prim->field_0;
-                *(s32*)&poly3->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
-                *(u16*)&poly3->u2 = prim->field_8;
-                *(u16*)&poly3->u3 = prim->field_A;
+                setUV0ClutWord(poly3, (u32)prim->field_0 | ((u32)prim->field_2 << 16));
+                setUV1TPageWord(poly3, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16)) & 0xFFFFFF);
+                setUV2Word(poly3, prim->field_8);
+                setUV3Word(poly3, prim->field_A);
 
                 setlen(poly3, 12);
                 setlen(poly2, 8);
@@ -3254,10 +3255,10 @@ __block1530:
                 PSX_ST_RGB(poly0, r3, 0x3C000000);
             }
 
-            *(s32*)&poly0->u0 = *(s32*)&prim->field_0;
-            *(s32*)&poly0->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
-            *(u16*)&poly0->u2 = prim->field_8;
-            *(u16*)&poly0->u3 = prim->field_A;
+            setUV0ClutWord(poly0, (u32)prim->field_0 | ((u32)prim->field_2 << 16));
+            setUV1TPageWord(poly0, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16)) & 0xFFFFFF);
+            setUV2Word(poly0, prim->field_8);
+            setUV3Word(poly0, prim->field_A);
 
 #ifdef SH_PC_PORT
             /* PSX command byte 0x3C lands in p1/p2/p3 which PsyCross reads as
@@ -3435,12 +3436,12 @@ __block19CC:
                 scratchData->field_380.s_0.field_12, scratchData->field_380.s_0.field_13);
 #endif
 
-            *(s32*)&poly4->r0 = *(s32*)&scratchData->field_380.s_0.field_8;
+            PSX_ST_RGBC(poly4, PSX_LD_CVEC(&scratchData->field_380.s_0.field_8));
 
-            *(s32*)&poly4->u0 = *(s32*)&prim->field_0;
-            *(s32*)&poly4->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
-            *(u16*)&poly4->u2 = prim->field_8;
-            *(u16*)&poly4->u3 = prim->field_A;
+            setUV0ClutWord(poly4, (u32)prim->field_0 | ((u32)prim->field_2 << 16));
+            setUV1TPageWord(poly4, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16)) & 0xFFFFFF);
+            setUV2Word(poly4, prim->field_8);
+            setUV3Word(poly4, prim->field_A);
 
             setlen(poly4, 9);
 
@@ -4208,35 +4209,55 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
             }
 #endif
 
-            *(s32*)&poly.gt3->x0 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0];
-            *(s32*)&poly.gt3->x1 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_1];
-            *(s32*)&poly.gt3->x2 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_2];
+            /* The gouraud twin of the packed-store class fixed at the FT4
+             * emitter above: raw word stores into r0/x0/u0. On BE the r0
+             * quartet is declared code-first, so &r0 is byte 11 -- the word
+             * store is misaligned BY LAYOUT and traps on MIPS (the first
+             * crash the GTE fix uncovered). XY words were silently x/y
+             * swapped, UV words scrambled. Same treatment: read the packed
+             * source words, test, then decompose through the portable
+             * writers. */
+            {
+                s32 xy0 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0];
+                s32 xy1 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_1];
+                s32 xy2 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_2];
 
 #ifdef SH_PC_PORT
-            if (VERTEX_OOB(*(s32*)&poly.gt3->x0) || VERTEX_OOB(*(s32*)&poly.gt3->x1) || VERTEX_OOB(*(s32*)&poly.gt3->x2)) {
-                _dbgPrimOobFail++;
-                continue;
+                if (VERTEX_OOB(xy0) || VERTEX_OOB(xy1) || VERTEX_OOB(xy2)) {
+                    _dbgPrimOobFail++;
+                    continue;
+                }
+#endif
+                PSX_ST_XY(poly.gt3, x0, xy0);
+                PSX_ST_XY(poly.gt3, x1, xy1);
+                PSX_ST_XY(poly.gt3, x2, xy2);
             }
+#ifdef SH_PC_PORT
             SH_PGXP_PROP3(scratchData, poly.gt3,
                 scratchData->u.s_1.field_0, scratchData->u.s_1.field_1, scratchData->u.s_1.field_2);
 #endif
 
             if (var_a3 != 0)
             {
-                *(s32*)&poly.gt3->r0 = *(s32*)&scratchData->field_21C[scratchData->u.s_1.field_4];
-                *(s32*)&poly.gt3->r1 = *(s32*)&scratchData->field_21C[scratchData->u.s_1.field_5];
-                *(s32*)&poly.gt3->r2 = *(s32*)&scratchData->field_21C[scratchData->u.s_1.field_6];
+                PSX_ST_RGBC(poly.gt3,    PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_4]));
+                PSX_ST_RGB(poly.gt3, r1, PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_5]));
+                PSX_ST_RGB(poly.gt3, r2, PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_6]));
             }
             else
             {
-                *(s32*)&poly.gt3->r0 = *(s32*)&poly.gt3->r1 = *(s32*)&poly.gt3->r2 = *(s32*)&scratchData->field_3D8;
+                u32 flatC = PSX_LD_CVEC(&scratchData->field_3D8);
+                PSX_ST_RGBC(poly.gt3, flatC);
+                PSX_ST_RGB(poly.gt3, r1, flatC);
+                PSX_ST_RGB(poly.gt3, r2, flatC);
             }
 
             poly.gt3->code = (prim->field_6.bits.isTransparent * 2) | 0x34; /* was: (flags >> 15) * 2 */
 
-            *(s32*)&poly.gt3->u0 = *(s32*)&prim->field_0 + scratchData->u.s_1.field_8;
-            *(s32*)&poly.gt3->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
-            *(u16*)&poly.gt3->u2 = prim->field_8;
+            setUV0ClutWord(poly.gt3, ((u32)prim->field_0 | ((u32)prim->field_2 << 16))
+                                     + (u32)scratchData->u.s_1.field_8);
+            setUV1TPageWord(poly.gt3, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16))
+                                      & 0xFFFFFF);
+            setUV2Word(poly.gt3, prim->field_8);
 
 #ifdef SH_PC_PORT
             /* Encode per-vertex fog so the shader can blend toward fog color
@@ -4305,17 +4326,26 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
             }
 #endif
 
-            *(s32*)&poly.gt4->x0 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0];
-            *(s32*)&poly.gt4->x1 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_1];
-            *(s32*)&poly.gt4->x2 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_2];
-            *(s32*)&poly.gt4->x3 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_3];
+            /* Same portable-store conversion as the GT3 branch above. */
+            {
+                s32 xy0 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0];
+                s32 xy1 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_1];
+                s32 xy2 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_2];
+                s32 xy3 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_3];
 
 #ifdef SH_PC_PORT
-            if (VERTEX_OOB(*(s32*)&poly.gt4->x0) || VERTEX_OOB(*(s32*)&poly.gt4->x1) ||
-                VERTEX_OOB(*(s32*)&poly.gt4->x2) || VERTEX_OOB(*(s32*)&poly.gt4->x3)) {
-                _dbgPrimOobFail++;
-                continue;
+                if (VERTEX_OOB(xy0) || VERTEX_OOB(xy1) ||
+                    VERTEX_OOB(xy2) || VERTEX_OOB(xy3)) {
+                    _dbgPrimOobFail++;
+                    continue;
+                }
+#endif
+                PSX_ST_XY(poly.gt4, x0, xy0);
+                PSX_ST_XY(poly.gt4, x1, xy1);
+                PSX_ST_XY(poly.gt4, x2, xy2);
+                PSX_ST_XY(poly.gt4, x3, xy3);
             }
+#ifdef SH_PC_PORT
             SH_PGXP_PROP4(scratchData, poly.gt4,
                 scratchData->u.s_1.field_0, scratchData->u.s_1.field_1,
                 scratchData->u.s_1.field_2, scratchData->u.s_1.field_3);
@@ -4323,22 +4353,28 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
 
             if (var_a3 != 0)
             {
-                *(s32*)&poly.gt4->r0 = *(s32*)&scratchData->field_21C[scratchData->u.s_1.field_4];
-                *(s32*)&poly.gt4->r1 = *(s32*)&scratchData->field_21C[scratchData->u.s_1.field_5];
-                *(s32*)&poly.gt4->r2 = *(s32*)&scratchData->field_21C[scratchData->u.s_1.field_6];
-                *(s32*)&poly.gt4->r3 = *(s32*)&scratchData->field_21C[scratchData->u.s_1.field_7];
+                PSX_ST_RGBC(poly.gt4,    PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_4]));
+                PSX_ST_RGB(poly.gt4, r1, PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_5]));
+                PSX_ST_RGB(poly.gt4, r2, PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_6]));
+                PSX_ST_RGB(poly.gt4, r3, PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_7]));
             }
             else
             {
-                *(s32*)&poly.gt4->r0 = *(s32*)&poly.gt4->r1 = *(s32*)&poly.gt4->r2 = *(s32*)&poly.gt4->r3 = *(s32*)&scratchData->field_3D8;
+                u32 flatC = PSX_LD_CVEC(&scratchData->field_3D8);
+                PSX_ST_RGBC(poly.gt4, flatC);
+                PSX_ST_RGB(poly.gt4, r1, flatC);
+                PSX_ST_RGB(poly.gt4, r2, flatC);
+                PSX_ST_RGB(poly.gt4, r3, flatC);
             }
 
             poly.gt4->code = (prim->field_6.bits.isTransparent * 2) | 0x3C; /* was: (flags >> 15) * 2 */
 
-            *(s32*)&poly.gt4->u0 = *(s32*)&prim->field_0 + scratchData->u.s_1.field_8;
-            *(s32*)&poly.gt4->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
-            *(u16*)&poly.gt4->u2 = prim->field_8;
-            *(u16*)&poly.gt4->u3 = prim->field_A;
+            setUV0ClutWord(poly.gt4, ((u32)prim->field_0 | ((u32)prim->field_2 << 16))
+                                     + (u32)scratchData->u.s_1.field_8);
+            setUV1TPageWord(poly.gt4, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16))
+                                      & 0xFFFFFF);
+            setUV2Word(poly.gt4, prim->field_8);
+            setUV3Word(poly.gt4, prim->field_A);
 
 #ifdef SH_PC_PORT
             /* Encode per-vertex fog. PsyCross GT4 reads v0 fog from pad2,
@@ -4921,10 +4957,10 @@ void Gfx_BillboardDraw(s32 arg0, q19_12 posX, q19_12 posY, q19_12 posZ, GsOT* ot
             s32 clut  = 0x8C;
             temp_lo_2 = Q12(sp498) / temp_a0;
 
-            *(s32*)&poly_gt4->r0 = *(s32*)&sp58[0];
-            *(s32*)&poly_gt4->r1 = *(s32*)&sp58[1];
-            *(s32*)&poly_gt4->r2 = *(s32*)&sp58[2];
-            temp_a0              = *(s32*)&sp58[3];
+            PSX_ST_RGBC(poly_gt4,    PSX_LD_CVEC(&sp58[0]));
+            PSX_ST_RGB(poly_gt4, r1, PSX_LD_CVEC(&sp58[1]));
+            PSX_ST_RGB(poly_gt4, r2, PSX_LD_CVEC(&sp58[2]));
+            temp_a0              = (s32)PSX_LD_CVEC(&sp58[3]);
 
             do {} while (0); // @hack
 
@@ -4934,10 +4970,10 @@ void Gfx_BillboardDraw(s32 arg0, q19_12 posX, q19_12 posY, q19_12 posZ, GsOT* ot
 
             poly_gt4->clut       = clut;
             PSX_ST_RGB(poly_gt4, r3, temp_a0);
-            *(s16*)&poly_gt4->u0 = *(s16*)&temp_fp->field_8;
-            *(s16*)&poly_gt4->u1 = sp4A0;
-            *(s16*)&poly_gt4->u2 = sp4A8;
-            *(s16*)&poly_gt4->u3 = *(s16*)&temp_fp->field_A;
+            poly_gt4->u0 = (u8)(temp_fp->field_8 & 0xFF);  poly_gt4->v0 = (u8)((u16)temp_fp->field_8 >> 8);
+            poly_gt4->u1 = (u8)(sp4A0 & 0xFF);             poly_gt4->v1 = (u8)((u16)sp4A0 >> 8);
+            poly_gt4->u2 = (u8)(sp4A8 & 0xFF);             poly_gt4->v2 = (u8)((u16)sp4A8 >> 8);
+            poly_gt4->u3 = (u8)(temp_fp->field_A & 0xFF);  poly_gt4->v3 = (u8)((u16)temp_fp->field_A >> 8);
 
             temp_a0_2 = Q12_MULT(curPtr->field_8, temp_lo_2);
             temp_v1_4 = Q12_MULT(curPtr->field_6, temp_lo_2);
