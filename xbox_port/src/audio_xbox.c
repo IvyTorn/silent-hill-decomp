@@ -448,6 +448,28 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
         return;
     }
 
+#if defined(SH_N64_PORT)
+    /* Total-silence fast path. The per-sample loop below runs the reverb
+     * network and master maths even with zero live voices, and on this port it
+     * runs on the game's own CPU: measured ~100ms per pump in the emulator
+     * mixing nothing at all. No live voice, no XA stream and a dry reverb
+     * bus means the output is exactly zeros, so say so and return. Skipped
+     * when reverb is on: the comb/allpass tails keep ringing after the last
+     * voice dies and cutting them would click. XA needs no term here - this
+     * port's Xa_XboxMixInto is a no-op stub. */
+    {
+        int live = 0;
+        for (i = 0; i < SPU_VOICES; i++)
+            if (s_v[i].active) { live = 1; break; }
+        if (!live && !s_reverbOn) {
+            memset(out, 0, (size_t)frames * 4);
+            if (rear)   memset(rear,   0, (size_t)frames * 4);
+            if (cenLfe) memset(cenLfe, 0, (size_t)frames * 4);
+            return;
+        }
+    }
+#endif
+
     const double envRate = (double)SRC_HZ / (double)OUT_HZ;
 
     for (f = 0; f < frames; f++) {
