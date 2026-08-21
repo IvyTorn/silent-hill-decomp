@@ -279,13 +279,21 @@ int CdRead(int sectors, unsigned long* buf, int mode)
 
             if (idx < 0)
             {
+                /* Zero-fill and COUNT IT DONE rather than short-read: a short
+                 * read stalls the FS queue and the caller waits forever (the
+                 * SND-less diagnostic pack hung the map0 boot exactly there,
+                 * silently, for 28 minutes). A zeroed sector gives the parser
+                 * something well-formed enough to reject; audio from a missing
+                 * VAB is silence, not a wedge. Warn once per streak. */
                 if (!s_warned)
                 {
                     s_warned = 1;
-                    SH_DBG("[CD] lba %d not in pack - rebuild with more --dirs",
+                    SH_DBG("[CD] lba %d not in pack - zero-filled (rebuild with more --dirs for real data)",
                            s_curSector + done);
                 }
-                break;
+                memset(dst + (size_t)done * BIN_DATA_SIZE, 0, BIN_DATA_SIZE);
+                done++;
+                continue;
             }
 
             if (fseek(s_bin, (long)s_packDataOffset + idx * BIN_DATA_SIZE, SEEK_SET) != 0)
