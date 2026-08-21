@@ -1285,7 +1285,16 @@ void DrawOTag(u_long* p)
     if (g_Nv2aFrameCount != s_cnFrame) {
         /* Every 120 frames so the render-phase split lines up 1:1 with [FT]'s
          * window and the two can be read against each other. */
+#if defined(SH_N64_PORT)
+        /* g_Nv2aFrameCount reads 0 here on this port (open bug), which turned
+         * the %120 pacing into EVERY FRAME -- and with the log stream carried
+         * over ISViewer that throttled the whole game to ~1fps in ares. Pace
+         * on a local tick instead until the frame counter is fixed. */
+        static int s_n64CensusTick = 0;
+        if ((s_n64CensusTick++ % 120) == 0 && s_cnPrims > 0) {
+#else
         if (s_cnFrame >= 0 && (s_cnFrame % 120) == 0 && s_cnPrims > 0) {
+#endif
             SH_DBG("[OTS] f=%d calls=%d n0=%d n1=%d prims=%d bb=%d,%d,%d,%d",
                    s_cnFrame, s_cnCallsMax, s_cnNodes[0], s_cnNodes[1], s_cnPrims,
                    s_bbMinX, s_bbMaxX, s_bbMinY, s_bbMaxY);
