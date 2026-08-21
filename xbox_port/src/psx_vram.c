@@ -860,6 +860,41 @@ uint32_t* PsxVram_GetTexture(int tpage, int clut)
  * still-referenced page straight to the next decode. -2 never matches a lookup,
  * and zeroing hits makes it the preferred victim through the NORMAL path, where
  * the lastUse/seq in-flight guard still applies. */
+#if defined(SH_N64_PORT)
+/* Map transition: hand the paletted cache's heap (PAGE_N*64KB + PAL_N*1KB,
+ * ~272KB at this port's sizes) back to the allocator so the next map's DSO has
+ * room to dlopen. Everything re-allocates lazily on the next textured draw via
+ * the s_palPathReady init pass, and a slot whose re-alloc fails is simply
+ * skipped by every scan here -- fewer slots means decode thrash, not a crash.
+ * The RDP may still be reading a page out of RDRAM, so drain it first; the
+ * bind memo in gpu_rdp.c would otherwise keep a dangling pointer, so clear it
+ * through the NULL bind. */
+void PsxVram_N64ReleaseCache(void)
+{
+    extern void GpuNv2a_DrainGpu(void);
+    extern void GpuNv2a_BindPaletted(const void* page, const void* pal);
+    int i;
+
+    if (!s_palPathReady)
+        return;
+    GpuNv2a_DrainGpu();
+    GpuNv2a_BindPaletted(NULL, NULL);
+    for (i = 0; i < PAGE_N; i++) {
+        free(s_pages[i].data);
+        s_pages[i].data = NULL;
+        s_pages[i].key  = -1;
+    }
+    for (i = 0; i < PAL_N; i++) {
+        free(s_pals[i].data);
+        s_pals[i].data = NULL;
+        s_pals[i].key  = -1;
+    }
+    s_palPathReady = 0;
+    SH_DBG("[VRAM] paletted cache released for overlay load, free=%uKB",
+           Xbox_MemFreeKB());
+}
+#endif
+
 void PsxVram_InvalidateResidentSlot(int slot)
 {
     const int pageKey = 0x40000000 | slot;

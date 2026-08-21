@@ -66,6 +66,17 @@ void* MapDso_Open(const char* mapName)
         s_openName[0] = '\0';
     }
 
+    /* The paletted texture cache holds ~272KB of heap and the larger overlays
+     * need 70-118KB against a two-digit free figure; release it before asking
+     * dlopen for that much. It re-fills lazily on the next textured draw.
+     * Unconditional, NOT inside the close-previous block: the very first DSO
+     * load (leaving the statically-linked map0_s00) has no previous handle and
+     * is exactly the one that was failing. */
+    {
+        extern void PsxVram_N64ReleaseCache(void);
+        PsxVram_N64ReleaseCache();
+    }
+
     for (i = 0; i < sizeof(s_dirs) / sizeof(s_dirs[0]); i++)
     {
         snprintf(path, sizeof(path), "%s/%s.dso", s_dirs[i], mapName);
