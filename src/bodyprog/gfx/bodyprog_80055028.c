@@ -3754,6 +3754,20 @@ void func_8005A21C(s_ModelInfo* modelInfo, GsOT_TAG* otTag, bool arg2, MATRIX* m
     vertOffset   = modelHdr->vertexOffset;
     normalOffset = modelHdr->normalOffset;
 
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: one real composed model-view matrix. Rotation entries
+     * must stay inside ~+/-4096 and roughly orthonormal; t is the model's
+     * view-space position. */
+    {
+        static int s_mvLog = 0;
+        if ((s_mvLog++ & 1023) == 0)
+            SH_DBG("[MV] r=%d,%d,%d/%d,%d,%d/%d,%d,%d t=%d,%d,%d",
+                   (int)mat->m[0][0], (int)mat->m[0][1], (int)mat->m[0][2],
+                   (int)mat->m[1][0], (int)mat->m[1][1], (int)mat->m[1][2],
+                   (int)mat->m[2][0], (int)mat->m[2][1], (int)mat->m[2][2],
+                   (int)mat->t[0], (int)mat->t[1], (int)mat->t[2]);
+    }
+#endif
     for (curMeshHdr = modelHdr->meshHdrs; curMeshHdr < &modelHdr->meshHdrs[modelHdr->meshCount]; curMeshHdr++)
     {
         func_8005A900(curMeshHdr, vertOffset, scratchData, mat);
@@ -3980,6 +3994,18 @@ void func_8005A900(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
                    (int)(short)(CFC2(0) & 0xFFFF), (unsigned)MFC2(0),
                    (int)MFC2_S(9), (int)MFC2_S(25),
                    (int)((int)CFC2(24) >> 16), (int)(CFC2(26) & 0xFFFF));
+            /* Identity x identity through the same GTE compose the camera and
+             * every model matrix go through. PASS = diag 4096 and t=(7,8,9). */
+            {
+                MATRIX ia = {{{4096, 0, 0}, {0, 4096, 0}, {0, 0, 4096}}, {7, 8, 9}};
+                MATRIX ib = {{{4096, 0, 0}, {0, 4096, 0}, {0, 0, 4096}}, {1, 2, 3}};
+                MATRIX io;
+                Vw_MultiplyAndTransformMatrix(&ia, &ib, &io);
+                SH_DBG("[UT3] m=%d,%d,%d off=%d,%d t=%d,%d,%d",
+                       (int)io.m[0][0], (int)io.m[1][1], (int)io.m[2][2],
+                       (int)io.m[0][1], (int)io.m[1][0],
+                       (int)io.t[0], (int)io.t[1], (int)io.t[2]);
+            }
         }
     }
 #endif

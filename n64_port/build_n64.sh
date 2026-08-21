@@ -113,5 +113,20 @@ if [ -d "$SCRIPT_DIR/filesystem/maps" ]; then
     "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh_hardware.z64"         --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"         ${MSYM:+"$MSYM"}         --align 4096 "$HWDFS"
     ls -l "$OUT/sh_hardware.z64"
 fi
+
+# Diagnostic ROM: SND-less disc pack + maps, small enough (<64MB) that ares
+# keeps ISViewer alive and prints the game's ENTIRE debug log to stdout --
+# run it with run_emu_log.ps1. Build build/diag_disc.shpak once with:
+#   python n64_port/tools/mkdiscpack.py <disc.bin> n64_port/build/diag_disc.shpak --dirs 1ST,ANIM,TIM,MISC
+if [ -f "$SCRIPT_DIR/build/diag_disc.shpak" ] && [ -d "$SCRIPT_DIR/filesystem/maps" ]; then
+    rm -rf "$SCRIPT_DIR/build/diagfs"
+    mkdir -p "$SCRIPT_DIR/build/diagfs"
+    cp "$SCRIPT_DIR/build/diag_disc.shpak" "$SCRIPT_DIR/build/diagfs/disc.shpak"
+    cp -r "$SCRIPT_DIR/filesystem/maps" "$SCRIPT_DIR/build/diagfs/maps"
+    "$I/bin/mkdfs" "$SCRIPT_DIR/build/sh_diag.dfs" "$SCRIPT_DIR/build/diagfs" >/dev/null
+    rm -f "$OUT/sh_diag.z64"
+    "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh_diag.z64"         --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"         ${MSYM:+"$MSYM"}         --align 4096 "$SCRIPT_DIR/build/sh_diag.dfs"
+    ls -l "$OUT/sh_diag.z64"
+fi
 echo
 echo "Run: powershell -File n64_port/run_emu.ps1 -Rom n64_port/bin/sh.z64"
