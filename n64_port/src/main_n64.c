@@ -47,6 +47,8 @@ extern void SH_DebugLogInit(void);   /* sh_log_n64.c */
 extern void SH_DebugLogFlush(void);
 extern void Xbox_MemReport(const char* tag);
 extern void Mcard_XboxInit(void);   /* xbox_port/src/mcard_xbox.c */
+extern void PcConfig_Load(const char* path);      /* pc_port/src/pc_config.c (SDL-free) */
+extern void XboxConfig_ApplyOverrides(void);      /* xbox_port/src/xbox_compat_globals.c */
 
 /* ------------------------------------------------------------- screen */
 
@@ -116,6 +118,22 @@ int main(void)
 
     Sh_Say("cd");
     Cd_N64Init();
+
+    /* Config, THEN the console overrides -- and calling these at all is the
+     * fix for two hardware bugs at once. This port ran for weeks on raw PC
+     * defaults because nothing here ever loaded a config: globalCharaPool=1
+     * put the entire character roster's ILM+ANM on a 1.5MB heap (the New Game
+     * black screen: pool exhausts the heap, chunk buffers starve, the load
+     * waits forever), preloadChunks=1 made map init try to fund 256 chunk
+     * slots, and widescreenMode=1 (Hor+) laid the 2D screens out for a wider
+     * virtual display -- on a 4:3 320-wide screen that is text shifted right.
+     * The Xbox override set pins all of these to what a console can afford;
+     * the cfg file on SD stays the user's tuning hook, applied first so the
+     * overrides win only where they must. main_psp.c has always done this;
+     * omitting it here was the mistake. */
+    Sh_Say("config");
+    PcConfig_Load("sd:/silenthill/silenthill.cfg");
+    XboxConfig_ApplyOverrides();
 
     /* PSX kernel events + memory card. NOT optional and not obvious: it is what
      * resolves the save location, and without it mcard_xbox.c reports no card,

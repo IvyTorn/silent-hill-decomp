@@ -169,6 +169,7 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
     posX = g_StringPosition.vx;
     posY = g_StringPosition.vy;
 
+
     glyphColor = STRING_COLORS[g_StringColorId];
     ot         = &g_OtTags0[g_ActiveBufferIdx][g_Strings2dLayerIdx];
 

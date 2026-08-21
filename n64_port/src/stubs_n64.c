@@ -17,6 +17,10 @@
 #include "sh_log.h"
 #include "savefs_n64.h"
 
+/* TEMP diagnostic: last MainLoop call site, written by ML_TRACE in
+ * game_main.c, printed by the pad watchdog. */
+const char* g_MlTraceTag = "pre-loop";
+
 /* --------------------------------------------------------------- memory */
 
 /* Real, and the numbers that matter most on this port: the heap is whatever is

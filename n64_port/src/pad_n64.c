@@ -86,6 +86,62 @@ void Pad_Poll(void)
     if (!s_padBuf)
         return;
 
+/* 1 = the emulator drives a New Game itself (no human input path in ares).
+ * MUST be 0 for hardware: the injector mashes START/CROSS forever, which
+ * in-game means constant pausing and dialogue skipping. */
+#define SH_N64_AUTOSTART 0
+#if SH_N64_AUTOSTART
+    /* TEMP diagnostic: drive a real New Game with no human. The emulator runs
+     * ~7 game-frames a second, so from ~100 s in, mash START then CROSS on a
+     * cycle -- that walks PUSH-START -> menu (cursor sits on START with no
+     * saves) -> confirm -> difficulty confirm. Removes the hardware round-trip
+     * from reproducing the map-load hang. */
+    {
+        static unsigned s_poll = 0;
+        unsigned        phase;
+        s_poll++;
+        /* Watchdog: name the last MainLoop site every ~9s of polls. A hang
+         * that spin-waits on VSync keeps this printing its own tag; a hang
+         * that does not freezes the log entirely, which is its own answer. */
+        if ((s_poll & 63) == 0)
+        {
+            extern const char* g_MlTraceTag;
+            extern void ShLogN64_PushWrapped(const char* line);
+            char ln[56];
+            int  di = 0, k;
+            const char* pre = "[MLWD] ";
+            while (*pre) ln[di++] = *pre++;
+            for (k = 0; g_MlTraceTag[k] && di < 54; k++) ln[di++] = g_MlTraceTag[k];
+            ln[di] = 0;
+            ShLogN64_PushWrapped(ln);
+        }
+        if (s_poll > 700)
+        {
+            phase = s_poll % 20;
+            /* Byte split per the main path below: buf[2] = bits 8..15,
+             * buf[3] = bits 0..7. START is bit 3 (LOW byte), CROSS bit 14
+             * (HIGH byte) -- the first version had them swapped, plus a
+             * negative shift. */
+            if (phase < 2)
+            {
+                s_padBuf[0] = 0x00; s_padBuf[1] = 0x41;
+                s_padBuf[2] = 0xFF;
+                s_padBuf[3] = (unsigned char)~(1u << PSXB_START);        /* 0xF7 */
+                s_padBuf[4] = s_padBuf[5] = s_padBuf[6] = s_padBuf[7] = 0x80;
+                return;
+            }
+            if (phase >= 10 && phase < 12)
+            {
+                s_padBuf[0] = 0x00; s_padBuf[1] = 0x41;
+                s_padBuf[2] = (unsigned char)~(1u << (PSXB_CROSS - 8));  /* 0xBF */
+                s_padBuf[3] = 0xFF;
+                s_padBuf[4] = s_padBuf[5] = s_padBuf[6] = s_padBuf[7] = 0x80;
+                return;
+            }
+        }
+    }
+#endif
+
     joypad_poll();
 
     if (!joypad_is_connected(JOYPAD_PORT_1))

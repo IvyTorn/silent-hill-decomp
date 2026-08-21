@@ -1950,6 +1950,10 @@ void GameState_Boot_Update(void) // 0x80032D1C
 extern void GsSortOt_GetSubrootBounds(uintptr_t* lo, uintptr_t* hi);
 #endif
 
+#if defined(SH_N64_PORT)
+extern const char* g_MlTraceTag;   /* stubs_n64.c; ML_TRACE below */
+#endif
+
 void MainLoop(void) // 0x80032EE0
 {
     #define TICKS_PER_SECOND_MIN (TICKS_PER_SECOND / 4)
@@ -2356,7 +2360,16 @@ void MainLoop(void) // 0x80032EE0
             continue;
         }
 
+#if defined(SH_N64_PORT)
+/* TEMP diagnostic: the New Game hang does not log, so name the last MainLoop
+ * call site instead. pad_n64.c prints this from the VSync path -- the PSX
+ * spin-wait idiom calls VSync, so a stuck wait keeps printing its own tag.
+ * The variable lives in stubs_n64.c: this macro is defined INSIDE MainLoop,
+ * and a definition here would be a local. */
+#define ML_TRACE(tag) (g_MlTraceTag = (tag))
+#else
 #define ML_TRACE(tag) ((void)0)
+#endif
 #ifdef SH_XBOX_PORT
         /* Close the last frame-cost gap: everything between the GameState update
          * and DrawSync (audio task pool + XA + file queue + camera). This is the
