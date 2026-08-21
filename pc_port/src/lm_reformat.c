@@ -31,6 +31,94 @@
 static inline u32 rd32(const u8* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24); }
 static inline u16 rd16(const u8* p) { return p[0] | (p[1] << 8); }
 
+#if defined(__BIG_ENDIAN__) ||     (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+/* ---------------------------------------------------------------------------
+ * Big-endian vertex/primitive pool swap.
+ *
+ * The rd16/rd32 readers above make every HEADER field endian-proof, but they
+ * only fix the POINTERS to the mesh pools -- the pool contents stay raw
+ * little-endian in the load buffer, and the software GTE reads those s16s
+ * directly. On N64 (and any BE target) that is byte-swapped vertices, i.e.
+ * exploded geometry for every model and map chunk.
+ *
+ * Swapped in place, once per fresh parse: the isLoaded guard in
+ * LmHeader_FixOffsets_PC already guarantees a buffer is parsed exactly once
+ * per disc load, so the swap inherits that. A dedup table guards the pools
+ * WITHIN one parse: meshes can share pools (the model header carries
+ * vertexOffset/normalOffset for exactly that), and a shared pool swapped
+ * twice is worse than not swapped at all.
+ *
+ * Per element:
+ *   verticesXy  DVECTOR      2 x s16     -> swap each
+ *   verticesZ   s16          1 x s16     -> swap each
+ *   normals     s_Normal     4 x s8      -> NO swap (bytes are bytes)
+ *   primitives  s_Primitive  u16 at 0,2,4,8,10 -> swap each
+ *               the union u16 at offset 6 is BITFIELDS, and BE flips bitfield
+ *               allocation within the byte too: LE packs byte 7 as
+ *               (isTransparent<<7)|materialIdx, a BE-compiled reader wants
+ *               (materialIdx<<1)|isTransparent. That is a rotate-left-by-one
+ *               of byte 7; byte 6 (field_6_0, a full u8) is already aligned.
+ *               field_C/field_10 are u8[4] -> no swap.
+ * ------------------------------------------------------------------------- */
+#define LM_SWAP_DEDUP_MAX 256
+static const void* s_lmSwapped[LM_SWAP_DEDUP_MAX];
+static int         s_lmSwappedCount;
+
+static void LmSwap_Reset(void) { s_lmSwappedCount = 0; }
+
+static int LmSwap_FirstTime(const void* p)
+{
+    int i;
+    if (p == NULL)
+        return 0;
+    for (i = 0; i < s_lmSwappedCount; i++)
+        if (s_lmSwapped[i] == p)
+            return 0;
+    if (s_lmSwappedCount >= LM_SWAP_DEDUP_MAX) {
+        /* Overflow means a pool silently stays little-endian; say so rather
+         * than let it read as "one model is scrambled for no reason". */
+        SH_DBG("[LM-SWAP] dedup table FULL - a pool was left unswapped");
+        return 0;
+    }
+    s_lmSwapped[s_lmSwappedCount++] = p;
+    return 1;
+}
+
+static void LmSwap_S16(void* p, int count)
+{
+    u8* b = (u8*)p;
+    int i;
+    for (i = 0; i < count; i++, b += 2) {
+        u8 t = b[0]; b[0] = b[1]; b[1] = t;
+    }
+}
+
+static void LmSwap_MeshPools(s_MeshHeader* m)
+{
+    if (LmSwap_FirstTime(m->verticesXy))
+        LmSwap_S16(m->verticesXy, m->vertexCount * 2);   /* vx,vy per DVECTOR */
+    if (LmSwap_FirstTime(m->verticesZ))
+        LmSwap_S16(m->verticesZ, m->vertexCount);
+    /* normals: s8 components, endian-free */
+    if (LmSwap_FirstTime(m->primitives)) {
+        u8* pr = (u8*)m->primitives;
+        int i;
+        for (i = 0; i < m->primitiveCount; i++, pr += 20) {
+            u8 t;
+            t = pr[0];  pr[0]  = pr[1];  pr[1]  = t;
+            t = pr[2];  pr[2]  = pr[3];  pr[3]  = t;
+            t = pr[4];  pr[4]  = pr[5];  pr[5]  = t;
+            pr[7] = (u8)(((pr[7] & 0x7F) << 1) | ((pr[7] >> 7) & 1));
+            t = pr[8];  pr[8]  = pr[9];  pr[9]  = t;
+            t = pr[10]; pr[10] = pr[11]; pr[11] = t;
+        }
+    }
+}
+#else
+static void LmSwap_Reset(void) { }
+static void LmSwap_MeshPools(s_MeshHeader* m) { (void)m; }
+#endif
+
 #ifdef SH_XBOX_PORT
 /* Xbox (64MB) heap-leak fix. LmHeader_FixOffsets_PC callocs material/model/mesh
  * headers on every LM parse and stores the pointers in the header — which is
@@ -119,6 +207,7 @@ static void ParseModelHeader(s_ModelHeader* dst, const u8* src, u8* base)
             for (int j = 0; j < dst->meshCount; j++)
             {
                 ParseMeshHeader(&meshes[j], base + meshOff + j * PSX_SIZEOF_MESH_HEADER, base);
+                LmSwap_MeshPools(&meshes[j]);
             }
             dst->meshHdrs = meshes;
         }
@@ -192,6 +281,10 @@ void LmHeader_FixOffsets_PC(s_LmHeader* lmHdr)
     /* Free the prior parse of THIS buffer before re-allocating (leak fix). */
     LmTrack_FreePrior(raw);
 #endif
+
+    /* One dedup scope per parse: pools shared BETWEEN meshes of this LM must
+     * swap exactly once, pools of a different (re)load must swap again. */
+    LmSwap_Reset();
 
     /* Parse materials (PSX stride = 24 bytes) into heap allocation */
     s_Material* mats = NULL;

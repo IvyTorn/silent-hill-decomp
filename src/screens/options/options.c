@@ -727,7 +727,11 @@ static void Options_PcOptionsMenu_EntryStringsDraw(void)
     const s_PcOpt* tbl = PcOpt_Page(&count);
     DVECTOR        strPos  = { 100, 20 };
 #ifdef SH_XBOX_PORT
+#ifdef SH_N64_PORT
+    const char*    HEADING = "N64_Options";
+#else
     const char*    HEADING = "Xbox_Options";
+#endif
 #else
     const char*    HEADING = "PC_Options";
 #endif

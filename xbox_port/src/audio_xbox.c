@@ -362,7 +362,17 @@ static float s_wet       = 0.0f;
 #define REV_NAP   4
 static const int REV_COMB_L[REV_NCOMB] = { 1214, 1293, 1390, 1476, 1548, 1623, 1695, 1760 };
 static const int REV_AP_L[REV_NAP]     = { 605, 480, 371, 245 };
+#if defined(SH_N64_PORT)
+/* 114KB of reverb comb lines for an output stage that is not wired on this
+ * port yet (Audio_XboxPump is a no-op; the RSP mixer replaces all of this).
+ * 8 samples keeps the code compiling and the arrays addressable; the real
+ * length returns with the N64 audio backend if this path is ever kept. */
+static float s_combBuf[2][REV_NCOMB][8]; static int s_combIdx[2][REV_NCOMB]; static float s_combLP[2][REV_NCOMB];
+#define REV_COMB_LEN 8
+#else
 static float s_combBuf[2][REV_NCOMB][1792]; static int s_combIdx[2][REV_NCOMB]; static float s_combLP[2][REV_NCOMB];
+#define REV_COMB_LEN 1792
+#endif
 static float s_apBuf[2][REV_NAP][672];      static int s_apIdx[2][REV_NAP];
 #define REV_FEEDBACK 0.84f
 #define REV_DAMP1    0.20f
@@ -401,6 +411,7 @@ static float RevProcess(int ch, float in)   /* one sample, one channel */
                     * truncates to 0 in the int wet fold — inaudible. */
     for (i = 0; i < REV_NCOMB; i++) {
         int   len = REV_COMB_L[i] + spread;
+        if (len > REV_COMB_LEN) len = REV_COMB_LEN;   /* N64: arrays are stubs */
         int*  idx = &s_combIdx[ch][i];
         float y   = s_combBuf[ch][i][*idx];
         s_combLP[ch][i] = y * REV_DAMP2 + s_combLP[ch][i] * REV_DAMP1;

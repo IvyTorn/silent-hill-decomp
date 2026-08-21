@@ -186,9 +186,14 @@ void Cd_N64Init(void)
      * flashcart always wins over whatever was baked into the ROM -- otherwise
      * a trimmed test image would silently shadow the real disc. */
     static const char* const names[] = {
+        /* Pack BEFORE bin: a FAT fseek walks the file's cluster chain, and
+         * the 616MB BIN is ~8x the clusters of the 78MB pack -- on the SC64
+         * that difference is the map-load time. The pack also skips the
+         * 2352->2048 cook per sector. The BIN stays fully supported as the
+         * no-tools path and is needed for raw-sector XA later. */
+        "sd:/silenthill/disc.shpak",
         "sd:/silenthill/Silent Hill (USA).bin",
         "sd:/silenthill/disc.bin",
-        "sd:/silenthill/disc.shpak",
         "sd:/Silent Hill (USA).bin",
         "rom:/disc.shpak",
         "rom:/disc.bin",

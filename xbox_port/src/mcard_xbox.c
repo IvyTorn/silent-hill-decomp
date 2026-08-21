@@ -270,23 +270,60 @@ static void mc_format_buffer(unsigned char* buf)
     memset(buf + 16 * MC_FRAME_SIZE, 0xFF, 20 * MC_FRAME_SIZE);
 }
 
-/* Write a freshly-formatted card image to disk. Returns 1 on success. */
+/* Write a freshly-formatted card image to disk. Returns 1 on success.
+ *
+ * Streamed in 4KB chunks from a static buffer, NOT malloc'd whole: the old
+ * malloc(MC_TOTAL_SIZE) was a 128KB heap spike, and on the N64 -- where the
+ * whole heap is ~1.3MB and the texture cache lands between card 0 and card 1
+ * -- the second card's spike failed forever, at ~6 retries a minute, visible
+ * as an endless [HEAP] malloc 128 KB -> 0x0 column in the census. The header
+ * (frame 0 + directory + broken-sector list) fits the first chunk; everything
+ * after is 0xFF fill, which is also what the sparse savefs stores for free. */
 static int mc_write_fresh_card(int chan)
 {
-    unsigned char* fresh;
-    FILE*          f;
-    size_t         n;
-
-    fresh = (unsigned char*)malloc(MC_TOTAL_SIZE);
-    if (!fresh) return 0;
-    mc_format_buffer(fresh);
+    static unsigned char chunk[4096];
+    FILE*  f;
+    size_t n = 0;
+    int    ofs;
 
     f = mc_fopen(chan, "wb");
-    if (!f) { free(fresh); return 0; }
-    n = fwrite(fresh, 1, MC_TOTAL_SIZE, f);
+    if (!f) return 0;
+
+    for (ofs = 0; ofs < MC_TOTAL_SIZE; ofs += (int)sizeof(chunk)) {
+        if (ofs == 0) {
+            /* Frame 0 + the 15 directory entries occupy the first 16 frames
+             * (2048 bytes) -- inside this chunk. The broken-sector list
+             * (frames 16..35) is all 0xFF, which is the fill everywhere else
+             * anyway, so no special handling. Matches mc_format_buffer
+             * byte-for-byte. */
+            memset(chunk, 0xFF, sizeof(chunk));
+            /* Frame 0: magic + xor checksum. */
+            memset(chunk, 0, MC_FRAME_SIZE);
+            chunk[0] = 'M';
+            chunk[1] = 'C';
+            {
+                unsigned char xorck = 0;
+                int i;
+                for (i = 0; i < MC_FRAME_SIZE - 1; i++) xorck ^= chunk[i];
+                chunk[MC_FRAME_SIZE - 1] = xorck;
+            }
+            /* Frames 1..15: free directory entries (all inside chunk 0). */
+            {
+                int i;
+                for (i = 0; i < MC_DIR_ENTRY_COUNT; i++) {
+                    McDirEntry* d = (McDirEntry*)(chunk + (1 + i) * MC_FRAME_SIZE);
+                    memset(d, 0, sizeof(*d));
+                    d->attr = MC_DIR_ATTR_FREE;
+                }
+            }
+            /* Frames 16..35 are 0xFF (broken-sector list), already the fill. */
+        } else if (ofs == (int)sizeof(chunk)) {
+            memset(chunk, 0xFF, sizeof(chunk));
+        }
+        n += fwrite(chunk, 1, sizeof(chunk), f);
+    }
     fflush(f);
     fclose(f);
-    free(fresh);
 
     if (n != MC_TOTAL_SIZE) {
         SH_DBG("[MCRD] format WRITE FAILED at %s (wrote %d of %d)",

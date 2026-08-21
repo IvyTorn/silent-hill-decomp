@@ -44,7 +44,7 @@ if ! mips64-elf-g++ -o "$OUT/sh.elf" "$GATE"/*.o -lc -mabi=o64 \
         -Wl,-L"$I/mips64-elf/lib" -Wl,-ldragon -Wl,-lm -Wl,-ldragonsys \
         -Wl,-T"$I/mips64-elf/lib/n64.ld" \
         ${EXTERNS:+-Wl,-T"$EXTERNS"} \
-        -Wl,--gc-sections -Wl,--wrap,__do_global_ctors \
+        -Wl,--gc-sections -Wl,--wrap,__do_global_ctors -Wl,--wrap,malloc -Wl,--wrap,calloc \
         -Wl,-Map="$SCRIPT_DIR/build/sh.map",--cref 2> "$SCRIPT_DIR/build/link.log"; then
     echo "LINK FAILED"
     echo

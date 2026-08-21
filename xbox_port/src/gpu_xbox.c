@@ -1481,7 +1481,12 @@ static int s_fbRestrictOn;
  * page: 640x448 would be 573 KB of RDRAM reserved for a resolution this port
  * cannot produce. 320x240 is what gpu_rdp.c allocates and therefore the most
  * that can ever be read back. */
-static unsigned short s_fbReadbackBuf[320 * 240];
+/* Minimal, not 320x240: every consumer sits behind `if (!fb) return;` and
+ * GpuNv2a_ReadbackSurface returns NULL on this port, so the buffer is dead
+ * weight until the readback path is built -- and its 150 KB is two map chunk
+ * slots on a machine that cannot yet fund four. Size it with the feature when
+ * pause/save backgrounds land. */
+static unsigned short s_fbReadbackBuf[16];
 #else
 static unsigned short s_fbReadbackBuf[640 * 448]; /* one page image (max 640-wide credits) */
 #endif

@@ -2600,7 +2600,7 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
                         setlen(poly3, 12);
                         setlen(poly1, 8);
 
-                        if (prim->field_6.flags & 0x8000)
+                        if (prim->field_6.bits.isTransparent) /* was: flags & 0x8000 -- LE bit 15 IS this bitfield */
                         {
 #ifdef SH_PC_PORT
                             /* PC: Skip fog overlay + SetPriority packets.
@@ -3011,7 +3011,7 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
                 setlen(poly3, 12);
                 setlen(poly2, 8);
 
-                if (prim->field_6.flags & 0x8000)
+                if (prim->field_6.bits.isTransparent) /* was: flags & 0x8000 -- LE bit 15 IS this bitfield */
                 {
 #ifdef SH_PC_PORT
                     /* PC: Skip fog overlay + SetPriority (no mask bit support).
@@ -4167,7 +4167,7 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                 *(s32*)&poly.gt3->r0 = *(s32*)&poly.gt3->r1 = *(s32*)&poly.gt3->r2 = *(s32*)&scratchData->field_3D8;
             }
 
-            poly.gt3->code = ((prim->field_6.flags >> 15) * 2) | 0x34;
+            poly.gt3->code = (prim->field_6.bits.isTransparent * 2) | 0x34; /* was: (flags >> 15) * 2 */
 
             *(s32*)&poly.gt3->u0 = *(s32*)&prim->field_0 + scratchData->u.s_1.field_8;
             *(s32*)&poly.gt3->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
@@ -4268,7 +4268,7 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                 *(s32*)&poly.gt4->r0 = *(s32*)&poly.gt4->r1 = *(s32*)&poly.gt4->r2 = *(s32*)&poly.gt4->r3 = *(s32*)&scratchData->field_3D8;
             }
 
-            poly.gt4->code = ((prim->field_6.flags >> 15) * 2) | 0x3C;
+            poly.gt4->code = (prim->field_6.bits.isTransparent * 2) | 0x3C; /* was: (flags >> 15) * 2 */
 
             *(s32*)&poly.gt4->u0 = *(s32*)&prim->field_0 + scratchData->u.s_1.field_8;
             *(s32*)&poly.gt4->u1 = *(s32*)&prim->field_4 & 0xFFFFFF;
