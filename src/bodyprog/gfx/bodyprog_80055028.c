@@ -3947,8 +3947,55 @@ void func_8005A900(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
         return;
     }
 
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: deterministic RTPT unit test, once. Identity rotation,
+     * T=(0,0,1000), three distinct vertices. PASS = three distinct SX with
+     * SZ=1000 each. The observed in-game collapse (every vertex at OFX,OFY
+     * with real SZ) means IR1/IR2 die between the loads and the projection;
+     * this says whether the core itself does it with known-good inputs. */
+    {
+        static int s_utDone = 0;
+        if ((s_utDone++ & 2047) == 0)
+        {
+            MATRIX  um  = {{{4096, 0, 0}, {0, 4096, 0}, {0, 0, 4096}}, {0, 0, 1000}};
+            DVECTOR uxy[3];
+            u16     uz[3];
+            DVECTOR oxy[3];
+            u16     oz[3];
+            uxy[0].vx = 100;  uxy[0].vy = 50;
+            uxy[1].vx = -100; uxy[1].vy = 50;
+            uxy[2].vx = 0;    uxy[2].vy = -50;
+            uz[0] = uz[1] = uz[2] = 0;
+            SetRotMatrix(&um);
+            SetTransMatrix(&um);
+            gte_LoadVector0_1_2_XYZ(uxy, uz);
+            gte_rtpt();
+            gte_FetchScreen0_1_2_XYZ(oxy, oz);
+            SH_DBG("[UT] xy=%08x,%08x,%08x z=%d,%d,%d",
+                   *(u32*)&oxy[0], *(u32*)&oxy[1], *(u32*)&oxy[2],
+                   (int)oz[0], (int)oz[1], (int)oz[2]);
+            /* Register-level view of the same run: R11 back through CFC2,
+             * VX0 through MFC2(0), IR1/MAC1 after the op, plus OFX/H. */
+            SH_DBG("[UT2] r11=%d v0=%08x ir1=%d mac1=%d ofx=%d h=%d",
+                   (int)(short)(CFC2(0) & 0xFFFF), (unsigned)MFC2(0),
+                   (int)MFC2_S(9), (int)MFC2_S(25),
+                   (int)((int)CFC2(24) >> 16), (int)(CFC2(26) & 0xFFFF));
+        }
+    }
+#endif
+
     SetRotMatrix(mat);
     SetTransMatrix(mat);
+
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: expose the transform's write window so the emit-side
+     * probes can check the prims' indices actually fall inside it. */
+    {
+        extern int g_N64XfOff, g_N64XfVc;
+        g_N64XfOff = (int)offset;
+        g_N64XfVc  = (int)meshHdr->vertexCount;
+    }
+#endif
 
     outXy = &scratchData->screenXy_0[offset];
     outZ  = &scratchData->screenZ_168[offset];
@@ -4332,6 +4379,24 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                 {
 #ifdef SH_N64_PORT
                     _dbgPrimBackFail++;
+                    /* TEMP diagnostic: quad twin of the GT3 [BF] probe. The
+                     * cull wants n012<=0 AND n312>=0; print both and the SXY
+                     * words. Both zero = collapsed projection; consistently
+                     * opposite-signed = mirrored winding. */
+                    {
+                        static int s_bfLog4 = 0;
+                        if ((s_bfLog4++ & 2047) == 0)
+                        {
+                            extern int g_N64XfOff, g_N64XfVc;
+                            SH_DBG("[BF4] n=%d,%d xy0=%08x z=%d idx=%d,%d,%d,%d win=%d+%d",
+                                   (int)sp4, (int)_sp4b,
+                                   (unsigned)*(u32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0],
+                                   (int)scratchData->screenZ_168[scratchData->u.s_1.field_0],
+                                   (int)scratchData->u.s_1.field_0, (int)scratchData->u.s_1.field_1,
+                                   (int)scratchData->u.s_1.field_2, (int)scratchData->u.s_1.field_3,
+                                   g_N64XfOff, g_N64XfVc);
+                        }
+                    }
 #endif
                     continue;
                 }
