@@ -4113,6 +4113,7 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
 
 #ifdef SH_PC_PORT
     s32 _dbgPrimPass = 0, _dbgPrimDepthFail = 0, _dbgPrimOobFail = 0, _dbgPrimTotal = 0;
+    s32 _dbgPrimBackFail = 0;
     {
         static int _charTexLog = 0;
         if (_charTexLog < 3 && meshHdr->primitiveCount > 0) {
@@ -4200,7 +4201,12 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                 if (PsyX_PGXP_TriBackface(&scratchData->screenXy_0[scratchData->u.s_1.field_0],
                                           &scratchData->screenXy_0[scratchData->u.s_1.field_1],
                                           &scratchData->screenXy_0[scratchData->u.s_1.field_2], r4))
+                {
+#ifdef SH_N64_PORT
+                    _dbgPrimBackFail++;
+#endif
                     continue;
+                }
             }
 #else
             if (r4 <= 0)
@@ -4310,7 +4316,12 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                                            &scratchData->screenXy_0[scratchData->u.s_1.field_1],
                                            &scratchData->screenXy_0[scratchData->u.s_1.field_2],
                                            &scratchData->screenXy_0[scratchData->u.s_1.field_3], sp4, _sp4b))
+                {
+#ifdef SH_N64_PORT
+                    _dbgPrimBackFail++;
+#endif
                     continue;
+                }
             }
 #else
             if (sp4 <= 0)
@@ -4417,15 +4428,17 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
      * question: never-called / depth-culled / OOB-culled / passed. */
     {
         static int s_accTot, s_accPass, s_accDepth, s_accOob, s_accCalls;
+        static int s_accBack;
         s_accTot   += _dbgPrimTotal;
         s_accPass  += _dbgPrimPass;
         s_accDepth += _dbgPrimDepthFail;
         s_accOob   += _dbgPrimOobFail;
+        s_accBack  += _dbgPrimBackFail;
         if ((++s_accCalls & 255) == 0)
         {
-            SH_DBG("[MESH] calls=%d tot=%d pass=%d depth=%d oob=%d",
-                   s_accCalls, s_accTot, s_accPass, s_accDepth, s_accOob);
-            s_accTot = s_accPass = s_accDepth = s_accOob = 0;
+            SH_DBG("[MESH] calls=%d tot=%d pass=%d depth=%d oob=%d back=%d",
+                   s_accCalls, s_accTot, s_accPass, s_accDepth, s_accOob, s_accBack);
+            s_accTot = s_accPass = s_accDepth = s_accOob = s_accBack = 0;
         }
     }
 #endif

@@ -883,11 +883,12 @@ void func_800D1D3C(GsOT_TAG* tag, SVECTOR3* arg1, MATRIX* arg2, s32 arg3) // 0x8
            0xE0, 0xE0,
            0xFF, 0xE0);
 
-    *(s32*)&poly->x0 = *(s32*)&sp4C;
-    *(s32*)&poly->x1 = *(s32*)&sp50;
-    *(s32*)&poly->x2 = *(s32*)&sp54;
-    *(s32*)&poly->x3 = *(s32*)&sp58;
-    *(s32*)&poly->r0 = *(s32*)&sp48;
+    /* Same BE-portable conversion as twinfeeler.c. */
+    PSX_ST_XY(poly, x0, *(s32*)&sp4C);
+    PSX_ST_XY(poly, x1, *(s32*)&sp50);
+    PSX_ST_XY(poly, x2, *(s32*)&sp54);
+    PSX_ST_XY(poly, x3, *(s32*)&sp58);
+    PSX_ST_RGBC(poly, PSX_LD_CVEC(&sp48));
 
     setPolyFT4(poly);
     setSemiTrans(poly, true);
