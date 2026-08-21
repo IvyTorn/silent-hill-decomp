@@ -58,7 +58,7 @@ static int  s_screenLog = 1;
  * is why muting them there had no effect. */
 static const char* const s_ringMuted[] = {
     "[OTS", "[OTT", "[ABR", "[FOGPAD", "[BIDI", "[UIDIAG",
-    "[BOOT0", "[FSQ", "[UPD", "[FT]", "[MCFSM", "[MCRD", "[SH_AUDIO",
+    "[BOOT0", "[FSQ", "[UPD", "[FT]", "[MCFSM", "[MCRD", "[SH_AUDIO", "[GPU]", "[FONTDUMP",
 };
 
 static int ShLog_RingMuted(const char* line)

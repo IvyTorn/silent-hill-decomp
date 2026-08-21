@@ -39,10 +39,19 @@
 #define SAVEFS_MAX_FILES 2
 #define SAVEFS_MAX_SIZE  (128 * 1024)
 
+/* SPARSE storage. A flat 128 KB per card cost 256 KB of heap at boot -- a
+ * quarter of everything this machine has -- to hold two files that are almost
+ * entirely 0xFF filler: a formatted card is 0xFF everywhere except ~2 KB of
+ * header and directory, and a save writes ~8 KB more. Blocks materialise on
+ * first write; an unmaterialised block READS as 0xFF, which is exactly what
+ * mc_format_buffer would have written there. */
+#define SAVEFS_BLOCK_SIZE  8192
+#define SAVEFS_BLOCK_COUNT (SAVEFS_MAX_SIZE / SAVEFS_BLOCK_SIZE)
+
 typedef struct
 {
     char           name[16];
-    unsigned char* data;
+    unsigned char* block[SAVEFS_BLOCK_COUNT];
     int            size;
     int            used;
 } SaveFile;
@@ -76,14 +85,7 @@ static SaveFile* SaveFs_Find(const char* name, int create)
     if (!create || freeIdx < 0)
         return NULL;
 
-    s_files[freeIdx].data = (unsigned char*)malloc(SAVEFS_MAX_SIZE);
-    if (s_files[freeIdx].data == NULL)
-    {
-        SH_DBG("[SAVEFS] out of heap allocating %s (%d KB)", name, SAVEFS_MAX_SIZE / 1024);
-        return NULL;
-    }
-
-    memset(s_files[freeIdx].data, 0, SAVEFS_MAX_SIZE);
+    memset(s_files[freeIdx].block, 0, sizeof(s_files[freeIdx].block));
     snprintf(s_files[freeIdx].name, sizeof(s_files[freeIdx].name), "%s", name);
     s_files[freeIdx].size = 0;
     s_files[freeIdx].used = 1;
@@ -147,7 +149,23 @@ static int SaveFs_Read(void* file, uint8_t* ptr, int len)
     if (len > avail)
         len = avail;
 
-    memcpy(ptr, h->file->data + h->pos, (size_t)len);
+    {
+        int done = 0;
+        while (done < len)
+        {
+            int pos   = h->pos + done;
+            int bi    = pos / SAVEFS_BLOCK_SIZE;
+            int bo    = pos % SAVEFS_BLOCK_SIZE;
+            int chunk = SAVEFS_BLOCK_SIZE - bo;
+            if (chunk > len - done)
+                chunk = len - done;
+            if (h->file->block[bi] != NULL)
+                memcpy(ptr + done, h->file->block[bi] + bo, (size_t)chunk);
+            else
+                memset(ptr + done, 0xFF, (size_t)chunk);
+            done += chunk;
+        }
+    }
     h->pos += len;
     return len;
 }
@@ -174,7 +192,30 @@ static int SaveFs_Write(void* file, uint8_t* ptr, int len)
         return -1;
     }
 
-    memcpy(h->file->data + h->pos, ptr, (size_t)len);
+    {
+        int done = 0;
+        while (done < len)
+        {
+            int pos   = h->pos + done;
+            int bi    = pos / SAVEFS_BLOCK_SIZE;
+            int bo    = pos % SAVEFS_BLOCK_SIZE;
+            int chunk = SAVEFS_BLOCK_SIZE - bo;
+            if (chunk > len - done)
+                chunk = len - done;
+            if (h->file->block[bi] == NULL)
+            {
+                h->file->block[bi] = (unsigned char*)malloc(SAVEFS_BLOCK_SIZE);
+                if (h->file->block[bi] == NULL)
+                {
+                    errno = ENOSPC;
+                    return done > 0 ? done : -1;
+                }
+                memset(h->file->block[bi], 0xFF, SAVEFS_BLOCK_SIZE);
+            }
+            memcpy(h->file->block[bi] + bo, ptr + done, (size_t)chunk);
+            done += chunk;
+        }
+    }
     h->pos += len;
     /* Only ever grows: a seek-and-overwrite in the middle of the card must not
      * truncate the blocks after it, which is exactly what the save path does. */
@@ -247,7 +288,11 @@ static int SaveFs_Unlink(char* name)
         errno = ENOENT;
         return -1;
     }
-    free(f->data);
+    {
+        int bi;
+        for (bi = 0; bi < SAVEFS_BLOCK_COUNT; bi++)
+            free(f->block[bi]);
+    }
     memset(f, 0, sizeof(*f));
     return 0;
 }

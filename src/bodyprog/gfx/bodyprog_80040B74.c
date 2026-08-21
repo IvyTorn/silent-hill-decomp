@@ -961,7 +961,17 @@ void Ipd_ActiveChunksClear(s_MapTerrain* map, s32 arg1) // 0x80042300
                  * the owned pool and leave the rest NULL — loads never target
                  * them (the engine already tolerates NULL here: that is
                  * exactly the state the failed callocs left it in). */
+#if defined(SH_N64_PORT)
+                /* The Xbox's 24 is still 1.5MB on a machine whose WHOLE heap
+                 * is under 1MB: every calloc fails (checked, harmless) but the
+                 * attempts drain the allocator so the small UNCHECKED lmHdr
+                 * malloc downstream is what actually crashes -- New Game died
+                 * there on hardware. Streaming addresses 4 exterior slots plus
+                 * margin; 6 x 64KB = 384KB, which fits. */
+                enum { XBOX_OWNED_SLOT_CAP = 6 };
+#else
                 enum { XBOX_OWNED_SLOT_CAP = 24 };
+#endif
                 if (i >= XBOX_OWNED_SLOT_CAP)
                 {
                     curChunk->ipdHdr = NULL;
@@ -2871,6 +2881,17 @@ void IpdHeader_FixOffsets(s_IpdHeader* ipdHdr, s_LmHeader** lmHdrs, s32 lmHdrCou
              * addresses overwrite the fixed-up modelHdrs/materials pointers.
              * Copy to heap so the struct survives other chunks loading. */
             s_LmHeader* heapLmHdr = (s_LmHeader*)malloc(sizeof(s_LmHeader));
+            if (heapLmHdr == NULL) {
+                /* Out of heap. Fail the CHUNK, not the console: mark it
+                 * unloaded so the renderer skips it and the loader re-queues,
+                 * exactly like the invalid-IPD path above. The unchecked
+                 * version of this line was the New Game crash on N64 --
+                 * memcpy to NULL+4, with the real culprit being the owned-slot
+                 * callocs having drained the heap first. */
+                SH_DBG("[IPD] lmHdr heap copy FAILED (out of heap) - chunk skipped");
+                ipdHdr->isLoaded = false;
+                return;
+            }
             *heapLmHdr = *ipdHdr->lmHdr;
             ipdHdr->lmHdr = heapLmHdr;
         }

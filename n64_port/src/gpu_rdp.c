@@ -137,6 +137,11 @@ static void ApplyMode(void)
     {
         rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
         rdpq_mode_tlut(TLUT_RGBA16);
+        /* PSX texel 0x0000 is ALWAYS transparent; the TLUT encodes it as alpha
+         * 0, but without an alpha test the RDP happily draws alpha-0 texels as
+         * opaque black. That was every glyph and sprite carrying its empty
+         * texels as a solid black box -- the title menu's "START" sat in one. */
+        rdpq_mode_alphacompare(1);
     }
     else
     {
