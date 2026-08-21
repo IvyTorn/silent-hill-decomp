@@ -1949,7 +1949,9 @@ void Options_MainOptionsMenu_EntryStringsDraw(void) // 0x801E42EC
         "Exit",
         "Brightness_Level",
         "Controller_Config",
-#if defined(SH_XBOX_PORT)
+#if defined(SH_N64_PORT)
+        "N64_Options",
+#elif defined(SH_XBOX_PORT)
         "Xbox_Options",
 #elif defined(SH_PC_PORT)
         "PC_Options",
