@@ -42,7 +42,7 @@
 /* 0 while the port has nothing worth looking at. The on-screen log is the only
  * diagnostic channel a TV or a headless emulator run has, and geometry starts
  * appearing long before the game reaches anything worth seeing. */
-#define SH_N64_LOG_HIDE_ON_FIRST_TRI 0
+#define SH_N64_LOG_HIDE_ON_FIRST_TRI 1
 
 /* Matches display_init below. The README's memory budget assumes this. */
 #define SCR_W 320
@@ -91,8 +91,20 @@ static int s_modeDirty = 1;
  * rather than drawing with wrong texels -- an honest miss is easier to see and
  * to count than a subtly wrong picture. */
 #define TEX_PAGE_DIM  256
-#define TEX_TILE_W    64
-#define TEX_TILE_H    32
+/* The texel budget is TMEM's lower half (the TLUT owns the upper): 2048 bytes,
+ * one byte per CI8 texel, with each ROW padded to 8 bytes by the RDP's DMA.
+ * The old check demanded a fixed 64x32 box, which rejected every tall-thin
+ * sprite the title screen draws -- a 17x49 glyph strip is 1176 padded bytes
+ * and fits with room to spare. Shape does not matter; padded area does. */
+#define TEX_TMEM_BYTES 2048
+
+static int TexBoxFits(int s0, int t0, int s1, int t1)
+{
+    int w    = s1 - s0;
+    int h    = t1 - t0;
+    int padW = (w + 7) & ~7;
+    return w > 0 && h > 0 && padW * h <= TEX_TMEM_BYTES;
+}
 
 static const uint8_t*  s_texPage;
 static const uint32_t* s_texPal;
@@ -105,6 +117,7 @@ static int s_cnTris;
 static int s_cnDropped;
 static int s_cnTexTris;
 static int s_cnTexTooBig;
+static int s_cnTexSplit;
 
 static const rdpq_trifmt_t TRIFMT_SH_SHADE = {
     .pos_offset   = 0,
@@ -190,14 +203,38 @@ static const rdpq_trifmt_t TRIFMT_SH_TEX = {
     .z_offset     = -1,
 };
 
+/* Draw one staged triangle, splitting it until each piece's UV footprint fits
+ * the TMEM tile. Bisection at the midpoint of the longest UV edge; position,
+ * colour, UV and W all interpolate linearly, WHICH IS FAITHFUL: the PSX
+ * texture-mapped affinely, so a linearly split pair rasterises to exactly the
+ * texels the unsplit triangle would have -- this is not an approximation the
+ * way it would be under perspective-correct sampling.
+ *
+ * Depth 5 caps a triangle at 32 pieces. A triangle still too big after that
+ * spans >2048 texels of a 256-texel page and is degenerate input; it draws
+ * flat rather than wrong. */
+static void DrawStagedTri(const float* va, const float* vb, const float* vc, int depth);
+
+static void MidVert(float* out, const float* p, const float* q)
+{
+    int i;
+    for (i = 0; i < 9; i++)
+        out[i] = (p[i] + q[i]) * 0.5f;
+}
+
 static void DrawTexturedTri(const ShVertex* a, const ShVertex* b, const ShVertex* c)
 {
     float va[9], vb[9], vc[9];
-    int   s0, t0, s1, t1;
 
     StageTexVert(va, a);
     StageTexVert(vb, b);
     StageTexVert(vc, c);
+    DrawStagedTri(va, vb, vc, 7);
+}
+
+static void DrawStagedTri(const float* va, const float* vb, const float* vc, int depth)
+{
+    int s0, t0, s1, t1;
 
     /* The sub-rectangle this triangle actually samples. Floor/ceil rather than
      * round: a bilinear tap reaches one texel past the corner, and a tile that
@@ -215,25 +252,83 @@ static void DrawTexturedTri(const ShVertex* a, const ShVertex* b, const ShVertex
     if (s1 <= s0 || t1 <= t0)
         return;
 
-    if ((s1 - s0) > TEX_TILE_W || (t1 - t0) > TEX_TILE_H)
+    if (!TexBoxFits(s0, t0, s1, t1))
     {
-        /* Does not fit TMEM. Draw it flat rather than with wrong texels: a
-         * missing texture is visible and countable, a wrong one is neither.
-         *
-         * The mode is restored IMMEDIATELY, not deferred through s_modeDirty:
-         * ApplyMode only runs at the top of a flush, so a deferred restore
-         * would leave every following triangle in the same run drawing
-         * untextured too. */
+        if (depth > 0)
+        {
+            /* Split the longest UV edge and recurse. Two pieces per level, so
+             * the worst case at depth 5 is 32 uploads for one triangle --
+             * which is still drawing, where the old path drew grey. */
+            float mid[9];
+            float dab, dbc, dca;
+            /* Split along the axis that is actually too large, or the split
+             * can shave the harmless axis forever while the offending one
+             * never shrinks -- which is how the first version of this spent
+             * five levels and still handed 233 leaves to the flat path. */
+            int   ax = ((s1 - s0) >= (t1 - t0)) ? 6 : 7;
+
+            dab = fabsf(va[ax] - vb[ax]);
+            dbc = fabsf(vb[ax] - vc[ax]);
+            dca = fabsf(vc[ax] - va[ax]);
+
+            s_cnTexSplit++;
+            if (dab >= dbc && dab >= dca)
+            {
+                MidVert(mid, va, vb);
+                DrawStagedTri(va, mid, vc, depth - 1);
+                DrawStagedTri(mid, vb, vc, depth - 1);
+            }
+            else if (dbc >= dca)
+            {
+                MidVert(mid, vb, vc);
+                DrawStagedTri(va, vb, mid, depth - 1);
+                DrawStagedTri(va, mid, vc, depth - 1);
+            }
+            else
+            {
+                MidVert(mid, vc, va);
+                DrawStagedTri(mid, vb, vc, depth - 1);
+                DrawStagedTri(va, vb, mid, depth - 1);
+            }
+            return;
+        }
+
+        /* Out of depth: degenerate UV span. Draw flat rather than wrong; the
+         * mode is restored IMMEDIATELY because ApplyMode only runs at the top
+         * of a flush. */
         s_cnTexTooBig++;
         rdpq_mode_tlut(TLUT_NONE);
         rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
-        rdpq_triangle(&TRIFMT_SH_SHADE, (const float*)a, (const float*)b, (const float*)c);
+        {
+            /* TRIFMT_SH_SHADE reads pos at 0 and shade at 4 from ShVertex, but
+             * these are STAGED 9-float verts: pos 0, shade 2. A dedicated
+             * format keeps the fallback honest. */
+            static const rdpq_trifmt_t TRIFMT_STAGED_SHADE = {
+                .pos_offset   = 0,
+                .shade_offset = 2,
+                .tex_offset   = -1,
+                .z_offset     = -1,
+            };
+            rdpq_triangle(&TRIFMT_STAGED_SHADE, va, vb, vc);
+        }
         rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
         rdpq_mode_tlut(TLUT_RGBA16);
         s_cnTris++;
         return;
     }
 
+    /* The RDP's texture DMA reads RAM, not the CPU's data cache, and the page
+     * was decoded by CPU stores that may still be sitting there -- the symptom
+     * is every texel sampling as index 0 and the whole screen drawing one flat
+     * colour. Write back exactly the rows this tile will read; the page can be
+     * REDECODED into the same buffer at any time, so this cannot be hoisted to
+     * the bind. */
+    {
+        int t;
+        for (t = t0; t < t1; t++)
+            data_cache_hit_writeback((void*)(s_texPage + t * TEX_PAGE_DIM + s0),
+                                     (unsigned)(s1 - s0));
+    }
     rdpq_tex_upload_sub(TILE0, &s_pageSurf, NULL, s0, t0, s1, t1);
     rdpq_triangle(&TRIFMT_SH_TEX, va, vb, vc);
     s_cnTris++;
@@ -259,6 +354,9 @@ void GpuNv2a_FlushBatch(void)
         if (s_tlutDirty)
         {
             BuildTlut();
+            /* Same cache rule as the page: the TLUT was just built by CPU
+             * stores and the RDP will DMA it. */
+            data_cache_hit_writeback(s_tlut, sizeof(s_tlut));
             rdpq_tex_upload_tlut(s_tlut, 0, 256);
             s_tlutDirty = 0;
         }
@@ -268,6 +366,32 @@ void GpuNv2a_FlushBatch(void)
     }
     else
     {
+        /* PSX abr 2 is SUBTRACTIVE: out = B - F. The RDP blender has no
+         * negative coefficient, so it cannot do that -- and routing it through
+         * MULTIPLY at the vertices' alpha of 1.0 REPLACES the screen with the
+         * fade colour instead: the boot fade is a full-screen abr-2 quad at
+         * 0.88 grey, and that painted the entire frame flat light-grey over
+         * everything, every frame, for as long as this port has drawn.
+         *
+         * The mapping that keeps the fade a fade: draw BLACK with alpha equal
+         * to the subtrahend's brightness. MEM*(1-f) is multiplicative
+         * darkening -- not bit-exact against B-F's clamp, but monotone in f,
+         * black at f=1, identity at f=0, which is the whole visible behaviour
+         * of a fade. */
+        if (s_curBlend == 3)
+        {
+            for (i = s_runStart; i < s_batchUsed; i++)
+            {
+                float f = s_batch[i].col[0];
+                if (s_batch[i].col[1] > f) f = s_batch[i].col[1];
+                if (s_batch[i].col[2] > f) f = s_batch[i].col[2];
+                s_batch[i].col[0] = 0.0f;
+                s_batch[i].col[1] = 0.0f;
+                s_batch[i].col[2] = 0.0f;
+                s_batch[i].col[3] = f;
+            }
+        }
+
         for (i = s_runStart; i + 2 < s_batchUsed; i += 3)
         {
             rdpq_triangle(&TRIFMT_SH_SHADE,
@@ -360,6 +484,7 @@ void GpuNv2a_FrameBegin(void)
     s_cnDropped  = 0;
     s_cnTexTris  = 0;
     s_cnTexTooBig = 0;
+    s_cnTexSplit = 0;
     s_modeDirty  = 1;
 
     s_fb = display_get();
@@ -391,10 +516,10 @@ void GpuNv2a_FrameEnd(void)
      *
      * It stays up until something explicitly turns it off. Flip this when there
      * is a picture worth seeing. */
-    if (SH_N64_LOG_HIDE_ON_FIRST_TRI && s_cnTris > 0 && ShLogN64_ScreenEnabled())
+    if (SH_N64_LOG_HIDE_ON_FIRST_TRI && s_cnTexTris > 0 && ShLogN64_ScreenEnabled())
     {
         ShLogN64_ScreenEnable(0);
-        SH_DBG("[GPU] first geometry drawn; on-screen log off");
+        SH_DBG("[GPU] first TEXTURED geometry drawn; on-screen log off");
     }
 
     if (ShLogN64_ScreenEnabled())
@@ -417,10 +542,15 @@ void GpuNv2a_FrameEnd(void)
     g_Nv2aDrawCycles = (int)(get_ticks() - s_frameStart);
 
 
-    if ((g_Nv2aFrameCount & 63) == 0)
-        SH_DBG("[GPU] f%d tris=%d tex=%d big=%d drop=%d %dus",
-               g_Nv2aFrameCount, s_cnTris, s_cnTexTris, s_cnTexTooBig, s_cnDropped,
+    {
+        /* Paced by a LOCAL counter: g_Nv2aFrameCount is stuck at 0 (open bug,
+         * see README), and pacing on it makes this line flood every frame. */
+        static int s_censusTick = 0;
+        if ((s_censusTick++ & 63) == 0)
+        SH_DBG("[GPU] f%d tris=%d tex=%d split=%d big=%d drop=%d %dus",
+               g_Nv2aFrameCount, s_cnTris, s_cnTexTris, s_cnTexSplit, s_cnTexTooBig, s_cnDropped,
                (int)TICKS_TO_US((unsigned)g_Nv2aDrawCycles));
+    }
 }
 
 void GpuNv2a_WaitVbl(void)

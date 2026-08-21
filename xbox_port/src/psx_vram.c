@@ -921,6 +921,18 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
         extern unsigned Xbox_MemFreeKB(void);
         int b, ok = 0, okp = 0;
         for (i = 0; i < TEX_DIM; i++) {        /* Morton spread tables */
+#if defined(SH_N64_PORT)
+            /* IDENTITY, not Morton: the swizzle is an NV2A texture-memory
+             * requirement, and the RDP wants plain linear rows. Feeding it the
+             * Morton layout produced a picture of horizontally-shredded noise
+             * -- indices scattered across rows, sampling into the wrong
+             * palette entries -- that read as "texture decode broken" when the
+             * decode was fine and only the ADDRESSING was foreign. Identity
+             * tables keep the decode loop itself byte-for-byte shared. */
+            s_swzX[i] = (unsigned)i;
+            s_swzY[i] = (unsigned)i << 8;      /* v * TEX_DIM, as an OR term */
+            (void)b;
+#else
             unsigned x = 0, y = 0;
             for (b = 0; b < 8; b++) {
                 x |= (unsigned)((i >> b) & 1) << (2 * b);
@@ -928,6 +940,7 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
             }
             s_swzX[i] = x;
             s_swzY[i] = y;
+#endif
         }
         for (i = 0; i < PAGE_N; i++) {
             s_pages[i].key  = -1;

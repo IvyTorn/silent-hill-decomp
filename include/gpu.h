@@ -315,6 +315,54 @@ typedef struct _PrimColor
 
 #endif /* SH_PRIM_FIELDWISE */
 
+/* ---------------------------------------------------------------------------
+ * PACKED-WORD writers.
+ *
+ * The decomp writes primitive field GROUPS as one 32-bit store in ~50 places,
+ * e.g. `*(u32*)&poly->r0 = color` or `*(u32*)&sprt->u0 = u | (v<<8) | (clut<<16)`.
+ * That is the PSX's own idiom and it is exact on a little-endian machine whose
+ * primitives have the PSX's layout. It is wrong TWICE anywhere else:
+ *
+ *   - Byte order. On big-endian the low byte of the word lands at the HIGHEST
+ *     address, so a colour word puts `code` where `r0` lives and a UV word puts
+ *     the CLUT where `u0` lives. Every texture coordinate comes out garbage,
+ *     which is what "the logos draw white and untextured" actually was.
+ *
+ *   - Alignment. This port's primitives are larger than the PSX's, so a field
+ *     the PSX had 4-aligned may not be. &POLY_G4.r0 sits at offset 11 here, and
+ *     MIPS traps a misaligned sw rather than fixing it up -- an immediate CPU
+ *     exception in the title screen's fog.
+ *
+ * These decompose the packed word into the same bytes the little-endian store
+ * would have produced, then write them as fields. Use them instead of the cast.
+ *
+ * The word argument is evaluated more than once, which is safe for every call
+ * site in the tree today -- they are all side-effect-free arithmetic on locals.
+ * Check that before using one on anything with a side effect.
+ * ------------------------------------------------------------------------- */
+
+/** @brief `*(u32*)&p->r0 = w`, portably: r0,g0,b0,code. */
+#define setRGBCWord0(p, w)     setRGBC0(p, (w) & 0xFF, ((w) >> 8) & 0xFF, ((w) >> 16) & 0xFF, ((w) >> 24) & 0xFF)
+#define setRGBCWord1(p, w)     setRGBC1(p, (w) & 0xFF, ((w) >> 8) & 0xFF, ((w) >> 16) & 0xFF, ((w) >> 24) & 0xFF)
+#define setRGBCWord2(p, w)     setRGBC2(p, (w) & 0xFF, ((w) >> 8) & 0xFF, ((w) >> 16) & 0xFF, ((w) >> 24) & 0xFF)
+#define setRGBCWord3(p, w)     setRGBC3(p, (w) & 0xFF, ((w) >> 8) & 0xFF, ((w) >> 16) & 0xFF, ((w) >> 24) & 0xFF)
+
+/** @brief `*(u32*)&p->u0 = w`, portably: u0,v0,clut (clut is the upper 16). */
+#define setUV0ClutWord(p, w)     setUV0AndClutSum(p, (w) & 0xFF, ((w) >> 8) & 0xFF, ((w) >> 16) & 0xFFFF)
+
+/** @brief `*(u32*)&p->u1 = w`, portably: u1,v1,tpage (tpage is the upper 16). */
+#define setUV1TPageWord(p, w)     setUV1AndTPageSum(p, (w) & 0xFF, ((w) >> 8) & 0xFF, ((w) >> 16) & 0xFFFF)
+
+/** @brief `*(u32*)&p->w = w`, portably: w = low half, h = high half. */
+#define setWHWord(p, _w) setWHFast(p, (_w) & 0xFFFF, ((_w) >> 16) & 0xFFFF)
+
+/** @brief `*(u32*)&p->x0 = w`, portably: x0 = low half, y0 = high half. */
+#define setXY0Word(p, _w) setXY0Fast(p, (s16)((_w) & 0xFFFF), (s16)(((_w) >> 16) & 0xFFFF))
+
+/** @brief `*(u16*)&p->u2 = w` / `u3`, portably. */
+#define setUV2Word(p, w) setUV2Sum(p, (w) & 0xFF, ((w) >> 8) & 0xFF)
+#define setUV3Word(p, w) setUV3Sum(p, (w) & 0xFF, ((w) >> 8) & 0xFF)
+
 #define setRGB1Fast(p, r, g, b) \
     (*(u16*)&(p)->r1 = (r) + ((g) << 8), (p)->b1 = (b))
 
