@@ -42,7 +42,7 @@
 /* 0 while the port has nothing worth looking at. The on-screen log is the only
  * diagnostic channel a TV or a headless emulator run has, and geometry starts
  * appearing long before the game reaches anything worth seeing. */
-#define SH_N64_LOG_HIDE_ON_FIRST_TRI 0
+#define SH_N64_LOG_HIDE_ON_FIRST_TRI 1
 
 /* Matches display_init below. The README's memory budget assumes this. */
 #define SCR_W 320
