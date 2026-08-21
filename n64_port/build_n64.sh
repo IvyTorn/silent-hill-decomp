@@ -97,5 +97,21 @@ rm -f "$OUT/sh.z64"
     ${DFS:+--align 4096 "$DFS"}
 
 ls -l "$OUT/sh.z64"
+
+# The hardware ROM: same executable, DFS holds ONLY the map overlays (2.4MB).
+# The overlays MUST travel inside the ROM because they bind against this exact
+# build's msym table -- a stale maps/ folder on the SD card would dlopen and
+# jump into nothing. Disc data stays on SD (sd:/silenthill/, it is user data
+# and 78MB), which cd_n64.c's probe order finds by itself.
+if [ -d "$SCRIPT_DIR/filesystem/maps" ]; then
+    HWDFS="$SCRIPT_DIR/build/sh_hw.dfs"
+    rm -rf "$SCRIPT_DIR/build/hwfs"
+    mkdir -p "$SCRIPT_DIR/build/hwfs"
+    cp -r "$SCRIPT_DIR/filesystem/maps" "$SCRIPT_DIR/build/hwfs/maps"
+    "$I/bin/mkdfs" "$HWDFS" "$SCRIPT_DIR/build/hwfs" >/dev/null
+    rm -f "$OUT/sh_hardware.z64"
+    "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh_hardware.z64"         --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"         ${MSYM:+"$MSYM"}         --align 4096 "$HWDFS"
+    ls -l "$OUT/sh_hardware.z64"
+fi
 echo
 echo "Run: powershell -File n64_port/run_emu.ps1 -Rom n64_port/bin/sh.z64"

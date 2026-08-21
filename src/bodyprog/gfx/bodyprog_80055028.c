@@ -3755,6 +3755,7 @@ void func_8005A21C(s_ModelInfo* modelInfo, GsOT_TAG* otTag, bool arg2, MATRIX* m
             func_8005AA08(curMeshHdr, normalOffset, (s_GteScratchData2*)scratchData);
         }
 
+        SH_PKT_ALIGN_CHECK("pre-8005AC50");
         func_8005AC50(curMeshHdr, (s_GteScratchData2*)scratchData, otTag, (s32)(intptr_t)arg2);
     }
 }

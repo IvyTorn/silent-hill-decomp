@@ -2181,6 +2181,7 @@ void MainLoop(void) // 0x80032EE0
 #endif
         }
         GsOUT_PACKET_P = s_PcPacketBufs[g_ActiveBufferIdx];
+        SH_PKT_ALIGN_CHECK("frame-reset");
 #else
         if (g_GameWork.gameState == GameState_MainLoadScreen ||
             g_GameWork.gameState == GameState_InGame)

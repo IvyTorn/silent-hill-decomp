@@ -1551,6 +1551,7 @@ void func_8003DA9C(e_CharaId charaId, GsCOORDINATE2* boneCoords, s32 arg2, q3_12
     unsigned long long _c0;
     if (charaId != Chara_None) g_XbCharaCount++;
     _c0 = ShxWdRdtsc();
+    SH_PKT_ALIGN_CHECK("ShxCharaDraw-entry");
     ShxCharaDrawImpl(charaId, boneCoords, arg2, timer, arg4);
     g_XbCharaCycles += ShxWdRdtsc() - _c0;
 }

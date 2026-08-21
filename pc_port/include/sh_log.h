@@ -128,3 +128,13 @@ static inline int Xbox_TmdBufferValid(const void* buf, const char* who)
 #endif /* SH_XBOX_PORT */
 
 #endif /* SH_LOG_H */
+
+/* TEMP N64 diagnostic: MIPS faults on unaligned word stores, and the crash at
+ * 800641DC proved GsOUT_PACKET_P arrives ODD at the char-mesh emitter. Plant
+ * this at draw chokepoints; the FIRST tag that fires brackets the emitter that
+ * advanced the cursor by a non-multiple-of-4. Each site logs once. */
+#if defined(SH_N64_PORT)
+#define SH_PKT_ALIGN_CHECK(tag) do {     if (((uintptr_t)GsOUT_PACKET_P) & 3) {         static int s_alignOnce;         if (!s_alignOnce) { s_alignOnce = 1;             SH_DBG("[ALIGN] pkt=%p at " tag, (void*)GsOUT_PACKET_P); }         GsOUT_PACKET_P = (PACKET*)(((uintptr_t)GsOUT_PACKET_P + 3) & ~(uintptr_t)3);     } } while (0)
+#else
+#define SH_PKT_ALIGN_CHECK(tag) do { } while (0)
+#endif
