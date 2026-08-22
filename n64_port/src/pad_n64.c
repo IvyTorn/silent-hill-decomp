@@ -89,7 +89,9 @@ void Pad_Poll(void)
 /* 1 = the emulator drives a New Game itself (no human input path in ares).
  * MUST be 0 for hardware: the injector mashes START/CROSS forever, which
  * in-game means constant pausing and dialogue skipping. */
-#define SH_N64_AUTOSTART 0
+/* 2 = press START only (reach the title menu and LINGER there - the menu
+ * screenshot mode); 1 = full New Game drive; 0 = hardware (humans only). */
+#define SH_N64_AUTOSTART 2
 #if SH_N64_AUTOSTART
     /* TEMP diagnostic: drive a real New Game with no human. The emulator runs
      * ~7 game-frames a second, so from ~100 s in, mash START then CROSS on a
@@ -130,7 +132,12 @@ void Pad_Poll(void)
                 s_padBuf[4] = s_padBuf[5] = s_padBuf[6] = s_padBuf[7] = 0x80;
                 return;
             }
-            if (phase >= 10 && phase < 12)
+            if (SH_N64_AUTOSTART == 2)
+            {
+                /* Menu-linger mode: no CROSS ever, so the cursor never
+                 * confirms and the title menu stays up for the capture. */
+            }
+            else if (phase >= 10 && phase < 12)
             {
                 s_padBuf[0] = 0x00; s_padBuf[1] = 0x41;
                 s_padBuf[2] = (unsigned char)~(1u << (PSXB_CROSS - 8));  /* 0xBF */

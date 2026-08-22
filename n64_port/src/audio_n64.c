@@ -41,10 +41,34 @@ void Audio_XboxPump(void)
     /* Fill every free ring slot. After a slow frame this mixes more than one
      * buffer in a burst; that is the correct trade - the alternative is an
      * audible underrun gap on exactly the frames that are already struggling. */
-    while (audio_can_write())
     {
-        short* buf = audio_write_begin();
-        Audio_RenderInto(buf, audio_get_buffer_length());
-        audio_write_end();
+        int wrote = 0, peak = 0;
+        while (audio_can_write())
+        {
+            short* buf = audio_write_begin();
+            int    n   = audio_get_buffer_length();
+            Audio_RenderInto(buf, n);
+            {
+                int i;
+                for (i = 0; i < n * 2; i += 64)
+                {
+                    int v = buf[i] < 0 ? -buf[i] : buf[i];
+                    if (v > peak) peak = v;
+                }
+            }
+            audio_write_end();
+            wrote++;
+        }
+
+        /* TEMP diagnostic: where does silence come from - no voices keyed
+         * (game/SPU side), voices keyed but zero samples (mixer side), or
+         * samples present (output side / hardware AI)? */
+        {
+            extern int Audio_N64DiagVoices(void); /* audio_xbox.c */
+            static int s_sndTick = 0;
+            if ((s_sndTick++ & 511) == 0)
+                SH_DBG("[SNDD] wrote=%d peak=%d live=%d",
+                       wrote, peak, Audio_N64DiagVoices());
+        }
     }
 }

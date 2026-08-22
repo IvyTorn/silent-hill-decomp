@@ -656,6 +656,18 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
     }
 }
 
+#if defined(SH_N64_PORT)
+/* TEMP diagnostic for the [SNDD] census: how many voices are live. */
+int Audio_N64DiagVoices(void)
+{
+    int i, n = 0;
+    for (i = 0; i < SPU_VOICES; i++)
+        if (s_v[i].active)
+            n++;
+    return n;
+}
+#endif
+
 /* Legacy stereo entry point — the fallback path and PrimeBuffer-era callers. */
 void Audio_RenderInto(short* out, int frames)
 {
