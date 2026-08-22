@@ -657,7 +657,9 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
 }
 
 #if defined(SH_N64_PORT)
-/* TEMP diagnostic for the [SNDD] census: how many voices are live. */
+/* TEMP diagnostic for the [SNDD] census: how many voices are live, and how
+ * many key-ons have EVER happened (0 forever = the game side never asks). */
+int g_N64KeyOnCount;
 int Audio_N64DiagVoices(void)
 {
     int i, n = 0;
@@ -806,9 +808,16 @@ void SpuGetVoiceAttr(SpuVoiceAttr* a)
     }
 }
 
+#if defined(SH_N64_PORT)
+#define SH_N64_COUNT_KEYON() do { extern int g_N64KeyOnCount; if (on_off == 1) g_N64KeyOnCount++; } while (0)
+#else
+#define SH_N64_COUNT_KEYON() do { } while (0)
+#endif
+
 void SpuSetKey(int on_off, unsigned int voice_bit)
 {
     int i;
+    SH_N64_COUNT_KEYON();
     for (i = 0; i < SPU_VOICES; i++) {
         Voice* v;
         if ((voice_bit & SPU_VOICECH(i)) == 0)

@@ -65,10 +65,11 @@ void Audio_XboxPump(void)
          * samples present (output side / hardware AI)? */
         {
             extern int Audio_N64DiagVoices(void); /* audio_xbox.c */
+            extern int g_N64KeyOnCount;
             static int s_sndTick = 0;
             if ((s_sndTick++ & 511) == 0)
-                SH_DBG("[SNDD] wrote=%d peak=%d live=%d",
-                       wrote, peak, Audio_N64DiagVoices());
+                SH_DBG("[SNDD] wrote=%d peak=%d live=%d keyons=%d",
+                       wrote, peak, Audio_N64DiagVoices(), g_N64KeyOnCount);
         }
     }
 }
