@@ -47,10 +47,10 @@ def load_filetable(path):
     rows = re.findall(r"\{\s*(0x[0-9a-fA-F]+)\s*,\s*(\d+)\s*,.*?//\s*(\S+)", text)
     if not rows:
         sys.exit(f"no entries parsed from {path}")
-    return [(int(a, 16), int(b), p.split("/")[0]) for a, b, p in rows]
+    return [(int(a, 16), int(b), p.split("/")[0], p) for a, b, p in rows]
 
 
-def merge_runs(entries, wanted):
+def merge_runs(entries, wanted, files_re=None):
     """Union the LBA ranges of the wanted directories into sorted runs.
 
     The file table has entries that overlap and repeat -- the raw sum of file
@@ -58,7 +58,8 @@ def merge_runs(entries, wanted):
     not an optimisation, it is what stops the pack storing the same sector many
     times over.
     """
-    spans = sorted((a, a + n) for a, n, d in entries if d in wanted and n > 0)
+    spans = sorted((a, a + n) for a, n, d, path in entries
+                   if n > 0 and (d in wanted or (files_re and files_re.search(path))))
     if not spans:
         sys.exit("no files matched the requested directories")
 
@@ -77,6 +78,10 @@ def main():
     ap.add_argument("out", help="output .shpak")
     ap.add_argument("--filetable", default=None,
                     help="path to filetable.c.USA.inc (default: alongside this script's repo)")
+    ap.add_argument("--files", default=None,
+                    help="regex over full disc paths; matching files are "
+                         "included IN ADDITION to --dirs (e.g. "
+                         "'SND/(FIRST|MAP00|MEP0|.*KDT)')")
     ap.add_argument("--dirs", default=DEFAULT_DIRS,
                     help=f"comma-separated disc directories to include (default: {DEFAULT_DIRS})")
     args = ap.parse_args()
@@ -92,7 +97,8 @@ def main():
         sys.exit("XA cannot be packed: Mode-2 Form-2 payloads do not fit the cooked form")
 
     entries = load_filetable(ft)
-    runs = merge_runs(entries, wanted)
+    files_re = re.compile(args.files) if args.files else None
+    runs = merge_runs(entries, wanted, files_re)
     total = sum(hi - lo for lo, hi in runs)
 
     print(f"dirs      : {','.join(sorted(wanted))}")
