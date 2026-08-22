@@ -285,11 +285,16 @@ int CdRead(int sectors, unsigned long* buf, int mode)
                  * silently, for 28 minutes). A zeroed sector gives the parser
                  * something well-formed enough to reject; audio from a missing
                  * VAB is silence, not a wedge. Warn once per streak. */
-                if (!s_warned)
                 {
-                    s_warned = 1;
-                    SH_DBG("[CD] lba %d not in pack - zero-filled (rebuild with more --dirs for real data)",
-                           s_curSector + done);
+                    /* Log every DISTINCT missing region, not just the first:
+                     * the once-only form cost a 25-minute emulator run per
+                     * discovered gap. Consecutive sectors of one file stay
+                     * quiet. */
+                    static int s_lastMissLba = -10;
+                    int miss = s_curSector + done;
+                    if (miss != s_lastMissLba + 1)
+                        SH_DBG("[CD] lba %d not in pack - zero-filled", miss);
+                    s_lastMissLba = miss;
                 }
                 memset(dst + (size_t)done * BIN_DATA_SIZE, 0, BIN_DATA_SIZE);
                 done++;
