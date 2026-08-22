@@ -119,6 +119,14 @@ int main(void)
     Sh_Say("cd");
     Cd_N64Init();
 
+    /* SD is mounted (or declared absent) by now: start mirroring the log to
+     * the card so a hardware session hands back a real log instead of a
+     * phone photo of the screen. */
+    {
+        extern void ShLogN64_EnableSdMirror(void);
+        ShLogN64_EnableSdMirror();
+    }
+
     /* Config, THEN the console overrides -- and calling these at all is the
      * fix for two hardware bugs at once. This port ran for weeks on raw PC
      * defaults because nothing here ever loaded a config: globalCharaPool=1

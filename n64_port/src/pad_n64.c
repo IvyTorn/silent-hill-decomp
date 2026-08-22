@@ -93,7 +93,7 @@ void Pad_Poll(void)
  * reached - the menu-capture mode; mode 2's START-only mash never CONFIRMED
  * the no-card dialog, so the KCET check looped forever); 2 = START only
  * (BROKEN, see above); 1 = full New Game drive; 0 = hardware (humans only). */
-#define SH_N64_AUTOSTART 3
+#define SH_N64_AUTOSTART 0
 #if SH_N64_AUTOSTART
     /* TEMP diagnostic: drive a real New Game with no human. The emulator runs
      * ~7 game-frames a second, so from ~100 s in, mash START then CROSS on a

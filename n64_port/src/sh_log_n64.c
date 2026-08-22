@@ -167,6 +167,8 @@ int Sh_LogAllow(const char* fmt)
 /* Splits the stream into lines for the ring and forwards the bytes to stderr,
  * which is where libdragon's IS-Viewer and USB writers already sit. Both
  * destinations get everything; neither knows about the other. */
+static FILE* s_sdMirror;
+
 static int ShLog_Write(void* cookie, const char* buf, int len)
 {
     /* A WHOLE logical line, not a 39-char screen row. The ring filter matches on
@@ -198,7 +200,23 @@ static int ShLog_Write(void* cookie, const char* buf, int len)
     }
 
     fwrite(buf, 1, (size_t)len, stderr);
+    if (s_sdMirror != NULL)
+        fwrite(buf, 1, (size_t)len, s_sdMirror);
     return len;
+}
+
+/* Hardware has no IS-Viewer, and until now no way to hand a log back at all -
+ * every hardware report was a phone photo of a screen. The SD card the disc
+ * already lives on takes a mirror of the whole stream; the per-second flush
+ * below keeps it fresh without a per-line card write. Called from main once
+ * the SD mount has settled. */
+void ShLogN64_EnableSdMirror(void)
+{
+    if (s_sdMirror != NULL)
+        return;
+    s_sdMirror = fopen("sd:/silenthill/silenthill.log", "w");
+    if (s_sdMirror != NULL)
+        SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log");
 }
 
 void SH_DebugLogInit(void)
@@ -223,4 +241,6 @@ void SH_DebugLogFlush(void)
 {
     if (g_ShDebugLog != NULL)
         fflush(g_ShDebugLog);
+    if (s_sdMirror != NULL)
+        fflush(s_sdMirror);
 }
