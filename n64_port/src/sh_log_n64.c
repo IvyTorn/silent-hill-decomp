@@ -241,6 +241,14 @@ void SH_DebugLogFlush(void)
 {
     if (g_ShDebugLog != NULL)
         fflush(g_ShDebugLog);
+    /* fflush alone is NOT enough on the card: FAT keeps the file's size in
+     * the directory entry, and libdragon's driver only commits that on
+     * close. A power-off after an hour of fflush-only writes left a 0-byte
+     * log (the first hardware log ever handed back). Close and reopen in
+     * append mode on every flush so the entry is current within a second. */
     if (s_sdMirror != NULL)
-        fflush(s_sdMirror);
+    {
+        fclose(s_sdMirror);
+        s_sdMirror = fopen("sd:/silenthill/silenthill.log", "a");
+    }
 }
