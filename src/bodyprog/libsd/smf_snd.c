@@ -1480,6 +1480,15 @@ s16 SdUtKeyOnV(s16 voice, s16 vabid, s16 prog, s16 tone, s16 note, s16 fine, s16
     {
         vo = -1;
     }
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: [VKO2] fires and [VKO3] never does - the bail is in
+     * this gap. Print the reservation state and the voice about to be used. */
+    {
+        static int s_vko4 = 0;
+        if (s_vko4 < 8) { s_vko4++; SH_DBG("[VKO4] vo=%d reserved=%d vh=%d",
+            (int)vo, (int)sd_reserved_voice, vab_h[vabid].vh_addr_4 != 0); }
+    }
+#endif
 
     if (vo != -1)
     {
