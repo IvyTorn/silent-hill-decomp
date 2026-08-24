@@ -397,10 +397,13 @@ void func_80045534(s_Skeleton* skel, GsOT* ot, s32 arg2, GsCOORDINATE2* boneCoor
             {
                 static int s_boneLog = 0;
                 if ((s_boneLog++ & 511) == 0)
-                    SH_DBG("[BONE2] idx=%d local=%d,%d out=%d,%d t=%d",
+                    SH_DBG("[BONE2] idx=%d local=%d,%d world=%d,%d,%d root=%d,%d,%d out=%d,%d t=%d",
                            (int)(u8)curBone->bone.idx,
                            (int)boneCoords[(u8)curBone->bone.idx].coord.m[0][0],
                            (int)boneCoords[(u8)curBone->bone.idx].coord.m[1][1],
+                           (int)worldMat.m[0][0], (int)worldMat.m[1][1], (int)worldMat.m[2][2],
+                           (int)boneCoords[0].coord.m[0][0], (int)boneCoords[0].coord.m[1][1],
+                           (int)boneCoords[0].coord.m[2][2],
                            (int)viewMat.m[0][0], (int)viewMat.m[1][1],
                            (int)viewMat.t[2]);
             }

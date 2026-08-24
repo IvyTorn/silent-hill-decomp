@@ -827,6 +827,20 @@ void SpuSetKey(int on_off, unsigned int voice_bit)
         if (on_off == SPU_ON) {
             int ls, le;
             v->pcmLen = decodeVag(v->addr, v->pcm, VOICE_PCM_CAP, &ls, &le);
+#if defined(SH_N64_PORT)
+            /* TEMP diagnostic: 428 key-ons and never a nonzero output sample.
+             * Is there VAG data at the voice address (SPU RAM upload), and
+             * does the decoder produce anything from it? */
+            {
+                static int s_spuw = 0;
+                if (s_spuw < 8) {
+                    const unsigned char* b = &s_spuRam[v->addr & (SPU_RAM_SIZE - 1)];
+                    s_spuw++;
+                    SH_DBG("[SPUW] addr=%u bytes=%02x%02x%02x%02x pcmLen=%d loop=%d..%d pitch=%d",
+                           (unsigned)v->addr, b[0], b[1], b[2], b[3], v->pcmLen, ls, le, (int)(v->step * 4096.0));
+                }
+            }
+#endif
             v->loopStart = ls;
             v->loopEnd   = le;
             v->looping   = (le > 0 && ls >= 0 && le <= v->pcmLen);
