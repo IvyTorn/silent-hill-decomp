@@ -76,7 +76,13 @@ if [ -n "$DSOS" ]; then
 fi
 cp "$OUT/sh.elf" "$OUT/sh.elf.stripped"
 mips64-elf-strip -s "$OUT/sh.elf.stripped"
-"$I/bin/n64elfcompress" -o "$OUT" -c 1 "$OUT/sh.elf.stripped"
+# -c 0: NOT compressed. The level-1 stream is unpacked in place by IPL3 at
+# boot, and once the ELF grew past ~1.1MB the unpack started overwriting the
+# tail of its own input: a hardware boot then crashed in Fs_InitializeMem on a
+# garbage instruction (0x90dfb200 where the ELF holds jr ra) that the card's
+# ROM did not contain. The emulator tolerated it. An extra ~1MB of cartridge
+# is nothing; a corrupt .text tail is everything.
+"$I/bin/n64elfcompress" -o "$OUT" -c 0 "$OUT/sh.elf.stripped"
 # A DragonFS image, when n64_port/filesystem has anything in it. That directory
 # is gitignored and holds disc data, which is not ours to redistribute -- the
 # ROM builds fine without it and simply finds no disc, which is what a build
