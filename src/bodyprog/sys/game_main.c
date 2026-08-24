@@ -2216,6 +2216,11 @@ void MainLoop(void) // 0x80032EE0
              * progresses without a screen (Boot->Konami->...->MainMenu->...). */
             static int s_xbLastState = -1;
             if (g_GameWork.gameState != s_xbLastState) {
+#ifdef SH_N64_PORT
+                /* Mirror for the autostart robot (pad_n64.c is HAL-side and
+                 * cannot see g_GameWork). */
+                { extern int g_N64GameState; g_N64GameState = (int)g_GameWork.gameState; }
+#endif
                 SH_DBG("[SH-XBOX] GameState -> %d (step %d)",
                        g_GameWork.gameState, g_GameWork.gameStateSteps[0]);
                 s_xbLastState = g_GameWork.gameState;

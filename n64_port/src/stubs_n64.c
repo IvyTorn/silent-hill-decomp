@@ -26,7 +26,8 @@ const char* g_MlTraceTag = "pre-loop";
  * [3]=vcInitCamera */
 int g_N64CamProbe[4];
 int g_N64VbSnap[6];
-int g_N64XfOff, g_N64XfVc;
+int g_N64XfOff, g_N64XfVc, g_N64XfM[6];
+int g_N64GameState;
 
 /* --------------------------------------------------------------- memory */
 

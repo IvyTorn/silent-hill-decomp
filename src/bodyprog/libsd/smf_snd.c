@@ -1498,6 +1498,16 @@ s16 SdUtKeyOnV(s16 voice, s16 vabid, s16 prog, s16 tone, s16 note, s16 fine, s16
         note_value  = note_base + fine;
         sd_vag_atr  = &sd_vh->vag_atr[(prog * 16) + tone];
 
+#ifdef SH_N64_PORT
+        /* TEMP diagnostic: the guard values for the first few keyon attempts.
+         * vag==0 or a note outside [min,max] is a silent bail; garbage here
+         * points at the raw little-endian VAB header being misread on BE. */
+        {
+            static int s_vko3 = 0;
+            if (s_vko3 < 8) { s_vko3++; SH_DBG("[VKO3] vag=%d min=%d max=%d note=%d ps=%d",
+                (int)sd_vag_atr->vag, (int)sd_vag_atr->min, (int)sd_vag_atr->max, (int)note, (int)sd_vh->vab_h.ps); }
+        }
+#endif
         if (sd_vag_atr->vag == 0)
         {
             return -1;

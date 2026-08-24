@@ -120,19 +120,32 @@ void Pad_Poll(void)
             ln[di] = 0;
             ShLogN64_PushWrapped(ln);
         }
-        if (SH_N64_AUTOSTART == 4 && s_poll > 3000)
+        if (SH_N64_AUTOSTART == 4)
         {
-            /* Walk: hold UP on the stick and d-pad; everything else idle. */
-            s_padBuf[0] = 0x00; s_padBuf[1] = 0x41;
-            s_padBuf[2] = 0xFF;
-            s_padBuf[3] = (unsigned char)~(1u << PSXB_UP);            /* 0xEF */
-            s_padBuf[4] = s_padBuf[5] = 0x80;
-            s_padBuf[6] = 0x80; s_padBuf[7] = 0x00;                   /* stick full up */
-            return;
+            /* State-driven, not poll-count-driven: the poll thresholds were
+             * tuned on a 7-20 VPS ISViewer crawl and fire inside the first
+             * minute at healthy speed. GameState mirror: 7 = main menu
+             * (PARK there ~45s for the screenshot window, then push on),
+             * 11 = in game (hold UP so Harry walks and footsteps fire). */
+            extern int g_N64GameState;
+            static unsigned s_menuParked;
+            if (g_N64GameState == 11)
+            {
+                s_padBuf[0] = 0x00; s_padBuf[1] = 0x41;
+                s_padBuf[2] = 0xFF;
+                s_padBuf[3] = (unsigned char)~(1u << PSXB_UP);        /* 0xEF */
+                s_padBuf[4] = s_padBuf[5] = 0x80;
+                s_padBuf[6] = 0x80; s_padBuf[7] = 0x00;               /* stick full up */
+                return;
+            }
+            if (g_N64GameState == 7 && s_menuParked < 2700)
+            {
+                s_menuParked++;                                       /* ~45s at 60Hz */
+                goto real_input;
+            }
         }
         if (s_poll > 700 &&
-            (SH_N64_AUTOSTART != 3 || s_poll < 1400) &&
-            (SH_N64_AUTOSTART != 4 || s_poll < 1400 || s_poll >= 2200))
+            (SH_N64_AUTOSTART != 3 || s_poll < 1400))
         {
             phase = s_poll % 20;
             /* Byte split per the main path below: buf[2] = bits 8..15,
@@ -159,6 +172,7 @@ void Pad_Poll(void)
     }
 #endif
 
+real_input:
     joypad_poll();
 
     if (!joypad_is_connected(JOYPAD_PORT_1))

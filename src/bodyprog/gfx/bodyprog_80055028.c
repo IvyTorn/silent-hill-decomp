@@ -4017,9 +4017,15 @@ void func_8005A900(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
     /* TEMP diagnostic: expose the transform's write window so the emit-side
      * probes can check the prims' indices actually fall inside it. */
     {
-        extern int g_N64XfOff, g_N64XfVc;
+        extern int g_N64XfOff, g_N64XfVc, g_N64XfM[6];
         g_N64XfOff = (int)offset;
         g_N64XfVc  = (int)meshHdr->vertexCount;
+        g_N64XfM[0] = (int)mat->m[0][0];
+        g_N64XfM[1] = (int)mat->m[2][2];
+        g_N64XfM[2] = (int)mat->t[2];
+        g_N64XfM[3] = (int)meshHdr->verticesXy[0].vx;
+        g_N64XfM[4] = (int)meshHdr->verticesXy[0].vy;
+        g_N64XfM[5] = (int)meshHdr->verticesZ[0];
     }
 #endif
 
@@ -4413,14 +4419,13 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                         static int s_bfLog4 = 0;
                         if ((s_bfLog4++ & 2047) == 0)
                         {
-                            extern int g_N64XfOff, g_N64XfVc;
-                            SH_DBG("[BF4] n=%d,%d xy0=%08x z=%d idx=%d,%d,%d,%d win=%d+%d",
-                                   (int)sp4, (int)_sp4b,
+                            extern int g_N64XfOff, g_N64XfVc, g_N64XfM[6];
+                            SH_DBG("[BF4] xy0=%08x z=%d win=%d+%d m=%d,%d tz=%d v0=(%d,%d,%d)",
                                    (unsigned)*(u32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0],
                                    (int)scratchData->screenZ_168[scratchData->u.s_1.field_0],
-                                   (int)scratchData->u.s_1.field_0, (int)scratchData->u.s_1.field_1,
-                                   (int)scratchData->u.s_1.field_2, (int)scratchData->u.s_1.field_3,
-                                   g_N64XfOff, g_N64XfVc);
+                                   g_N64XfOff, g_N64XfVc,
+                                   g_N64XfM[0], g_N64XfM[1], g_N64XfM[2],
+                                   g_N64XfM[3], g_N64XfM[4], g_N64XfM[5]);
                         }
                     }
 #endif
