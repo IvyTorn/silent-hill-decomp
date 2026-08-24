@@ -42,7 +42,10 @@ void xbox_log(const char* fmt, ...)
 #define SPU_RAM_SIZE    0x80000        /* 512 KB PSX SPU RAM */
 #define SPU_VOICES      24
 #if defined(SH_N64_PORT)
-#define OUT_HZ          22050          /* AI rate; halves the CPU mix cost, and
+#define OUT_HZ          11025          /* AI rate; the software mix measured 56-75ms
+                                        * per frame on hardware at 22050 (audioPumpMs),
+                                        * i.e. the whole frame. Half again until the
+                                        * mixer moves to the RSP. Every pitch/ADSR step
                                         * every pitch/ADSR step derives from it
                                         * so time stays correct */
 #else

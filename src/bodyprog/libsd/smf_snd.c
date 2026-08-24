@@ -1625,6 +1625,15 @@ s16 SdUtKeyOnV(s16 voice, s16 vabid, s16 prog, s16 tone, s16 note, s16 fine, s16
             vag_offset           = (vag_offset * 8);
             s_attr.voice         = spu_ch_tbl[vo];
             s_attr.addr          = vab_h[vabid].vb_start_addr_10 + vag_offset;
+#ifdef SH_N64_PORT
+            {
+                static int s_ko = 0;
+                if (s_ko < 12) { s_ko++;
+                    SH_DBG("[KO] vab=%d base=%d off=%d vag=%d addr=%d",
+                        (int)vabid, (int)vab_h[vabid].vb_start_addr_10,
+                        (int)vag_offset, (int)sd_vag_atr->vag, (int)s_attr.addr); }
+            }
+#endif
 
             s_attr.adsr1          = sd_vag_atr->adsr1;
             smf_port[vo].adsr1_46 = s_attr.adsr1;

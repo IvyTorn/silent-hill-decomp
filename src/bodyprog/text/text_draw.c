@@ -264,14 +264,14 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 }
                 else
                 {
-                    posXCpy = (u16)(posX + SH_N64_GADJX);
+                    posXCpy = (u16)posX;
 
                     glyphSprt              = (SPRT*)packet;
                     setWHWord(glyphSprt, 0x10000C);
 
                     addPrimFast(ot, glyphSprt, 4);
                     setRGBCWord0(glyphSprt, glyphColor);
-                    setXY0Word(glyphSprt, posXCpy + ((u32)(SH_N64_GLYPH_2D_SCREEN ? posY * 2 : posY) << 16));
+                    setXY0Word(glyphSprt, posXCpy + (posY << 16));
                     setUV0ClutWord(glyphSprt, (u32)kU + ((u32)kV << 8) + ((u32)kClut << 16));
 
                     packet += sizeof(SPRT);
@@ -339,14 +339,14 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 }
                 else
                 {
-                    posXCpy = (u16)(posX + SH_N64_GADJX);
+                    posXCpy = (u16)posX;
 
                     glyphSprt              = (SPRT*)packet;
                     setWHWord(glyphSprt, 0x10000C);
 
                     addPrimFast(ot, glyphSprt, 4);
                     setRGBCWord0(glyphSprt, glyphColor);
-                    setXY0Word(glyphSprt, posXCpy + ((u32)(SH_N64_GLYPH_2D_SCREEN ? drawY * 2 : drawY) << 16));
+                    setXY0Word(glyphSprt, posXCpy + (drawY << 16));
                     setUV0ClutWord(glyphSprt, u0 + (vTop << 8) + (g_FontLayout->packedClut << 16)); // `u0`, `v0`, `clut`.
 
                     packet += sizeof(SPRT);

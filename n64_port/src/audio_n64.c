@@ -19,7 +19,7 @@
 
 #include "sh_log.h"
 
-#define N64_AUDIO_HZ   22050
+#define N64_AUDIO_HZ   11025
 #define N64_AUDIO_BUFS 4
 
 void Audio_RenderInto(short* out, int frames); /* audio_xbox.c */
