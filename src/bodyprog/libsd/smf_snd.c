@@ -1291,6 +1291,15 @@ s32 SdVoKeyOn(s32 vab_pro, s32 pitch, u16 voll, u16 volr) // 0x800A0AA0
 
 #ifdef SH_PC_PORT
     if (!sd_vh) {
+#ifdef SH_N64_PORT
+        /* TEMP diagnostic: every [SFX] request died before SpuSetKey; this
+         * names the bail. NULL vh = the VAB header for this bank never
+         * registered (SdVabTransHead path). */
+        {
+            static int s_vkoLog = 0;
+            if (s_vkoLog < 8) { s_vkoLog++; SH_DBG("[VKO] null vh: vabid=%d prog=%d", (int)vabid, (int)prog); }
+        }
+#endif
         return -1;
     }
 #endif
@@ -1450,6 +1459,15 @@ s16 SdUtKeyOnV(s16 voice, s16 vabid, s16 prog, s16 tone, s16 note, s16 fine, s16
     s32          volume_scale;
     s32          note_value;
 
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: pairs with [VKO]. Entries here with keyons still 0
+     * put the bail INSIDE this function; no entries at all = the tone-match
+     * or free-voice scan in SdVoKeyOn ate the request. */
+    {
+        static int s_vko2 = 0;
+        if (s_vko2 < 8) { s_vko2++; SH_DBG("[VKO2] enter v=%d vab=%d prog=%d tone=%d note=%d", (int)voice, (int)vabid, (int)prog, (int)tone, (int)note); }
+    }
+#endif
     if (tone >= 0x10 || prog >= 0x80 || note >= 0x80)
     {
         return -1;
