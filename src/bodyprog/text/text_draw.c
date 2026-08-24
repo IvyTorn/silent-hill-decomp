@@ -242,17 +242,17 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
 
             if (Pc_KanjiCell((u16)(((u32)charCode << 8) | strCpy[1]), &kPage, &kU, &kV, &kClut))
             {
-                if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                if (g_SysWork.enableHighResGlyphs)
                 {
                     glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
                     setPolyFT4(glyphPoly);
                     setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
                     setXY4(glyphPoly,
-                           posX + SH_N64_GADJX,                           (posY * 2) + SH_N64_GADJY,
-                           posX + SH_N64_GADJX,                           (posY * 2) + SH_N64_GADJY + g_FontLayout->hiResGlyphBottom,
-                           posX + FONT_12X16_GLYPH_SIZE_X + SH_N64_GADJX, (posY * 2) + SH_N64_GADJY,
-                           posX + FONT_12X16_GLYPH_SIZE_X + SH_N64_GADJX, (posY * 2) + SH_N64_GADJY + g_FontLayout->hiResGlyphBottom);
+                           posX,                           posY * 2,
+                           posX,                           (posY * 2) + g_FontLayout->hiResGlyphBottom,
+                           posX + FONT_12X16_GLYPH_SIZE_X, posY * 2,
+                           posX + FONT_12X16_GLYPH_SIZE_X, (posY * 2) + g_FontLayout->hiResGlyphBottom);
 
                     setUV0ClutWord(glyphPoly, (u32)kU + ((u32)kV << 8) + ((u32)kClut << 16));
                     setUV1TPageWord(glyphPoly, (u32)kU + (kPage << 16) + (((u32)kV + 15) << 8));
@@ -264,7 +264,7 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 }
                 else
                 {
-                    posXCpy = (u16)posX;
+                    posXCpy = (u16)(posX + SH_N64_GADJX);
 
                     glyphSprt              = (SPRT*)packet;
                     setWHWord(glyphSprt, 0x10000C);
@@ -317,17 +317,17 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 u0         = (glyphIdx % FONT_12X16_ATLAS_COLUMN_COUNT) * FONT_12X16_GLYPH_SIZE_X;
 
                 // Draw glyph sprite.
-                if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                if (g_SysWork.enableHighResGlyphs)
                 {
                     glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
                     setPolyFT4(glyphPoly);
                     setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
                     setXY4(glyphPoly,
-                           posX + SH_N64_GADJX,                           (drawY * 2) + SH_N64_GADJY,
-                           posX + SH_N64_GADJX,                           (drawY * 2) + SH_N64_GADJY + g_FontLayout->hiResGlyphBottom,
-                           posX + FONT_12X16_GLYPH_SIZE_X + SH_N64_GADJX, (drawY * 2) + SH_N64_GADJY,
-                           posX + FONT_12X16_GLYPH_SIZE_X + SH_N64_GADJX, (drawY * 2) + SH_N64_GADJY + g_FontLayout->hiResGlyphBottom);
+                           posX,                           drawY * 2,
+                           posX,                           (drawY * 2) + g_FontLayout->hiResGlyphBottom,
+                           posX + FONT_12X16_GLYPH_SIZE_X, drawY * 2,
+                           posX + FONT_12X16_GLYPH_SIZE_X, (drawY * 2) + g_FontLayout->hiResGlyphBottom);
 
                     setUV0ClutWord(glyphPoly, u0 + (vTop << 8) + (g_FontLayout->packedClut << 16)); // `u0`, `v0`, `clut`.
                     setUV1TPageWord(glyphPoly, u0 + (page << 16) + ((vTop + 15) << 8));              // `u1`, `v1`, `page`.
@@ -339,7 +339,7 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 }
                 else
                 {
-                    posXCpy = (u16)posX;
+                    posXCpy = (u16)(posX + SH_N64_GADJX);
 
                     glyphSprt              = (SPRT*)packet;
                     setWHWord(glyphSprt, 0x10000C);
@@ -367,7 +367,7 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
             sizeCpy--;
 
             // Draw glyph sprite.
-            if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+            if (g_SysWork.enableHighResGlyphs)
             {
                 glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -860,7 +860,7 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                 if (Pc_KanjiCell((u16)(((u32)(u8)charCode << 8) | ((u8*)mapMsg)[1]),
                                  &kPage, &kU, &kV, &kClut))
                 {
-                    if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                    if (g_SysWork.enableHighResGlyphs)
                     {
                         glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -940,7 +940,7 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                     page      = g_FontLayout->tpageBase + (row / g_FontLayout->rowsPerPage);
                     temp_a0   = (idx % FONT_12X16_ATLAS_COLUMN_COUNT) * FONT_12X16_GLYPH_SIZE_X;
 
-                    if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                    if (g_SysWork.enableHighResGlyphs)
                     {
                         glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -985,7 +985,7 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                 }
             }
 #else
-            if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+            if (g_SysWork.enableHighResGlyphs)
             {
                 glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
