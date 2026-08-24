@@ -571,6 +571,9 @@ s16 SdVabOpenHead(u8* addr, s16 vabid) // 0x8009F79C
 
     p        = &vab_h[i];
     sd_vab_h = (VabHdr*)addr;
+#ifdef SH_N64_PORT
+    Sd_N64VabHeaderSwap(sd_vab_h);
+#endif
 
     p->vab_id_0         = i;
     p->vh_addr_4        = (SD_VAB_H*)sd_vab_h;
@@ -641,6 +644,9 @@ s16 SdVabOpenHeadSticky(u8* addr, s16 vabid, s32 sbaddr) // 0x8009F91C
     }
 
     p = &vab_h[i];
+#ifdef SH_N64_PORT
+    Sd_N64VabHeaderSwap((VabHdr*)addr);
+#endif
 
     p->vab_id_0         = i;
     p->vh_addr_4        = (SD_VAB_H*)addr;
@@ -697,6 +703,9 @@ s16 SdVabFakeHead(u8* addr, s16 vabid, u32 sbaddr) // 0x8009FAC0
 
     p        = &vab_h[i];
     sd_vab_h = (VabHdr*)addr;
+#ifdef SH_N64_PORT
+    Sd_N64VabHeaderSwap(sd_vab_h);
+#endif
 
     p->vab_id_0         = i;
     p->vh_addr_4        = (SD_VAB_H*)sd_vab_h;
@@ -744,6 +753,9 @@ s32 SdVbOpenOne(u8* addr, s32 sbaddr, s32 sbsize, s16 vabid) // 0x8009FBAC
     }
 
     p             = &vab_h[i];
+#ifdef SH_N64_PORT
+    Sd_N64VabHeaderSwap((VabHdr*)addr);
+#endif
     p->vb_size_14 = sbsize;
     p->vab_id_0   = i;
     p->vh_addr_4  = (SD_VAB_H*)addr;
@@ -1268,6 +1280,65 @@ s32 SdUtGetVabHdr(s16 vabId, VabHdr* vabhdrptr) // 0x800A0A40
 
     return 0;
 }
+
+#ifdef SH_N64_PORT
+/* The VAB header arrives from disc as raw LITTLE-ENDIAN bytes and every
+ * consumer reads its fields through the struct - on this big-endian CPU
+ * ps/ts/vs/fsize, every VagAtr adsr/prog/vag and the VAG size table came
+ * back byte-swapped. The ps>128 validity guard then refused every key-on:
+ * the entire "no sound" symptom. Swap once at registration; a real VAB's
+ * ps is 1..128, so an in-range ps means this image is already swapped
+ * (re-registration without a fresh CD read must not double-swap). */
+static void Sd_N64VabHeaderSwap(VabHdr* vh)
+{
+    unsigned short* w;
+    int             i, entries;
+
+    if (vh == NULL)
+        return;
+    if (vh->ps >= 1 && vh->ps <= 128)
+        return;                       /* already host-endian */
+
+    #define SWAP16(v) ((unsigned short)((((v) >> 8) & 0xFF) | (((v) & 0xFF) << 8)))
+    #define SWAP32(v) ((unsigned int)((((unsigned int)(v)) >> 24) | ((((unsigned int)(v)) >> 8) & 0xFF00u) |                         ((((unsigned int)(v)) << 8) & 0xFF0000u) | (((unsigned int)(v)) << 24)))
+
+    vh->ver       = (long)SWAP32(vh->ver);
+    vh->id        = (long)SWAP32(vh->id);
+    vh->fsize     = SWAP32(vh->fsize);
+    vh->reserved0 = SWAP16(vh->reserved0);
+    vh->ps        = SWAP16(vh->ps);
+    vh->ts        = SWAP16(vh->ts);
+    vh->vs        = SWAP16(vh->vs);
+
+    /* 128 ProgAtr entries always occupy 0x20..0x820. */
+    {
+        ProgAtr* pa = (ProgAtr*)((unsigned char*)vh + 0x20);
+        for (i = 0; i < 128; i++)
+            pa[i].attr = (short)SWAP16((unsigned short)pa[i].attr);
+    }
+
+    /* 16 VagAtr per program. */
+    {
+        VagAtr* va = (VagAtr*)((unsigned char*)vh + 0x820);
+        entries = (int)vh->ps * 16;
+        for (i = 0; i < entries; i++)
+        {
+            va[i].adsr1 = SWAP16(va[i].adsr1);
+            va[i].adsr2 = SWAP16(va[i].adsr2);
+            va[i].prog  = (short)SWAP16((unsigned short)va[i].prog);
+            va[i].vag   = (short)SWAP16((unsigned short)va[i].vag);
+        }
+    }
+
+    /* VAG size table: 256 u16 entries after the tone attributes. */
+    w = (unsigned short*)((unsigned char*)vh + 0x820 + ((int)vh->ps << 9));
+    for (i = 0; i < 256; i++)
+        w[i] = SWAP16(w[i]);
+
+    #undef SWAP16
+    #undef SWAP32
+}
+#endif
 
 s32 SdVoKeyOn(s32 vab_pro, s32 pitch, u16 voll, u16 volr) // 0x800A0AA0
 {
