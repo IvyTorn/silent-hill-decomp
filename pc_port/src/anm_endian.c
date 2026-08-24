@@ -41,6 +41,8 @@
 #if defined(__BIG_ENDIAN__) || \
     (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 
+#include "sh_log.h"
+
 #define ANM_DATA_OFFSET 404   /* 0x14 + 64*6, constant across every retail ANM */
 
 static uint32_t Swap32(uint32_t v)
@@ -84,11 +86,9 @@ void Anm_SwapForBigEndian(void* addr)
 #ifdef SH_N64_PORT
     /* TEMP diagnostic: which banks swap, which get rejected and why. */
     {
-        extern int fprintf(); extern void* g_ShDebugLog;
         static int s_anmLog = 0;
-        if (s_anmLog < 10 && g_ShDebugLog) { s_anmLog++;
-            fprintf(g_ShDebugLog, "[ANMSW] off=%d kfSize=%d rot=%d trans=%d kfN=%d fsz=%u
-",
+        if (s_anmLog < 10) { s_anmLog++;
+            SH_DBG("[ANMSW] off=%d kfSize=%d rot=%d trans=%d kfN=%d fsz=%u",
                 (int)dataOffset, (int)kfSize, (int)rotBC, (int)transBC, (int)kfCount, fileSize); }
     }
 #endif
