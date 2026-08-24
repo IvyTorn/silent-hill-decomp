@@ -89,11 +89,12 @@ void Pad_Poll(void)
 /* 1 = the emulator drives a New Game itself (no human input path in ares).
  * MUST be 0 for hardware: the injector mashes START/CROSS forever, which
  * in-game means constant pausing and dialogue skipping. */
-/* 3 = full mash until poll 1400 then idle (parks on whatever screen the mash
- * reached - the menu-capture mode; mode 2's START-only mash never CONFIRMED
- * the no-card dialog, so the KCET check looped forever); 2 = START only
- * (BROKEN, see above); 1 = full New Game drive; 0 = hardware (humans only). */
-#define SH_N64_AUTOSTART 0
+/* 4 = the full tour: mash to poll 1400, PARK 1400-2200 (title-menu screenshot
+ * window), mash again 2200-3000 (into New Game), then HOLD UP forever so
+ * Harry walks and footstep SFX exercise the whole sound chain; 3 = mash then
+ * idle; 2 = START only (BROKEN - CROSS is what confirms the no-card dialog);
+ * 1 = full New Game drive; 0 = hardware (humans only). */
+#define SH_N64_AUTOSTART 4
 #if SH_N64_AUTOSTART
     /* TEMP diagnostic: drive a real New Game with no human. The emulator runs
      * ~7 game-frames a second, so from ~100 s in, mash START then CROSS on a
@@ -119,7 +120,19 @@ void Pad_Poll(void)
             ln[di] = 0;
             ShLogN64_PushWrapped(ln);
         }
-        if (s_poll > 700 && (SH_N64_AUTOSTART != 3 || s_poll < 1400))
+        if (SH_N64_AUTOSTART == 4 && s_poll > 3000)
+        {
+            /* Walk: hold UP on the stick and d-pad; everything else idle. */
+            s_padBuf[0] = 0x00; s_padBuf[1] = 0x41;
+            s_padBuf[2] = 0xFF;
+            s_padBuf[3] = (unsigned char)~(1u << PSXB_UP);            /* 0xEF */
+            s_padBuf[4] = s_padBuf[5] = 0x80;
+            s_padBuf[6] = 0x80; s_padBuf[7] = 0x00;                   /* stick full up */
+            return;
+        }
+        if (s_poll > 700 &&
+            (SH_N64_AUTOSTART != 3 || s_poll < 1400) &&
+            (SH_N64_AUTOSTART != 4 || s_poll < 1400 || s_poll >= 2200))
         {
             phase = s_poll % 20;
             /* Byte split per the main path below: buf[2] = bits 8..15,
