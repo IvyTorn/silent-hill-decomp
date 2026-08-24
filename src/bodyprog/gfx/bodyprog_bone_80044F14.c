@@ -391,6 +391,20 @@ void func_80045534(s_Skeleton* skel, GsOT* ot, s32 arg2, GsCOORDINATE2* boneCoor
             }
 #endif
             Vw_CoordToWorldAndViewMatrices(&boneCoords[(u8)curBone->bone.idx], &worldMat, &viewMat);
+#ifdef SH_N64_PORT
+            /* TEMP diagnostic: is the bone's own local matrix zero (animation
+             * never wrote it) or does the compose zero a good input? */
+            {
+                static int s_boneLog = 0;
+                if ((s_boneLog++ & 511) == 0)
+                    SH_DBG("[BONE2] idx=%d local=%d,%d out=%d,%d t=%d",
+                           (int)(u8)curBone->bone.idx,
+                           (int)boneCoords[(u8)curBone->bone.idx].coord.m[0][0],
+                           (int)boneCoords[(u8)curBone->bone.idx].coord.m[1][1],
+                           (int)viewMat.m[0][0], (int)viewMat.m[1][1],
+                           (int)viewMat.t[2]);
+            }
+#endif
 
             if (curBone->bone.modelInfo.field_0 & (1 << 0))
             {

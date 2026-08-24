@@ -81,6 +81,17 @@ void Anm_SwapForBigEndian(void* addr)
                  ((uint32_t)p[14] << 16) | ((uint32_t)p[15] << 24);
     kfCount    = (uint16_t)(p[16] | (p[17] << 8));
 
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: which banks swap, which get rejected and why. */
+    {
+        extern int fprintf(); extern void* g_ShDebugLog;
+        static int s_anmLog = 0;
+        if (s_anmLog < 10 && g_ShDebugLog) { s_anmLog++;
+            fprintf(g_ShDebugLog, "[ANMSW] off=%d kfSize=%d rot=%d trans=%d kfN=%d fsz=%u
+",
+                (int)dataOffset, (int)kfSize, (int)rotBC, (int)transBC, (int)kfCount, fileSize); }
+    }
+#endif
     if (dataOffset != ANM_DATA_OFFSET)
         return;                                  /* headerless keyframe bank */
     if (kfSize != (uint16_t)(rotBC * 9 + transBC * 3))
