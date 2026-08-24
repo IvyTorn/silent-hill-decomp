@@ -407,6 +407,11 @@ void SdSetMono(void) // 0x8009F574
     sd_mono_st_flag = true;
 }
 
+#ifdef SH_N64_PORT
+static void Sd_N64VabHeaderSwap(VabHdr* vh); /* defined below; used by the
+                                              * SdVabTransHead registrations */
+#endif
+
 char SdSetReservedVoice(char voices) // 0x8009F584
 {
     if (voices >= 0x19)
