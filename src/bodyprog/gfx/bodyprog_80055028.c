@@ -4502,6 +4502,16 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                                      + (u32)scratchData->u.s_1.field_8);
             setUV1TPageWord(poly.gt4, ((u32)prim->field_4 | ((u32)prim->field_6.bits.field_6_0 << 16))
                                       & 0xFFFFFF);
+#ifdef SH_N64_PORT
+            /* TEMP diagnostic: emitter-side truth. tpage as composed, and the
+             * lit colour word (black colours = the "textured but unlit" case). */
+            { static int s_tpge; if ((s_tpge++ & 511) == 0)
+                SH_DBG("[TPGE] f4=%04x f6_0=%02x col=%08x flat=%d",
+                       (unsigned)prim->field_4, (unsigned)prim->field_6.bits.field_6_0,
+                       (unsigned)((var_a3 != 0) ? PSX_LD_CVEC(&scratchData->field_21C[scratchData->u.s_1.field_4])
+                                                : PSX_LD_CVEC(&scratchData->field_3D8)),
+                       (int)(var_a3 == 0)); }
+#endif
             setUV2Word(poly.gt4, prim->field_8);
             setUV3Word(poly.gt4, prim->field_A);
 

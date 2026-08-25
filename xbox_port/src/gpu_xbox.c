@@ -810,6 +810,11 @@ static int ProcessPoly(P_TAG* tag)
                 d[0] = p->x0; d[1] = p->y0; d[2] = p->x3; d[3] = p->y3;
             }
         }
+#ifdef SH_N64_PORT
+        /* TEMP diagnostic: which prim TYPE carries a 16-bit-direct tpage? */
+        { static int s_tpgF; if (((p->tpage >> 7) & 3) >= 2 && (s_tpgF++ & 127) == 0)
+            SH_DBG("[TPG] F code=%02x tpage=%04x clut=%04x xy=%d,%d", tag->code, p->tpage, p->clut, p->x0, p->y0); }
+#endif
         texAddr = TexLookup(p->tpage, p->clut);
         PutVertUV(&v[0], p->x0, p->y0, p->r0, p->g0, p->b0, p->u0, p->v0);
         PutVertUV(&v[1], p->x1, p->y1, p->r0, p->g0, p->b0, p->u1, p->v1);
@@ -842,6 +847,10 @@ static int ProcessPoly(P_TAG* tag)
                 const VERTTYPE xy[8] = { p4->x0, p4->y0, p4->x1, p4->y1, p4->x2, p4->y2, p4->x3, p4->y3 };
                 if (PolyOversized(xy, 2, 4)) { s_cnOversize++; return primLen; }
             }
+#ifdef SH_N64_PORT
+            { static int s_tpgQ; if (((p4->tpage >> 7) & 3) >= 2 && (s_tpgQ++ & 127) == 0)
+                SH_DBG("[TPG] Q code=%02x tpage=%04x clut=%04x xy=%d,%d", tag->code, p4->tpage, p4->clut, p4->x0, p4->y0); }
+#endif
             texAddr = TexLookup(p4->tpage, p4->clut);
             PutVertUV(&v[0], p4->x0, p4->y0, p4->r0, p4->g0, p4->b0, p4->u0, p4->v0);
             PutVertUV(&v[1], p4->x1, p4->y1, p4->r1, p4->g1, p4->b1, p4->u1, p4->v1);
@@ -861,6 +870,10 @@ static int ProcessPoly(P_TAG* tag)
                 const VERTTYPE xy[6] = { p3->x0, p3->y0, p3->x1, p3->y1, p3->x2, p3->y2 };
                 if (PolyOversized(xy, 2, 3)) { s_cnOversize++; return primLen; }
             }
+#ifdef SH_N64_PORT
+            { static int s_tpgT; if (((p3->tpage >> 7) & 3) >= 2 && (s_tpgT++ & 127) == 0)
+                SH_DBG("[TPG] T code=%02x tpage=%04x clut=%04x xy=%d,%d", tag->code, p3->tpage, p3->clut, p3->x0, p3->y0); }
+#endif
             texAddr = TexLookup(p3->tpage, p3->clut);
             PutVertUV(&v[0], p3->x0, p3->y0, p3->r0, p3->g0, p3->b0, p3->u0, p3->v0);
             PutVertUV(&v[1], p3->x1, p3->y1, p3->r1, p3->g1, p3->b1, p3->u1, p3->v1);
