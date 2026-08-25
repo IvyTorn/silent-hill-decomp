@@ -30,6 +30,19 @@
 
 static uint16_t s_vram[VRAM_W * VRAM_H];
 
+/* s_vram keeps the PSX's byte layout VERBATIM: LoadImage/MoveImage are raw
+ * byte copies of little-endian disc data, and StoreImage hands those bytes
+ * straight back to game code that expects PSX layout. On a big-endian CPU
+ * every 16-bit VALUE interpretation (texel unpack, CLUT colour, fill compare)
+ * must therefore swap; raw copies stay raw. Fill is the one writer of native
+ * values, so it swaps on the way IN to keep the layout invariant. */
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define VRAM_RD(w)  ((uint16_t)((((uint16_t)(w) >> 8) & 0x00FFu) | (((uint16_t)(w) << 8) & 0xFF00u)))
+#else
+#define VRAM_RD(w)  ((uint16_t)(w))
+#endif
+#define VRAM_WR(w)  VRAM_RD(w)
+
 typedef struct {
     int       key;
     int       lastKey;        /* key before an invalidation cleared it (miss-cause probe) */
@@ -210,7 +223,7 @@ void PsxVram_DumpFontStrip(const char* tag)
             const uint16_t* row = &s_vram[((FONT_STRIP_Y0 + v) & (VRAM_H - 1)) * VRAM_W];
             int n = 0;
             for (u = 0; u < 252; u += 2) {   /* 2:1 horizontal, 12px glyph -> 6 cols */
-                uint16_t word = row[(tx + (u >> 2)) & (VRAM_W - 1)];
+                uint16_t word = VRAM_RD(row[(tx + (u >> 2)) & (VRAM_W - 1)]);
                 line[n++] = (((word >> ((u & 3) * 4)) & 0x0F) != 0) ? '#' : '.';
             }
             line[n] = '\0';
@@ -313,6 +326,7 @@ void PsxVram_Fill(int x, int y, int w, int h, uint16_t c)
         return;
     if (x + w > VRAM_W) w = VRAM_W - x;
     FontStripWriteProbe("Fill", x, y, w, h);
+    c = VRAM_WR(c);
     for (row = 0; row < h; row++) {
         int vy = y + row;
         uint16_t* d;
@@ -380,7 +394,7 @@ static void PageDecodeIndices(int tpage, uint8_t* out)
 
         if (tp == 0) {                        /* one VRAM word feeds 4 texels */
             for (u = 0; u < TEX_DIM; u += 4, i++) {
-                uint16_t w = row[(tx + i) & (VRAM_W - 1)];
+                uint16_t w = VRAM_RD(row[(tx + i) & (VRAM_W - 1)]);
                 s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w        & 0x0F);
                 s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >>  4) & 0x0F);
                 s_swzScratch[s_swzX[u + 2] | sy] = (uint8_t)((w >>  8) & 0x0F);
@@ -388,7 +402,7 @@ static void PageDecodeIndices(int tpage, uint8_t* out)
             }
         } else {                              /* one VRAM word feeds 2 texels */
             for (u = 0; u < TEX_DIM; u += 2, i++) {
-                uint16_t w = row[(tx + i) & (VRAM_W - 1)];
+                uint16_t w = VRAM_RD(row[(tx + i) & (VRAM_W - 1)]);
                 s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w       & 0xFF);
                 s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >> 8) & 0xFF);
             }
@@ -417,7 +431,7 @@ static void PageDecodeIndicesResident(const uint16_t* src, const s_XbResidentDes
 
         if (d->bpp == 4) {
             for (u = 0; u < TEX_DIM && i < d->pitchWords; u += 4, i++) {
-                uint16_t w = row[i];
+                uint16_t w = VRAM_RD(row[i]);
                 s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w        & 0x0F);
                 s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >>  4) & 0x0F);
                 s_swzScratch[s_swzX[u + 2] | sy] = (uint8_t)((w >>  8) & 0x0F);
@@ -425,7 +439,7 @@ static void PageDecodeIndicesResident(const uint16_t* src, const s_XbResidentDes
             }
         } else {
             for (u = 0; u < TEX_DIM && i < d->pitchWords; u += 2, i++) {
-                uint16_t w = row[i];
+                uint16_t w = VRAM_RD(row[i]);
                 s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w       & 0xFF);
                 s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >> 8) & 0xFF);
             }
@@ -451,7 +465,7 @@ static void PaletteBuildResident(const s_XbResidentDesc* d, int row, uint32_t* o
     src = d->clut + (size_t)row * 256;
 
     for (i = 0; i < PAL_ENTRIES; i++)
-        out[i] = Psx16ToArgb(src[i]);
+        out[i] = Psx16ToArgb(VRAM_RD(src[i]));
     SH_STORE_BARRIER();
 }
 
@@ -468,7 +482,7 @@ static void PaletteBuild(int clut, uint32_t* out)
 
     for (i = 0; i < PAL_ENTRIES; i++) {
         int sx = cx + i;
-        out[i] = (sx < VRAM_W) ? Psx16ToArgb(row[sx]) : 0;
+        out[i] = (sx < VRAM_W) ? Psx16ToArgb(VRAM_RD(row[sx])) : 0;
     }
     SH_STORE_BARRIER();
 }
@@ -498,7 +512,7 @@ static void DecodePage(int tpage, int clut, uint32_t* out)
         int       palN = (tp == 0) ? 16 : (tp == 1) ? 256 : 0;
 
         for (u = 0; u < palN; u++) {
-            uint16_t c = clutRow[u];
+            uint16_t c = VRAM_RD(clutRow[u]);
             pal[u] = Psx16ToArgb(c);
             if (census) {
                 if (c == 0)          zeroCount++;
@@ -516,7 +530,7 @@ static void DecodePage(int tpage, int clut, uint32_t* out)
             if (tp == 0) {                        /* 4-bit: one word feeds 4 texels */
                 int i = 0;
                 for (u = 0; u < TEX_DIM; u += 4, i++) {
-                    uint16_t w = row[(tx + i) & (VRAM_W - 1)];
+                    uint16_t w = VRAM_RD(row[(tx + i) & (VRAM_W - 1)]);
                     o[u    ] = pal[w & 0x0F];
                     o[u + 1] = pal[(w >> 4) & 0x0F];
                     o[u + 2] = pal[(w >> 8) & 0x0F];
@@ -525,13 +539,13 @@ static void DecodePage(int tpage, int clut, uint32_t* out)
             } else if (tp == 1) {                 /* 8-bit: one word feeds 2 texels */
                 int i = 0;
                 for (u = 0; u < TEX_DIM; u += 2, i++) {
-                    uint16_t w = row[(tx + i) & (VRAM_W - 1)];
+                    uint16_t w = VRAM_RD(row[(tx + i) & (VRAM_W - 1)]);
                     o[u    ] = pal[w & 0xFF];
                     o[u + 1] = pal[(w >> 8) & 0xFF];
                 }
             } else {                              /* 16-bit direct: no palette */
                 for (u = 0; u < TEX_DIM; u++) {
-                    uint16_t texel = row[(tx + u) & (VRAM_W - 1)];
+                    uint16_t texel = VRAM_RD(row[(tx + u) & (VRAM_W - 1)]);
                     if (census) {
                         if (texel == 0)          zeroCount++;
                         else if (texel & 0x8000) stp1Count++;

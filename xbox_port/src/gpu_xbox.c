@@ -694,9 +694,26 @@ static void EmitTri(ShVertex* a, ShVertex* b, ShVertex* c)
 static void EmitQuad(ShVertex* v0, ShVertex* v1, ShVertex* v2, ShVertex* v3)
 {
     unsigned long long t0 = shx_rdtsc();
-    ShVertex* d = GpuNv2a_BatchAlloc(6);
-    if (d) {
+    ShVertex* d;
+#ifdef SH_N64_PORT
+    /* Axis-aligned textured quads (menu art, HUD, sprites) go through the
+     * RDP's native blitter instead of the TMEM-splitting triangle path. */
+    {
+        extern int GpuNv2a_TryBlitQuad(const ShVertex*, const ShVertex*,
+                                       const ShVertex*, const ShVertex*);
         if (UV_NEEDS_SCALE()) { ShVertex* sv[4]; sv[0]=v0; sv[1]=v1; sv[2]=v2; sv[3]=v3; ScalePalUvSrc(sv, 4); }
+        if (GpuNv2a_TryBlitQuad(v0, v1, v2, v3)) {
+            s_primCount++;
+            s_emitCycles += shx_rdtsc() - t0;
+            return;
+        }
+    }
+#endif
+    d = GpuNv2a_BatchAlloc(6);
+    if (d) {
+#ifndef SH_N64_PORT
+        if (UV_NEEDS_SCALE()) { ShVertex* sv[4]; sv[0]=v0; sv[1]=v1; sv[2]=v2; sv[3]=v3; ScalePalUvSrc(sv, 4); }
+#endif
         ShVertexCopy(&d[0], v0); ShVertexCopy(&d[1], v1); ShVertexCopy(&d[2], v2);
         ShVertexCopy(&d[3], v1); ShVertexCopy(&d[4], v2); ShVertexCopy(&d[5], v3);
         s_primCount++;

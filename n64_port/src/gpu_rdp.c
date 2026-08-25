@@ -410,6 +410,100 @@ void GpuNv2a_FlushBatch(void)
     s_runStart = s_batchUsed;
 }
 
+/* Axis-aligned textured quad -> one rdpq_tex_blit instead of two recursive
+ * split-triangles. The menu/HUD art is 128-256px tiles whose UV boxes never
+ * fit the 2048-byte TMEM window, so the tri path re-uploads dozens of chunks
+ * per sprite per frame - the measured "menus run like shit". The blitter
+ * chunks TMEM internally and draws texture_rectangles, which is the N64-native
+ * way to move sprites. Flat-colour quads only (2D art is flat-lit); the
+ * batch is flushed first so paint order inside a run is preserved, and the
+ * combiner is restored via s_modeDirty for whatever draws next. */
+int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
+                        const ShVertex* v2, const ShVertex* v3)
+{
+    float x0, y0, x1, y1, s0f, t0f, s1f, t1f;
+    int   s0, t0, s1, t1, t;
+
+    if (!s_texEnabled || s_texPage == NULL)
+        return 0;
+
+    /* Screen-space axis-aligned rect in the FT4 vertex order TL,TR,BL,BR. */
+    if (v0->pos[1] != v1->pos[1] || v2->pos[1] != v3->pos[1] ||
+        v0->pos[0] != v2->pos[0] || v1->pos[0] != v3->pos[0])
+        return 0;
+    x0 = v0->pos[0]; y0 = v0->pos[1];
+    x1 = v3->pos[0]; y1 = v3->pos[1];
+    if (x1 <= x0 || y1 <= y0)
+        return 0;
+
+    /* UV rect must be axis-aligned the same way (no flips - the game's 2D
+     * art never mirrors through this path). */
+    if (v0->tex[1] != v1->tex[1] || v2->tex[1] != v3->tex[1] ||
+        v0->tex[0] != v2->tex[0] || v1->tex[0] != v3->tex[0])
+        return 0;
+    s0f = v0->tex[0]; t0f = v0->tex[1];
+    s1f = v3->tex[0]; t1f = v3->tex[1];
+    if (s1f <= s0f || t1f <= t0f)
+        return 0;
+
+    /* Flat colour only. */
+    if (v0->col[0] != v1->col[0] || v0->col[0] != v2->col[0] || v0->col[0] != v3->col[0] ||
+        v0->col[1] != v1->col[1] || v0->col[1] != v2->col[1] || v0->col[1] != v3->col[1] ||
+        v0->col[2] != v1->col[2] || v0->col[2] != v2->col[2] || v0->col[2] != v3->col[2])
+        return 0;
+
+    s0 = (int)(s0f * (float)TEX_PAGE_DIM);
+    t0 = (int)(t0f * (float)TEX_PAGE_DIM);
+    s1 = (int)(s1f * (float)TEX_PAGE_DIM + 0.5f);
+    t1 = (int)(t1f * (float)TEX_PAGE_DIM + 0.5f);
+    if (s0 < 0) s0 = 0;
+    if (t0 < 0) t0 = 0;
+    if (s1 > TEX_PAGE_DIM) s1 = TEX_PAGE_DIM;
+    if (t1 > TEX_PAGE_DIM) t1 = TEX_PAGE_DIM;
+    if (s1 <= s0 || t1 <= t0)
+        return 0;
+
+    /* Earlier prims of this run first, so layering survives. */
+    GpuNv2a_FlushBatch();
+    ApplyMode();
+    if (s_tlutDirty)
+    {
+        BuildTlut();
+        data_cache_hit_writeback(s_tlut, sizeof(s_tlut));
+        rdpq_tex_upload_tlut(s_tlut, 0, 256);
+        s_tlutDirty = 0;
+    }
+
+    for (t = t0; t < t1; t++)
+        data_cache_hit_writeback((void*)(s_texPage + t * TEX_PAGE_DIM + s0),
+                                 (unsigned)(s1 - s0));
+
+    /* PSX texel modulation: 0x80 = 1.0, so scale by 2 like the tri path. */
+    {
+        float m0 = v0->col[0] * 2.0f, m1 = v0->col[1] * 2.0f, m2 = v0->col[2] * 2.0f;
+        if (m0 > 1.0f) m0 = 1.0f;
+        if (m1 > 1.0f) m1 = 1.0f;
+        if (m2 > 1.0f) m2 = 1.0f;
+        rdpq_set_prim_color(RGBA32((int)(m0 * 255.0f), (int)(m1 * 255.0f),
+                                   (int)(m2 * 255.0f), 255));
+    }
+    rdpq_mode_combiner(RDPQ_COMBINER_TEX_FLAT);
+
+    rdpq_tex_blit(&s_pageSurf, x0, y0, &(rdpq_blitparms_t){
+        .s0      = s0,
+        .t0      = t0,
+        .width   = s1 - s0,
+        .height  = t1 - t0,
+        .scale_x = (x1 - x0) / (float)(s1 - s0),
+        .scale_y = (y1 - y0) / (float)(t1 - t0),
+    });
+
+    s_cnTris += 2;
+    s_cnTexTris += 2;
+    s_modeDirty = 1;   /* combiner was changed; next flush re-applies */
+    return 1;
+}
+
 ShVertex* GpuNv2a_BatchAlloc(int count)
 {
     ShVertex* p;
