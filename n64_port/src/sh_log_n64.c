@@ -168,6 +168,7 @@ int Sh_LogAllow(const char* fmt)
  * which is where libdragon's IS-Viewer and USB writers already sit. Both
  * destinations get everything; neither knows about the other. */
 static FILE* s_sdMirror;
+static int   s_sdWanted;   /* mirror requested: reopen attempts may continue */
 
 static int ShLog_Write(void* cookie, const char* buf, int len)
 {
@@ -214,6 +215,7 @@ void ShLogN64_EnableSdMirror(void)
 {
     if (s_sdMirror != NULL)
         return;
+    s_sdWanted = 1;
     s_sdMirror = fopen("sd:/silenthill/silenthill.log", "w");
     if (s_sdMirror != NULL)
         SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log");
@@ -247,8 +249,11 @@ void SH_DebugLogFlush(void)
      * log (the first hardware log ever handed back). Close and reopen in
      * append mode on every flush so the entry is current within a second. */
     if (s_sdMirror != NULL)
-    {
         fclose(s_sdMirror);
+    /* Reopen EVERY flush while the mirror is wanted -- including after a
+     * failed reopen. One transient FAT failure (the options/card traffic
+     * lands exactly at the boot [VIB] read) used to NULL the mirror forever,
+     * which is why every hardware log died at ~200 lines at the same spot. */
+    if (s_sdWanted)
         s_sdMirror = fopen("sd:/silenthill/silenthill.log", "a");
-    }
 }

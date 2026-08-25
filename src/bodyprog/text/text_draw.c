@@ -1,4 +1,5 @@
 #include "game.h"
+#include "sh_log.h"   /* SH_DBG for the TEMP [GLY] probe */
 
 #include "bodyprog/bodyprog.h"
 #include "bodyprog/screen/screen_data.h"
@@ -381,6 +382,19 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                        SH_N64_GADJX + posX,                             (SH_N64_GADJY + posY * 2) + 30,
                        SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + posY * 2),
                        SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + posY * 2) + 30);
+#ifdef SH_N64_PORT
+                /* TEMP diagnostic: which coordinate SPACE do menu strings
+                 * arrive in? Settles "options invisible" -- absolute 0..640
+                 * means the GADJ shift is right, centre-relative means it
+                 * double-shifts them off screen left. */
+                {
+                    static int s_glyN;
+                    if (((s_glyN++) & 63) == 0)
+                        SH_DBG("[GLY] pos=%d,%d adj=%d,%d scrH=%d",
+                               (int)posX, (int)posY, (int)SH_N64_GADJX,
+                               (int)SH_N64_GADJY, (int)g_GameWork.gsScreenHeight);
+                }
+#endif
 
                 posX += glyphWidth;
 

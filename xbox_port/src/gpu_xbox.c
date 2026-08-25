@@ -702,7 +702,11 @@ static void EmitQuad(ShVertex* v0, ShVertex* v1, ShVertex* v2, ShVertex* v3)
         extern int GpuNv2a_TryBlitQuad(const ShVertex*, const ShVertex*,
                                        const ShVertex*, const ShVertex*);
         if (UV_NEEDS_SCALE()) { ShVertex* sv[4]; sv[0]=v0; sv[1]=v1; sv[2]=v2; sv[3]=v3; ScalePalUvSrc(sv, 4); }
-        if (GpuNv2a_TryBlitQuad(v0, v1, v2, v3)) {
+        /* 0: DISARMED pending hardware validation -- a hung RDP at the 2D
+         * load screen is this build's top progression suspect. Re-arm after
+         * a run proves the stall is elsewhere. */
+#define SH_N64_BLIT_QUADS 0
+        if (SH_N64_BLIT_QUADS && GpuNv2a_TryBlitQuad(v0, v1, v2, v3)) {
             s_primCount++;
             s_emitCycles += shx_rdtsc() - t0;
             return;
