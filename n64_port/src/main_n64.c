@@ -97,6 +97,20 @@ static void Sh_InitGameData(void)
 
 /* --------------------------------------------------------------- main */
 
+static void N64_CrashDump(exception_t* ex)
+{
+    SH_DBG("[CRASH] %s code=%d epc=%08lx cr=%08lx sr=%08lx",
+           ex->info ? ex->info : "?", (int)ex->code,
+           (unsigned long)ex->regs->epc, (unsigned long)ex->regs->cr,
+           (unsigned long)ex->regs->sr);
+    SH_DBG("[CRASH] ra=%08lx sp=%08lx a0=%08lx v0=%08lx s0=%08lx s8=%08lx",
+           (unsigned long)(uint32_t)ex->regs->ra, (unsigned long)(uint32_t)ex->regs->sp,
+           (unsigned long)(uint32_t)ex->regs->a0, (unsigned long)(uint32_t)ex->regs->v0,
+           (unsigned long)(uint32_t)ex->regs->s0, (unsigned long)(uint32_t)ex->regs->fp);
+    SH_DebugLogFlush();
+    exception_default_handler(ex);
+}
+
 int main(void)
 {
     /* isviewer and usblog both before anything else: if the very first game
@@ -105,6 +119,11 @@ int main(void)
     debug_init_isviewer();
     debug_init_usblog();
     SH_DebugLogInit();
+
+    /* Any unhandled CPU exception: name the site in the SD log (EPC/cause/
+     * ra/sp), commit it, then hand over to libdragon's crash screen so the
+     * TV names it too. Turns "frozen for minutes" into an address. */
+    register_exception_handler(N64_CrashDump);
 
     /* gpu_rdp.c owns display_init: the display is the GPU backend's resource
      * and VSync() drives FrameBegin/FrameEnd through it. Two owners would mean

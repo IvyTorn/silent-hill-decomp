@@ -203,6 +203,25 @@ static int ShLog_Write(void* cookie, const char* buf, int len)
     fwrite(buf, 1, (size_t)len, stderr);
     if (s_sdMirror != NULL)
         fwrite(buf, 1, (size_t)len, s_sdMirror);
+    /* Self-driven commit: the external once-per-second flush rides VSync's
+     * vblank counter, and any code path that stalls or bypasses VSync starves
+     * it -- the FAT size then freezes at the last fclose and the log READS as
+     * dead while lines keep flowing. Committing from inside the writer makes
+     * the cadence unstarvable: any line more than a second after the last
+     * commit cycles the file. Never call SH_DebugLogFlush here (fflush of the
+     * stream this callback serves would re-enter it). */
+    if (s_sdWanted)
+    {
+        static uint32_t s_lastCommitMs;
+        uint32_t nowMs = (uint32_t)get_ticks_ms();
+        if (nowMs - s_lastCommitMs > 1000)
+        {
+            s_lastCommitMs = nowMs;
+            if (s_sdMirror != NULL)
+                fclose(s_sdMirror);
+            s_sdMirror = fopen("sd:/silenthill/silenthill.log", "a");
+        }
+    }
     return len;
 }
 
