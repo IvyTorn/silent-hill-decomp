@@ -539,8 +539,6 @@ s16 SdVabOpenHead(u8* addr, s16 vabid) // 0x8009F79C
     s16     i;
     VabHdr* sd_vab_h;
 
-    body_partly_size = 0;
-
     if (*addr != 0x70)
     {
         return -1;
@@ -581,6 +579,7 @@ s16 SdVabOpenHead(u8* addr, s16 vabid) // 0x8009F79C
 #endif
 
     p->vab_id_0         = i;
+    body_partly_size[i] = 0;
     p->vh_addr_4        = (SD_VAB_H*)sd_vab_h;
     p->vh_size_8        = 0xA20 + (sd_vab_h->ps * 0x200);
     p->vb_size_14       = sd_vab_h->fsize - p->vh_size_8;
@@ -608,7 +607,6 @@ s16 SdVabOpenHeadSticky(u8* addr, s16 vabid, s32 sbaddr) // 0x8009F91C
     VabHdr* sd_vab_h;
 
     i                = 0;
-    body_partly_size = 0;
 
     if (*addr != 0x70)
     {
@@ -654,6 +652,7 @@ s16 SdVabOpenHeadSticky(u8* addr, s16 vabid, s32 sbaddr) // 0x8009F91C
 #endif
 
     p->vab_id_0         = i;
+    body_partly_size[i] = 0;
     p->vh_addr_4        = (SD_VAB_H*)addr;
     p->vh_size_8        = 0xA20 + (sd_vab_h->ps * 0x200);
     p->vb_start_addr_10 = sbaddr;
@@ -713,6 +712,7 @@ s16 SdVabFakeHead(u8* addr, s16 vabid, u32 sbaddr) // 0x8009FAC0
 #endif
 
     p->vab_id_0         = i;
+    body_partly_size[i] = 0;
     p->vh_addr_4        = (SD_VAB_H*)sd_vab_h;
     p->vh_size_8        = 0xA20 + (sd_vab_h->ps * 0x200);
     p->vb_size_14       = sd_vab_h->fsize - p->vh_size_8;
@@ -728,7 +728,6 @@ s32 SdVbOpenOne(u8* addr, s32 sbaddr, s32 sbsize, s16 vabid) // 0x8009FBAC
     VAB_H* p;
     s16    i;
 
-    body_partly_size = 0;
     i                = 0;
 
     if (vabid == -1)
@@ -763,6 +762,7 @@ s32 SdVbOpenOne(u8* addr, s32 sbaddr, s32 sbsize, s16 vabid) // 0x8009FBAC
 #endif
     p->vb_size_14 = sbsize;
     p->vab_id_0   = i;
+    body_partly_size[i] = 0;
     p->vh_addr_4  = (SD_VAB_H*)addr;
     p->vh_size_8  = sbsize;
     p->mvol_18    = 127;
@@ -832,26 +832,26 @@ s16 SdVabTransBodyPartly(u8* addr, u32 bufsize, s16 vabid) // 0x8009FDDC
 
     if (vab_h_id >= 0 && vab_h_id == vabid)
     {
-        SpuSetTransferStartAddr(vab_h[vabid].vb_start_addr_10 + body_partly_size);
-        if (vab_h[vabid].vb_size_14 - body_partly_size < bufsize)
+        SpuSetTransferStartAddr(vab_h[vabid].vb_start_addr_10 + body_partly_size[vabid]);
+        if (vab_h[vabid].vb_size_14 - body_partly_size[vabid] < bufsize)
         {
-            bufsize = vab_h[vabid].vb_size_14 - body_partly_size;
+            bufsize = vab_h[vabid].vb_size_14 - body_partly_size[vabid];
         }
         if (SpuWrite(addr, bufsize) != bufsize)
         {
             return -1;
         }
 
-        body_partly_size += bufsize;
+        body_partly_size[vabid] += bufsize;
         retval = vab_h_id;
 
-        if (body_partly_size < vab_h[vabid].vb_size_14)
+        if (body_partly_size[vabid] < vab_h[vabid].vb_size_14)
         {
             return -2;
         }
 
 #ifdef SH_PC_PORT
-        SH_DBG("[SH_AUDIO] SdVabTransBodyPartly: vabid=%d complete, total=%d", vabid, body_partly_size);
+        SH_DBG("[SH_AUDIO] SdVabTransBodyPartly: vabid=%d complete, total=%d", vabid, body_partly_size[vabid]);
 #endif
         return vab_h_id; // Maybe was meant to be return retval but devs just returned vab_h_id?
     }

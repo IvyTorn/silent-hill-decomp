@@ -13,7 +13,7 @@ s16  sd_keyoff_mode          = 0;
 // 2 bytes of padding.
 bool sd_mono_st_flag         = false;
 s32  sd_reverb_mode          = 0;
-u32  body_partly_size        = 0;
+u32  body_partly_size[16]    = {0};
 
 #include "smf_tables.h"
 

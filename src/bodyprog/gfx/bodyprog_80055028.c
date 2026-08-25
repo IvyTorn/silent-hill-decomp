@@ -457,6 +457,12 @@ void func_80055330(u8 arg0, s32 arg1, u8 arg2, s32 tintR, s32 tintG, s32 tintB, 
     g_WorldEnvWork.field_2C.m[2][1]    = (s16)tintB;
     g_WorldEnvWork.field_2C.m[2][0]    = (s16)tintB;
     g_WorldEnvWork.field_24            = (tintR * arg1) >> 17;
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: tint inputs at the env setter. */
+    { static int s_tin; if ((s_tin++ & 63) == 0)
+        SH_DBG("[TINT] r=%d g=%d b=%d gain=%d mode=%d",
+               (int)tintR, (int)tintG, (int)tintB, (int)arg1, (int)arg0); }
+#endif
     g_WorldEnvWork.field_25            = (tintG * arg1) >> 17;
     g_WorldEnvWork.field_26            = (tintB * arg1) >> 17;
 #ifdef SH_PC_PORT
@@ -1844,6 +1850,14 @@ void func_80057228(MATRIX* mat, s32 alpha, SVECTOR* arg2, VECTOR3* arg3) // 0x80
     gte_lddp(alpha);
     gte_gpf12();
     gte_stsv(&g_WorldEnvWork.field_74);
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: the world light vector as stored. Zero here = the zero
+     * enters at/before this GTE chain; sane here = it dies later. */
+    { static int s_lit; if ((s_lit++ & 255) == 0)
+        SH_DBG("[LIT] sv=%d,%d,%d m00=%d", (int)g_WorldEnvWork.field_74.vx,
+               (int)g_WorldEnvWork.field_74.vy, (int)g_WorldEnvWork.field_74.vz,
+               (int)mat->m[0][0]); }
+#endif
 
     // Divide `arg3` by 16 and subtract matrix translation.
     posX = Q12_TO_Q8(arg3->vx) - mat->t[0];
@@ -2122,6 +2136,17 @@ void func_80057A3C(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
     scratchData->field_380.field_0.m[0][1] = lightVec->vy;
     scratchData->field_380.field_0.m[0][2] = lightVec->vz;
     gte_SetLightMatrix(&scratchData->field_380.field_0);
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: the LLM row the NCT consumes + the colour matrix diag. */
+    { static int s_litm; if ((s_litm++ & 511) == 0)
+        SH_DBG("[LITM] llm0=%d,%d,%d lcm=%d,%d,%d",
+               (int)scratchData->field_380.field_0.m[0][0],
+               (int)scratchData->field_380.field_0.m[0][1],
+               (int)scratchData->field_380.field_0.m[0][2],
+               (int)g_WorldEnvWork.field_2C.m[0][0],
+               (int)g_WorldEnvWork.field_2C.m[1][1],
+               (int)g_WorldEnvWork.field_2C.m[2][2]); }
+#endif
 
     var_a3  = &scratchData->field_2B8[offset];
     temp_t2 = g_WorldEnvWork.field_20;

@@ -308,7 +308,11 @@ extern bool sd_int_flag;
 extern bool sd_int_flag2;
 extern s32  sd_timer_sync;
 extern bool smf_start_flag;
-extern u32  body_partly_size;
+/* PER BANK, not one global: the PSX serialized VAB body loads behind the CD,
+ * so one shared running offset was safe. This port's FS queue can interleave
+ * two banks' partial transfers, and a shared offset then writes each bank's
+ * chunks at the OTHER bank's progress -- valid keyons, silent samples. */
+extern u32  body_partly_size[16];
 extern s32  smf_file_no;
 extern u32  spu_ch_tbl[24];
 extern u16  PitchTbl[12][128];
