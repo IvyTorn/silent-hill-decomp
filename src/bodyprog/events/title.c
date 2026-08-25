@@ -97,8 +97,12 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
     // After staying idle in the title screen for some time, this checks if the intro FMV or a
     // demo gameplay segment should be played. If the next value from `g_Demo_ReproducedCount`
     // is a value divisible by 3, the intro FMV will play. Otherwise, it defaults to a gameplay demo.
-#if defined(SH_PC_PORT) && !defined(SH_XBOX_PORT)
-    playInGameDemo = false; /* Skip demo on PC - not fully functional there */
+#if (defined(SH_PC_PORT) && !defined(SH_XBOX_PORT)) || defined(SH_N64_PORT)
+    /* Skip demos on PC (not fully functional) and on N64: the attract demo
+     * boots a DEMO MAP that is not in the cartridge's map set, and that boot
+     * attempt is the title-idle hang. Idle cycles the (skipped) intro FMV
+     * instead, which simply returns to the title. */
+    playInGameDemo = false;
 #else
     /* Xbox + PSX: play the attract-mode gameplay demos (data is on the disc).
      * Same PSX cadence — every 3rd idle timeout shows the intro FMV instead. */

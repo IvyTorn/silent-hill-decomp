@@ -243,7 +243,7 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
 
             if (Pc_KanjiCell((u16)(((u32)charCode << 8) | strCpy[1]), &kPage, &kU, &kV, &kClut))
             {
-                if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                if (g_SysWork.enableHighResGlyphs)
                 {
                     glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -318,7 +318,7 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 u0         = (glyphIdx % FONT_12X16_ATLAS_COLUMN_COUNT) * FONT_12X16_GLYPH_SIZE_X;
 
                 // Draw glyph sprite.
-                if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                if (g_SysWork.enableHighResGlyphs)
                 {
                     glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -368,7 +368,7 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
             sizeCpy--;
 
             // Draw glyph sprite.
-            if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+            if (g_SysWork.enableHighResGlyphs)
             {
                 glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -874,7 +874,7 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                 if (Pc_KanjiCell((u16)(((u32)(u8)charCode << 8) | ((u8*)mapMsg)[1]),
                                  &kPage, &kU, &kV, &kClut))
                 {
-                    if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                    if (g_SysWork.enableHighResGlyphs)
                     {
                         glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -954,7 +954,7 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                     page      = g_FontLayout->tpageBase + (row / g_FontLayout->rowsPerPage);
                     temp_a0   = (idx % FONT_12X16_ATLAS_COLUMN_COUNT) * FONT_12X16_GLYPH_SIZE_X;
 
-                    if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+                    if (g_SysWork.enableHighResGlyphs)
                     {
                         glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
@@ -999,7 +999,7 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                 }
             }
 #else
-            if (g_SysWork.enableHighResGlyphs || SH_N64_GLYPH_2D_SCREEN)
+            if (g_SysWork.enableHighResGlyphs)
             {
                 glyphPoly = (POLY_FT4*)GsOUT_PACKET_P;
 
