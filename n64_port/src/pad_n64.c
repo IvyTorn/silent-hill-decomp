@@ -177,6 +177,10 @@ real_input:
 
     if (!joypad_is_connected(JOYPAD_PORT_1))
     {
+        /* TEMP diagnostic: a one-shot so a joybus failure on real hardware
+         * names itself instead of presenting as "the menu ignores me". */
+        static int s_saidDisc;
+        if (!s_saidDisc) { s_saidDisc = 1; SH_DBG("[PADR] port 1 NOT CONNECTED"); }
         Pad_FillIdle(s_padBuf);
         s_padBuf[0] = 0xFF;               /* disconnected */
         return;
@@ -228,6 +232,19 @@ real_input:
     if (sy < -STICK_DEADZONE) PRESS(PSXB_DOWN);
 
     #undef PRESS
+
+    /* TEMP diagnostic: raw PSX button word on every CHANGE (idle=0xFFFF), so
+     * the SD log proves whether hardware presses reach the game and in which
+     * GameState they landed. Quiet controller = zero lines. */
+    {
+        extern int g_N64GameState;
+        static unsigned short s_lastPsx = 0xFFFF;
+        if (psx != s_lastPsx)
+        {
+            SH_DBG("[PADR] btn=%04x state=%d", (unsigned)psx, g_N64GameState);
+            s_lastPsx = psx;
+        }
+    }
 
     s_padBuf[0] = 0x00;
     s_padBuf[1] = 0x41;

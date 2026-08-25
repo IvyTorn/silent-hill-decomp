@@ -103,10 +103,14 @@ void Tim_SwapForBigEndian(void* addr)
             rect = (uint16_t*)&blk[1];
             SwapWords16(rect, 4);     /* x, y, w, h */
 
-            /* Trust the size word over w*h: a truncated or padded rip would
-             * otherwise walk off the end of the buffer. */
-            words = (blk[0] - 12) / 2;
-            SwapWords16((uint16_t*)&blk[3], words);
+            /* The CLUT/pixel PAYLOAD words stay little-endian ON PURPOSE.
+             * VRAM's byte layout is defined as PSX-verbatim (LE) and every
+             * 16-bit interpretation swaps at the READ site (VRAM_RD in
+             * psx_vram.c) -- swapping payloads here too double-swaps them,
+             * which is exactly the rainbow-palette title screen. Only the
+             * fields game code reads as values (magic, mode, sizes, rects)
+             * are converted. */
+            (void)words;
 
             blk = (uint32_t*)((uint8_t*)blk + blk[0]);
         }
