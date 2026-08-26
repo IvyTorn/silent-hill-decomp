@@ -705,7 +705,7 @@ static void EmitQuad(ShVertex* v0, ShVertex* v1, ShVertex* v2, ShVertex* v3)
         /* 0: DISARMED pending hardware validation -- a hung RDP at the 2D
          * load screen is this build's top progression suspect. Re-arm after
          * a run proves the stall is elsewhere. */
-#define SH_N64_BLIT_QUADS 0
+#define SH_N64_BLIT_QUADS 1
         if (SH_N64_BLIT_QUADS && GpuNv2a_TryBlitQuad(v0, v1, v2, v3)) {
             s_primCount++;
             s_emitCycles += shx_rdtsc() - t0;

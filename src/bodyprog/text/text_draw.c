@@ -16,10 +16,21 @@
  * path. Cancel the offset and force the full-height POLY path, ONLY in those
  * modes - the in-game 240-tall screens are laid out correctly already. */
 #define SH_N64_GLYPH_2D_SCREEN (g_GameWork.gsScreenHeight != 240)
+/* The PSX hi-res 2D screens (title, main menu) are 640x448 and draw 12x16
+ * glyphs, which is normal there because hi-res PSX pixels are half-width.
+ * The N64 renders 320x240, so the backend halves everything and each glyph
+ * lands as 6x8 REAL pixels of mush. Draw those glyphs as double-size quads
+ * instead: 24x32 in PSX space is a true 12x16 on screen. Only the 448-tall
+ * screens -- the 224-tall in-game ones already map 1:1 and are correct.
+ * NOTE the test is against FRAMEBUFFER_HEIGHT_INTERLACED, not 240: 240 is
+ * the LOGICAL 2D space, while a progressive screen reports 224, so a `!= 240`
+ * test fires in-game as well (that is what broke options/inventory before). */
+#define SH_N64_HIRES_2D (g_GameWork.gsScreenHeight == FRAMEBUFFER_HEIGHT_INTERLACED)
 #define SH_N64_GADJX (SH_N64_GLYPH_2D_SCREEN ? -(g_GameWork.gsScreenWidth >> 1) : 0)
 #define SH_N64_GADJY (SH_N64_GLYPH_2D_SCREEN ? -(g_GameWork.gsScreenHeight >> 1) : 0)
 #else
 #define SH_N64_GLYPH_2D_SCREEN 0
+#define SH_N64_HIRES_2D 0
 #define SH_N64_GADJX 0
 #define SH_N64_GADJY 0
 #endif
@@ -250,10 +261,10 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                     setPolyFT4(glyphPoly);
                     setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
                     setXY4(glyphPoly,
-                           SH_N64_GADJX + posX,                           (SH_N64_GADJY + posY * 2),
-                           SH_N64_GADJX + posX,                           (SH_N64_GADJY + posY * 2) + g_FontLayout->hiResGlyphBottom,
-                           SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + posY * 2),
-                           SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + posY * 2) + g_FontLayout->hiResGlyphBottom);
+                           posX,                           (posY * 2),
+                           posX,                           (posY * 2) + g_FontLayout->hiResGlyphBottom,
+                           posX + FONT_12X16_GLYPH_SIZE_X, (posY * 2),
+                           posX + FONT_12X16_GLYPH_SIZE_X, (posY * 2) + g_FontLayout->hiResGlyphBottom);
 
                     setUV0ClutWord(glyphPoly, (u32)kU + ((u32)kV << 8) + ((u32)kClut << 16));
                     setUV1TPageWord(glyphPoly, (u32)kU + (kPage << 16) + (((u32)kV + 15) << 8));
@@ -325,10 +336,10 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                     setPolyFT4(glyphPoly);
                     setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
                     setXY4(glyphPoly,
-                           SH_N64_GADJX + posX,                           (SH_N64_GADJY + drawY * 2),
-                           SH_N64_GADJX + posX,                           (SH_N64_GADJY + drawY * 2) + g_FontLayout->hiResGlyphBottom,
-                           SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + drawY * 2),
-                           SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + drawY * 2) + g_FontLayout->hiResGlyphBottom);
+                           posX,                           (drawY * 2),
+                           posX,                           (drawY * 2) + g_FontLayout->hiResGlyphBottom,
+                           posX + FONT_12X16_GLYPH_SIZE_X, (drawY * 2),
+                           posX + FONT_12X16_GLYPH_SIZE_X, (drawY * 2) + g_FontLayout->hiResGlyphBottom);
 
                     setUV0ClutWord(glyphPoly, u0 + (vTop << 8) + (g_FontLayout->packedClut << 16)); // `u0`, `v0`, `clut`.
                     setUV1TPageWord(glyphPoly, u0 + (page << 16) + ((vTop + 15) << 8));              // `u1`, `v1`, `page`.
@@ -378,10 +389,10 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 setPolyFT4(glyphPoly);
                 setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
                 setXY4(glyphPoly,
-                       SH_N64_GADJX + posX,                             (SH_N64_GADJY + posY * 2),
-                       SH_N64_GADJX + posX,                             (SH_N64_GADJY + posY * 2) + 30,
-                       SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + posY * 2),
-                       SH_N64_GADJX + posX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + posY * 2) + 30);
+                       posX,                             (posY * 2),
+                       posX,                             (posY * 2) + 30,
+                       posX + FONT_12X16_GLYPH_SIZE_X, (posY * 2),
+                       posX + FONT_12X16_GLYPH_SIZE_X, (posY * 2) + 30);
 #ifdef SH_N64_PORT
                 /* TEMP diagnostic: which coordinate SPACE do menu strings
                  * arrive in? Settles "options invisible" -- absolute 0..640
@@ -408,6 +419,37 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 addPrim(ot, glyphPoly);
                 GsOUT_PACKET_P = (u8*)glyphPoly + sizeof(POLY_FT4);
             }
+#ifdef SH_N64_PORT
+            else if (SH_N64_HIRES_2D)
+            {
+                /* Double-size textured quad in place of the 1:1 SPRT blit --
+                 * same 12x16 atlas cell, twice the screen rect, and the pen
+                 * advances twice as far so glyphs do not overlap. */
+                glyphPoly  = (POLY_FT4*)GsOUT_PACKET_P;
+                glyphIdx   = charCode - GLYPH_TABLE_ASCII_OFFSET;
+                glyphWidth = FONT_12X16_GLYPH_WIDTHS[glyphIdx];
+
+                setPolyFT4(glyphPoly);
+                setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
+                setXY4(glyphPoly,
+                       posX,                                     posY,
+                       posX,                                     posY + (FONT_12X16_GLYPH_SIZE_Y * 2),
+                       posX + (FONT_12X16_GLYPH_SIZE_X * 2),     posY,
+                       posX + (FONT_12X16_GLYPH_SIZE_X * 2),     posY + (FONT_12X16_GLYPH_SIZE_Y * 2));
+
+                posX += glyphWidth * 2;
+
+                u0 = (glyphIdx % FONT_12X16_ATLAS_COLUMN_COUNT) * FONT_12X16_GLYPH_SIZE_X;
+
+                setUV0ClutWord(glyphPoly, u0 + (0xF000 + (0x7FD3 << 16)));
+                setUV1TPageWord(glyphPoly, u0 + (((((glyphIdx / FONT_12X16_ATLAS_COLUMN_COUNT) & 0xF) | 16) << 16) | 0xFF00));
+                setUV2Word(glyphPoly, u0 - 0xFF4);
+                setUV3Word(glyphPoly, u0 - 0xF4);
+
+                addPrim(ot, glyphPoly);
+                GsOUT_PACKET_P = (u8*)glyphPoly + sizeof(POLY_FT4);
+            }
+#endif
             else
             {
                 posXCpy = (u16)posX;
@@ -881,10 +923,10 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                         setPolyFT4(glyphPoly);
                         setRGB0(glyphPoly, (s8)color, (s8)(color >> 8), (s8)(color >> 16));
                         setXY4(glyphPoly,
-                               SH_N64_GADJX + glyphPosX,                           (SH_N64_GADJY + glyphPosY * 2),
-                               SH_N64_GADJX + glyphPosX,                           (SH_N64_GADJY + glyphPosY * 2) + g_FontLayout->hiResGlyphBottom,
-                               SH_N64_GADJX + glyphPosX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + glyphPosY * 2),
-                               SH_N64_GADJX + glyphPosX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + glyphPosY * 2) + g_FontLayout->hiResGlyphBottom);
+                               glyphPosX,                           (glyphPosY * 2),
+                               glyphPosX,                           (glyphPosY * 2) + g_FontLayout->hiResGlyphBottom,
+                               glyphPosX + FONT_12X16_GLYPH_SIZE_X, (glyphPosY * 2),
+                               glyphPosX + FONT_12X16_GLYPH_SIZE_X, (glyphPosY * 2) + g_FontLayout->hiResGlyphBottom);
 
                         setUV0ClutWord(glyphPoly, (u32)kU + ((u32)kV << 8) + ((u32)kClut << 16));
                         setUV1TPageWord(glyphPoly, (u32)kU + (kPage << 16) + (((u32)kV + 15) << 8));
@@ -961,10 +1003,10 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                         setPolyFT4(glyphPoly);
                         setRGB0(glyphPoly, (s8)color, (s8)(color >> 8), (s8)(color >> 16));
                         setXY4(glyphPoly,
-                               SH_N64_GADJX + glyphPosX,                           (SH_N64_GADJY + drawY * 2),
-                               SH_N64_GADJX + glyphPosX,                           (SH_N64_GADJY + drawY * 2) + g_FontLayout->hiResGlyphBottom,
-                               SH_N64_GADJX + glyphPosX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + drawY * 2),
-                               SH_N64_GADJX + glyphPosX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + drawY * 2) + g_FontLayout->hiResGlyphBottom);
+                               glyphPosX,                           (drawY * 2),
+                               glyphPosX,                           (drawY * 2) + g_FontLayout->hiResGlyphBottom,
+                               glyphPosX + FONT_12X16_GLYPH_SIZE_X, (drawY * 2),
+                               glyphPosX + FONT_12X16_GLYPH_SIZE_X, (drawY * 2) + g_FontLayout->hiResGlyphBottom);
 
                         setUV0ClutWord(glyphPoly, temp_a0 + (vTop << 8) + (g_FontLayout->packedClut << 16));      // `u0`, `v0`, `clut`.
                         setUV1TPageWord(glyphPoly, temp_a0 + (page << 16) + ((vTop + 15) << 8));                   // `u1`, `v1`, `page`.
@@ -1009,10 +1051,10 @@ s32 Gfx_MapMsg_StringDraw(char* mapMsg, s32 strLength) // 0x8004AF18
                 setPolyFT4(glyphPoly);
                 setRGB0(glyphPoly, (s8)color, (s8)(color >> 8), (s8)(color >> 16));
                 setXY4(glyphPoly,
-                       SH_N64_GADJX + glyphPosX,                             (SH_N64_GADJY + glyphPosY * 2),
-                       SH_N64_GADJX + glyphPosX,                             (SH_N64_GADJY + glyphPosY * 2) + 30,
-                       SH_N64_GADJX + glyphPosX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + glyphPosY * 2),
-                       SH_N64_GADJX + glyphPosX + FONT_12X16_GLYPH_SIZE_X, (SH_N64_GADJY + glyphPosY * 2) + 30);
+                       glyphPosX,                             (glyphPosY * 2),
+                       glyphPosX,                             (glyphPosY * 2) + 30,
+                       glyphPosX + FONT_12X16_GLYPH_SIZE_X, (glyphPosY * 2),
+                       glyphPosX + FONT_12X16_GLYPH_SIZE_X, (glyphPosY * 2) + 30);
 
                 glyphPosX += charWidth;
 

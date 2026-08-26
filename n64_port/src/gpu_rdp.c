@@ -452,10 +452,14 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
         v0->col[2] != v1->col[2] || v0->col[2] != v2->col[2] || v0->col[2] != v3->col[2])
         return 0;
 
-    s0 = (int)(s0f * (float)TEX_PAGE_DIM);
-    t0 = (int)(t0f * (float)TEX_PAGE_DIM);
-    s1 = (int)(s1f * (float)TEX_PAGE_DIM + 0.5f);
-    t1 = (int)(t1f * (float)TEX_PAGE_DIM + 0.5f);
+    /* ShVertex UVs are RAW TEXELS (PutVertUV stores u/v verbatim), NOT 0..1 --
+     * scaling them by the page dimension pushed every span past the clamp and
+     * made this function bail on every quad, which is why arming it changed
+     * nothing on screen. */
+    s0 = (int)s0f;
+    t0 = (int)t0f;
+    s1 = (int)(s1f + 0.5f);
+    t1 = (int)(t1f + 0.5f);
     if (s0 < 0) s0 = 0;
     if (t0 < 0) t0 = 0;
     if (s1 > TEX_PAGE_DIM) s1 = TEX_PAGE_DIM;
@@ -465,6 +469,12 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
 
     /* Earlier prims of this run first, so layering survives. */
     GpuNv2a_FlushBatch();
+    /* FORCE the full mode apply: ApplyMode early-outs when !s_modeDirty, which
+     * would leave whatever the previous prim set -- including TLUT_NONE, under
+     * which this CI8 page samples its palette INDICES as colour. Dirty it first
+     * so tlut, alpha-compare and the PSX blend mode are all established, then
+     * swap only the combiner (prim colour drives modulation here, not shade). */
+    s_modeDirty = 1;
     ApplyMode();
     if (s_tlutDirty)
     {
@@ -478,15 +488,11 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
         data_cache_hit_writeback((void*)(s_texPage + t * TEX_PAGE_DIM + s0),
                                  (unsigned)(s1 - s0));
 
-    /* PSX texel modulation: 0x80 = 1.0, so scale by 2 like the tri path. */
-    {
-        float m0 = v0->col[0] * 2.0f, m1 = v0->col[1] * 2.0f, m2 = v0->col[2] * 2.0f;
-        if (m0 > 1.0f) m0 = 1.0f;
-        if (m1 > 1.0f) m1 = 1.0f;
-        if (m2 > 1.0f) m2 = 1.0f;
-        rdpq_set_prim_color(RGBA32((int)(m0 * 255.0f), (int)(m1 * 255.0f),
-                                   (int)(m2 * 255.0f), 255));
-    }
+    /* PutVertUV ALREADY applied the PSX 0x80=1.0 modulation (r <<= 1, clamped),
+     * so col is the final factor -- doubling it again blew every blit to white. */
+    rdpq_set_prim_color(RGBA32((int)(v0->col[0] * 255.0f),
+                               (int)(v0->col[1] * 255.0f),
+                               (int)(v0->col[2] * 255.0f), 255));
     rdpq_mode_combiner(RDPQ_COMBINER_TEX_FLAT);
 
     rdpq_tex_blit(&s_pageSurf, x0, y0, &(rdpq_blitparms_t){
