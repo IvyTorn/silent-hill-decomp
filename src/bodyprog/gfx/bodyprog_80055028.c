@@ -4106,10 +4106,18 @@ u8 func_8005AA08(s_MeshHeader* meshHdr, s32 arg1, s_GteScratchData2* scratchData
     // Same as `gte_strgb3`, but takes `VECTOR3` pointer to store results.
     // Not sure why this was needed, the func that uses it also ends up calling the normal `gte_strgb3` too.
 #ifdef SH_PC_PORT
+    /* GTE_B32, exactly as gte_strgb3 does: the GTE register holds the
+     * LE-composed PSX colour word (r in the low byte) on both endians, so a
+     * RAW store lands r,g,b REVERSED in CVECTOR memory on big-endian. Every
+     * world and character vertex came out with red forced to 0 and the red
+     * sitting in the code byte -- (0,80,76), the exact blue-green this port
+     * painted its whole world with. This macro is the LOOP body; gte_strgb3
+     * (already swapped) stores only the FINAL vertex, which is why the
+     * [TPGE] census read 111 reversed colour words against 7 correct ones. */
     #define gte_strgb3_vec( r0 ) do { \
-        *(u32*)((char*)(r0) + 0) = MFC2(20); \
-        *(u32*)((char*)(r0) + 4) = MFC2(21); \
-        *(u32*)((char*)(r0) + 8) = MFC2(22); \
+        *(u32*)((char*)(r0) + 0) = GTE_B32(MFC2(20)); \
+        *(u32*)((char*)(r0) + 4) = GTE_B32(MFC2(21)); \
+        *(u32*)((char*)(r0) + 8) = GTE_B32(MFC2(22)); \
     } while(0)
 #else
     #define gte_strgb3_vec( r0 ) __asm__ volatile ( \

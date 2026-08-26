@@ -419,37 +419,6 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 addPrim(ot, glyphPoly);
                 GsOUT_PACKET_P = (u8*)glyphPoly + sizeof(POLY_FT4);
             }
-#ifdef SH_N64_PORT
-            else if (SH_N64_HIRES_2D)
-            {
-                /* Double-size textured quad in place of the 1:1 SPRT blit --
-                 * same 12x16 atlas cell, twice the screen rect, and the pen
-                 * advances twice as far so glyphs do not overlap. */
-                glyphPoly  = (POLY_FT4*)GsOUT_PACKET_P;
-                glyphIdx   = charCode - GLYPH_TABLE_ASCII_OFFSET;
-                glyphWidth = FONT_12X16_GLYPH_WIDTHS[glyphIdx];
-
-                setPolyFT4(glyphPoly);
-                setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
-                setXY4(glyphPoly,
-                       posX,                                     posY,
-                       posX,                                     posY + (FONT_12X16_GLYPH_SIZE_Y * 2),
-                       posX + (FONT_12X16_GLYPH_SIZE_X * 2),     posY,
-                       posX + (FONT_12X16_GLYPH_SIZE_X * 2),     posY + (FONT_12X16_GLYPH_SIZE_Y * 2));
-
-                posX += glyphWidth * 2;
-
-                u0 = (glyphIdx % FONT_12X16_ATLAS_COLUMN_COUNT) * FONT_12X16_GLYPH_SIZE_X;
-
-                setUV0ClutWord(glyphPoly, u0 + (0xF000 + (0x7FD3 << 16)));
-                setUV1TPageWord(glyphPoly, u0 + (((((glyphIdx / FONT_12X16_ATLAS_COLUMN_COUNT) & 0xF) | 16) << 16) | 0xFF00));
-                setUV2Word(glyphPoly, u0 - 0xFF4);
-                setUV3Word(glyphPoly, u0 - 0xF4);
-
-                addPrim(ot, glyphPoly);
-                GsOUT_PACKET_P = (u8*)glyphPoly + sizeof(POLY_FT4);
-            }
-#endif
             else
             {
                 posXCpy = (u16)posX;
