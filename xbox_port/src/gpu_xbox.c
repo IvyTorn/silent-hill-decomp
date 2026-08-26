@@ -620,9 +620,27 @@ static void ApplyFog(ShVertex* v, int pad)
     v->col[0] *= 1.0f - f;
     v->col[1] *= 1.0f - f;
     v->col[2] *= 1.0f - f;
+#ifdef SH_N64_PORT
+    /* The RDP path stages position, colour and UV only -- it has no specular
+     * slot and no final-combiner add, so a fog colour written there is simply
+     * DROPPED and distance fog darkens geometry toward BLACK instead of fading
+     * it into the fog. Fold the fog term into the diffuse instead, which is
+     * the sum the other backends' combiner would have produced. It rides
+     * through the texture multiply rather than being added after it, so it is
+     * an approximation -- the exact form wants the RDP's own fog blender
+     * (rdpq_set_fog_color + RDPQ_BLENDER_FOG with the factor in shade alpha),
+     * which is a bigger change than this file should make. */
+    v->col[0] += g_PsyX_FogColor[0] * f;
+    v->col[1] += g_PsyX_FogColor[1] * f;
+    v->col[2] += g_PsyX_FogColor[2] * f;
+    if (v->col[0] > 1.0f) v->col[0] = 1.0f;
+    if (v->col[1] > 1.0f) v->col[1] = 1.0f;
+    if (v->col[2] > 1.0f) v->col[2] = 1.0f;
+#else
     v->spec[0] = g_PsyX_FogColor[0] * f;
     v->spec[1] = g_PsyX_FogColor[1] * f;
     v->spec[2] = g_PsyX_FogColor[2] * f;
+#endif
     s_cnFogged++;
     if (pad < s_cnPadMin) s_cnPadMin = pad;
     if (pad > s_cnPadMax) s_cnPadMax = pad;
