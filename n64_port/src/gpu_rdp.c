@@ -460,10 +460,15 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
     t0 = (int)t0f;
     s1 = (int)(s1f + 0.5f);
     t1 = (int)(t1f + 0.5f);
-    if (s0 < 0) s0 = 0;
-    if (t0 < 0) t0 = 0;
-    if (s1 > TEX_PAGE_DIM) s1 = TEX_PAGE_DIM;
-    if (t1 > TEX_PAGE_DIM) t1 = TEX_PAGE_DIM;
+    /* DECLINE anything that reaches outside the 256x256 page -- do NOT clamp.
+     * PSX VRAM is 512 rows and sprites routinely span past a page's bottom
+     * (KONAMI.TIM is 192 rows from v=240), so clamping kept a 16-row slice and
+     * then stretched it over the sprite's full height: a dark vertical bar
+     * where the logo belongs, which is exactly how this froze the console on
+     * its first live boot. The triangle path already handles these correctly,
+     * so handing them back is both safe and right. */
+    if (s0 < 0 || t0 < 0 || s1 > TEX_PAGE_DIM || t1 > TEX_PAGE_DIM)
+        return 0;
     if (s1 <= s0 || t1 <= t0)
         return 0;
 
