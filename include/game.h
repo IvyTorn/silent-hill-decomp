@@ -325,9 +325,30 @@ typedef struct _PlayerCombat
 } s_PlayerCombat;
 STATIC_ASSERT_SIZEOF(s_PlayerCombat, 20);
 
+/* THE BYTE VIEW IS DECLARED MSB-FIRST ON BIG-ENDIAN, and it has to be.
+ *
+ * MAP_EFFECTS_INFOS initialises the s32 member (.field_0 = 0xFF00) and the
+ * game reads the bytes back out: field_2 is the world LIGHTING MODE and
+ * field_1 the light-type selector. A byte struct declared in one order only
+ * means the same thing as the s32 on ONE endianness -- on the other, 0xFF00
+ * hands field_2 the 0xFF that was meant for field_1, the lighting mode
+ * becomes 255, `switch (g_WorldEnvWork.field_0)` in the mesh emitter matches
+ * NO case, so the colour matrix is never loaded and gte_nct lights every
+ * world vertex to BLACK (the N64 port's black-geometry-in-a-pale-void).
+ * Reversing the declaration makes both views agree with the value on both
+ * ends; there is no disc path into this union, so the s32 is authoritative. */
 typedef union
 {
     s32 field_0; // Flags?
+#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+    struct
+    {
+        u8 unk_3;
+        u8 field_2;
+        u8 field_1;
+        u8 field_0; // Flags.
+    } s_field_0;
+#else
     struct
     {
         u8 field_0; // Flags.
@@ -335,6 +356,7 @@ typedef union
         u8 field_2;
         u8 unk_3;
     } s_field_0;
+#endif
 } u_Unk0;
 
 /** @brief Map effects info. */
