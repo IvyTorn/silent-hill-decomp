@@ -94,7 +94,7 @@ void Pad_Poll(void)
  * Harry walks and footstep SFX exercise the whole sound chain; 3 = mash then
  * idle; 2 = START only (BROKEN - CROSS is what confirms the no-card dialog);
  * 1 = full New Game drive; 0 = hardware (humans only). */
-#define SH_N64_AUTOSTART 1
+#define SH_N64_AUTOSTART 0
 #if SH_N64_AUTOSTART
     /* TEMP diagnostic: drive a real New Game with no human. The emulator runs
      * ~7 game-frames a second, so from ~100 s in, mash START then CROSS on a
