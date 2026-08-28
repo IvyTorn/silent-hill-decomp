@@ -3286,7 +3286,18 @@ void MainLoop(void) // 0x80032EE0
                      * it the new chain terminator instead of just zeroing its
                      * length (the old behaviour left cur->addr pointing at the
                      * wild target, so DrawOTag would still chase it). */
-#if defined(SH_XBOX360_PORT)
+#if defined(SH_N64_PORT)
+/* N64 FIRST -- it defines SH_XBOX_PORT too. The Original Xbox cap below says
+ * "statics and g_PsxRam live under 128MB"; on the N64 nothing does. RDRAM is
+ * mapped at KSEG0 0x80000000, so every static, the PSX RAM block and the
+ * packet arenas all sit at 0x8xxxxxxx and fail the magnitude term, leaving a
+ * chain rescued only if it happens to land in a runtime pkt/ot/sub window.
+ * Anything else gets SPLICED TO ITS TERMINATOR -- which is precisely the
+ * "grey-void regression" the Xbox note below describes, and precisely the
+ * missing world geometry this port has shown all along. Use the whole cached
+ * RAM window as the magnitude term. */
+#define SH_OT_PTR_MAX ((uintptr_t)0xC0000000)
+#elif defined(SH_XBOX360_PORT)
 /* Tested BEFORE SH_XBOX_PORT, which the 360 also defines. The Original Xbox
  * value below says "statics and g_PsxRam live under 128MB"; on libXenon they do
  * not -- all 512MB of RAM is mapped at 0x80000000, so every static, the PSX RAM

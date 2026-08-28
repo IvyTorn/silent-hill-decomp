@@ -663,6 +663,7 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
 /* TEMP diagnostic for the [SNDD] census: how many voices are live, and how
  * many key-ons have EVER happened (0 forever = the game side never asks). */
 int g_N64KeyOnCount;
+int g_N64SilentKeyOns;   /* key-ons that decoded to zero samples */
 int Audio_N64DiagVoices(void)
 {
     int i, n = 0;
@@ -835,12 +836,29 @@ void SpuSetKey(int on_off, unsigned int voice_bit)
              * Is there VAG data at the voice address (SPU RAM upload), and
              * does the decoder produce anything from it? */
             {
-                static int s_spuw = 0;
-                if (s_spuw < 8) {
+                /* Sample the FAILURES, not the first 8 key-ons: those all fire
+                 * at boot before any VAB body is uploaded, so this probe has
+                 * never once caught an in-game silent voice. A voice with
+                 * pcmLen==0 is exactly the "keyons rise, live stays 0" case --
+                 * all-zero bytes mean the sample never reached SPU RAM, while
+                 * real bytes with pcmLen==0 mean the decoder rejected them. */
+                static int s_spuwBad = 0;
+                if (v->pcmLen == 0 && s_spuwBad < 12) {
                     const unsigned char* b = &s_spuRam[v->addr & (SPU_RAM_SIZE - 1)];
-                    s_spuw++;
-                    SH_DBG("[SPUW] addr=%u bytes=%02x%02x%02x%02x pcmLen=%d loop=%d..%d pitch=%d",
-                           (unsigned)v->addr, b[0], b[1], b[2], b[3], v->pcmLen, ls, le, (int)(v->step * 4096.0));
+                    s_spuwBad++;
+                    SH_DBG("[SPUW] SILENT addr=%u bytes=%02x%02x%02x%02x%02x%02x%02x%02x pitch=%d",
+                           (unsigned)v->addr, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+                           (int)(v->step * 4096.0));
+                    g_N64SilentKeyOns++;
+                }
+                else if (v->pcmLen > 0)
+                {
+                    static int s_spuwOk = 0;
+                    if (s_spuwOk < 4) {
+                        s_spuwOk++;
+                        SH_DBG("[SPUW] OK addr=%u pcmLen=%d loop=%d..%d pitch=%d",
+                               (unsigned)v->addr, v->pcmLen, ls, le, (int)(v->step * 4096.0));
+                    }
                 }
             }
 #endif

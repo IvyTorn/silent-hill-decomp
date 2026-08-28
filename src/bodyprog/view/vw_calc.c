@@ -407,7 +407,20 @@ void Vw_CoordHierarchyMatrixCompute(GsCOORDINATE2* rootCoord, MATRIX* transformM
      * truncated/uninitialised PSX pointer shows up as ~0 / non-canonical and
      * derefs to a wild read (the bad-ending crash: super == -1). Treat any
      * non-canonical link as end-of-chain instead of crashing. */
-    #if defined(SH_XBOX360_PORT)
+    #if defined(SH_N64_PORT)
+    /* N64 FIRST: this port defines SH_XBOX_PORT as well, so without its own
+     * branch it inherits the Original Xbox window below -- which demands
+     * `< 0x08000000` while every N64 address is 0x8xxxxxxx (RDRAM is mapped at
+     * KSEG0 0x80000000, and statics, heap and stacks all live there). The
+     * stack fallback then fails too, because a static bone array is nowhere
+     * near the stack's 1MB bucket. The result is COORD_PTR_OK false for
+     * essentially every coord, every transform degrading to identity, and
+     * NOTHING being positioned: exploded/garbled characters and no world
+     * geometry, with no crash to point at it. Exactly the failure the 360
+     * comment below records, for exactly the same reason.
+     * One contiguous window: KSEG0/KSEG1 for 8MB of RDRAM. */
+    #define COORD_PTR_OK(p) ((uintptr_t)(p) >= 0x80000000u &&                              (uintptr_t)(p) <  0xC0000000u &&                              (((uintptr_t)(p) & 3) == 0))
+    #elif defined(SH_XBOX360_PORT)
     /* The 360 defines SH_XBOX_PORT too, so it MUST be tested first or it
      * inherits the Original Xbox ranges below -- which reject every valid 360
      * pointer. That is not theoretical: it is what this build did. libXenon maps

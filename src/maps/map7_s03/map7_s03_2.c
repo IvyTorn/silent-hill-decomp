@@ -1909,7 +1909,13 @@ void func_800D9114(s_800F3D48* arg0) // 0x800D9114
 #elif defined(SH_XBOX_PORT)
 /* 32-bit: the 64-bit canonical bound below folds to compile-time TRUE, passing
  * any garbage >= 0x10000. Code/data pointers on Xbox all live < 128MB. */
+#if defined(SH_N64_PORT)
+/* N64 RDRAM sits at KSEG0 0x80000000, so the Xbox's <128MB window rejects
+ * every valid pointer here -- same class as COORD_PTR_OK and SH_OT_PTR_MAX. */
+#define SH_F3D48_PTR_OK(p) ((uintptr_t)(p) >= 0x80000000u && (uintptr_t)(p) < 0xC0000000u)
+#else
 #define SH_F3D48_PTR_OK(p) ((uintptr_t)(p) >= 0x10000 && (uintptr_t)(p) < 0x08000000)
+#endif
 #else
 #define SH_F3D48_PTR_OK(p) ((uintptr_t)(p) >= 0x10000ULL && (uintptr_t)(p) < 0x0000800000000000ULL)
 #endif

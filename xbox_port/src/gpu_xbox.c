@@ -218,7 +218,18 @@ static inline unsigned int* TexLookup(int tpage, int clut)
     r = (unsigned int*)PsxVram_GetPaletted(tpage, clut, &pal);
     if (!r) {
         pal = 0;
-        r   = PsxVram_GetTexture(tpage, clut);
+#if defined(SH_N64_PORT)
+        /* NO ARGB FALLBACK ON N64: that cache is 256KB per slot, so on this
+         * machine's ~1MB heap it gets exactly ONE. Every 16-bit-direct page
+         * then evicts that slot and forces a GPU drain -- the hardware log
+         * measured 65 drains inside a single 205ms frame (under 5 FPS). Those
+         * pages are framebuffer-feedback ones that decode ~99% transparent
+         * ([STP] zero=64717/65536), so they burn the whole frame budget to
+         * draw nothing. Decline and let the prim go untextured instead. */
+        r   = 0;
+#else
+        r   = PsxVram_GetTexture(tpage, clut);
+#endif
     }
     s_pendingPal = pal;
     if (pal) { s_pendingUvX = PAL_UV_SCALE; s_pendingUvY = PAL_UV_SCALE; }
