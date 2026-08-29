@@ -3780,15 +3780,17 @@ void func_8005A21C(s_ModelInfo* modelInfo, GsOT_TAG* otTag, bool arg2, MATRIX* m
     normalOffset = modelHdr->normalOffset;
 
 #ifdef SH_N64_PORT
-    /* Zero-rotation rescue: a model arriving with an all-zero rotation and a
-     * sane translation renders as an invisible point. Identity keeps it
-     * visible (unrotated) at the right place - wrong orientation beats an
-     * empty world while the upstream zeroing is chased. */
-    if (mat->m[0][0] == 0 && mat->m[1][1] == 0 && mat->m[2][2] == 0 &&
-        mat->m[0][1] == 0 && mat->m[1][0] == 0)
-    {
-        mat->m[0][0] = mat->m[1][1] = mat->m[2][2] = 4096;
-    }
+    /* MEASURE, do not rescue. Forcing identity turned every zero-rotation
+     * model into an unrotated piece at the same spot, which is what made
+     * the world read as one coagulated pile. Count instead. */
+
+
+
+    { extern int g_N64ZeroModelMat, g_N64ModelMat; g_N64ModelMat++;
+      if (mat->m[0][0] == 0 && mat->m[1][1] == 0 && mat->m[2][2] == 0 &&
+          mat->m[0][1] == 0 && mat->m[1][0] == 0) g_N64ZeroModelMat++; }
+
+
     /* TEMP diagnostic: one real composed model-view matrix. Rotation entries
      * must stay inside ~+/-4096 and roughly orthonormal; t is the model's
      * view-space position. */

@@ -391,30 +391,19 @@ void func_80045534(s_Skeleton* skel, GsOT* ot, s32 arg2, GsCOORDINATE2* boneCoor
             }
 #endif
 #ifdef SH_N64_PORT
-            /* A bone whose local matrix is still all-zero was never written:
-             * its rotationDataIdx>=0 (so bind init skipped it) and the anim
-             * mask never selected it. On PSX the same bytes happen to hold
-             * survivable garbage; here calloc zeros collapse the piece to a
-             * point and Harry renders as a warping blob. Identity keeps the
-             * piece visible at its bind position until the masking question
-             * is settled for real. */
+            /* MEASURE, do not substitute. Forcing identity here made every
+             * unwritten bone render as an unrotated piece stacked at the
+             * origin -- the "meshes coagulating" the user sees. Count them
+             * instead so the log says how many bones the animation never
+             * wrote, and let the real cause surface. */
             {
                 GsCOORDINATE2* bc = &boneCoords[(u8)curBone->bone.idx];
+                extern int g_N64ZeroBoneCount, g_N64BoneCount;
+                g_N64BoneCount++;
                 if (bc->coord.m[0][0] == 0 && bc->coord.m[1][1] == 0 &&
                     bc->coord.m[2][2] == 0 && bc->coord.m[0][1] == 0 &&
                     bc->coord.m[1][0] == 0)
-                {
-                    bc->coord.m[0][0] = bc->coord.m[1][1] = bc->coord.m[2][2] = 4096;
-                    bc->coord.m[0][1] = bc->coord.m[0][2] = 0;
-                    bc->coord.m[1][0] = bc->coord.m[1][2] = 0;
-                    bc->coord.m[2][0] = bc->coord.m[2][1] = 0;
-                    bc->flg = 0;
-                    {
-                        static int s_bfb = 0;
-                        if (s_bfb < 10) { s_bfb++; SH_DBG("[BONE3] identity-substituted bone idx=%d (disabledMask=%08x)",
-                            (int)(u8)curBone->bone.idx, (unsigned)g_SysWork.playerWork.extra.disabledAnimBones); }
-                    }
-                }
+                    g_N64ZeroBoneCount++;
             }
 #endif
             Vw_CoordToWorldAndViewMatrices(&boneCoords[(u8)curBone->bone.idx], &worldMat, &viewMat);

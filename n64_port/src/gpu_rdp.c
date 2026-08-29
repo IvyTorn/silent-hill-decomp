@@ -665,6 +665,26 @@ void GpuNv2a_FrameEnd(void)
             extern short VbWvsMatrix[];
             extern int   g_N64CamProbe[4]; /* vb,vw,mv,ic call counts */
             extern int   g_N64VbSnap[6];   /* hier00,hier22,work00,id200,wvs00,super */
+            {
+                /* [PIPE]: the whole vertex pipeline in one line per window.
+                 * zeroBone/zeroModel = matrices the animation or the chunk
+                 * loader never wrote (a nonzero count means geometry is
+                 * unpositioned, NOT mis-projected). instX/instZ = the spread
+                 * of model instance positions this window: a real room spans
+                 * thousands of units, a coagulated pile spans ~0. */
+                extern int g_N64ZeroBoneCount, g_N64BoneCount;
+                extern int g_N64ZeroModelMat, g_N64ModelMat;
+                extern int g_N64InstSpread[4];
+                SH_DBG("[PIPE] bones=%d zero=%d models=%d zero=%d instX=%d..%d instZ=%d..%d",
+                       g_N64BoneCount, g_N64ZeroBoneCount,
+                       g_N64ModelMat, g_N64ZeroModelMat,
+                       g_N64InstSpread[0], g_N64InstSpread[1],
+                       g_N64InstSpread[2], g_N64InstSpread[3]);
+                g_N64BoneCount = g_N64ZeroBoneCount = 0;
+                g_N64ModelMat = g_N64ZeroModelMat = 0;
+                g_N64InstSpread[0] = g_N64InstSpread[2] = 0x7FFFFFF;
+                g_N64InstSpread[1] = g_N64InstSpread[3] = -0x7FFFFFF;
+            }
             SH_DBG("[WVS] m00=%d t2=%d cam=%d,%d,%d,%d vb=%d,%d,%d,%d,%d,%d",
                    (int)VbWvsMatrix[0],
                    (int)((int*)((char*)VbWvsMatrix + 20))[2],

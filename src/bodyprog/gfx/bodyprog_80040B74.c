@@ -3201,6 +3201,19 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                     modelCoord.workm.t[2] += cellBoundZ;
                     Vw_CoordToWorldAndViewMatrices(&modelCoord, &worldMat, &viewMat);
 #ifdef SH_N64_PORT
+                    /* Per-instance spread: are the room's models actually at
+                     * DIFFERENT places, or all stacked at the chunk origin?
+                     * [WMAT] sampling one instance per 1024 calls could not
+                     * tell those apart. Track the min/max instance world X/Z
+                     * across the frame; a room spans many units, a pile is 0. */
+                    {
+                        extern int g_N64InstSpread[4];
+                        int ix = (int)modelCoord.workm.t[0], iz = (int)modelCoord.workm.t[2];
+                        if (g_N64InstSpread[0] > ix) g_N64InstSpread[0] = ix;
+                        if (g_N64InstSpread[1] < ix) g_N64InstSpread[1] = ix;
+                        if (g_N64InstSpread[2] > iz) g_N64InstSpread[2] = iz;
+                        if (g_N64InstSpread[3] < iz) g_N64InstSpread[3] = iz;
+                    }
                     /* TEMP: world chunks land at screen y~500-1200 ([BIGPRIM])
                      * while characters project correctly, so the camera-relative
                      * step is the suspect. Vw_CoordToWorldAndViewMatrices

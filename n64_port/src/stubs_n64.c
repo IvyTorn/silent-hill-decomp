@@ -25,6 +25,12 @@ const char* g_MlTraceTag = "pre-loop";
  * [0]=vbSetWorldScreenMatrix [1]=vwSetViewInfo [2]=vcMoveAndSetCamera
  * [3]=vcInitCamera */
 int g_N64CamProbe[4];
+/* Vertex-pipeline census (see [PIPE] in gpu_rdp.c). Counting rather than
+ * "rescuing" a zero matrix: the rescue made every unwritten bone/model render
+ * as an unrotated piece at one spot, which is the coagulated pile on screen. */
+int g_N64ZeroBoneCount, g_N64BoneCount;
+int g_N64ZeroModelMat, g_N64ModelMat;
+int g_N64InstSpread[4];   /* min/max of instance world X and Z this frame */
 int g_N64VbSnap[6];
 int g_N64XfOff, g_N64XfVc, g_N64XfM[6];
 int g_N64GameState;

@@ -202,6 +202,31 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
 
     glyphColor = STRING_COLORS[g_StringColorId];
     ot         = &g_OtTags0[g_ActiveBufferIdx][g_Strings2dLayerIdx];
+#ifdef SH_N64_PORT
+    /* Hi-res 2D screens (title/menus) are a 640x448 PSX space that this port
+     * renders at 320x240, so the backend halves everything and a 12x16 glyph
+     * becomes 6x8 real pixels -- unreadable mush. Those screens draw glyphs at
+     * DOUBLE size below, which also doubles the string's width, so re-centre
+     * it on its original centre first: shift left by half the added width,
+     * which is half the original width. Measure printable ASCII only and stop
+     * at a newline, matching what the draw loop advances on. */
+    if (SH_N64_HIRES_2D)
+    {
+        u8* _m = strCpy;
+        s32 _n = sizeCpy;
+        s32 _w = 0;
+        while (_n > 0 && *_m != 0 && *_m != 10)   /* NUL / newline */
+        {
+            if (*_m >= GLYPH_TABLE_ASCII_OFFSET &&
+                (*_m - GLYPH_TABLE_ASCII_OFFSET) < FONT_12X16_GLYPH_COUNT)
+                _w += FONT_12X16_GLYPH_WIDTHS[*_m - GLYPH_TABLE_ASCII_OFFSET];
+            _m++;
+            _n--;
+        }
+        posX -= _w / 2;
+    }
+#endif
+
 
     if (!g_SysWork.enableHighResGlyphs)
     {
@@ -419,6 +444,42 @@ bool Gfx_StringDraw(char* str, s32 strLength) // 0x8004A8E8
                 addPrim(ot, glyphPoly);
                 GsOUT_PACKET_P = (u8*)glyphPoly + sizeof(POLY_FT4);
             }
+#ifdef SH_N64_PORT
+            else if (SH_N64_HIRES_2D)
+            {
+                /* Double-size textured quad in place of the 1:1 SPRT blit, so
+                 * a 12x16 atlas cell lands as a true 12x16 on this port's
+                 * 320x240 output instead of 6x8 of mush.
+                 * ALLOCATE FROM `packet`, NOT GsOUT_PACKET_P: this function
+                 * snapshots GsOUT_PACKET_P into `packet` on entry and
+                 * republishes it on exit, so quads written through the global
+                 * cursor were rewound over and overwritten by later prims --
+                 * that was the stretched white shape over the title. */
+                glyphPoly  = (POLY_FT4*)packet;
+                glyphIdx   = charCode - GLYPH_TABLE_ASCII_OFFSET;
+                glyphWidth = FONT_12X16_GLYPH_WIDTHS[glyphIdx];
+
+                setPolyFT4(glyphPoly);
+                setRGB0(glyphPoly, glyphColor, glyphColor >> 8, glyphColor >> 16);
+                setXY4(glyphPoly,
+                       posX,                                 posY,
+                       posX,                                 posY + (FONT_12X16_GLYPH_SIZE_Y * 2),
+                       posX + (FONT_12X16_GLYPH_SIZE_X * 2), posY,
+                       posX + (FONT_12X16_GLYPH_SIZE_X * 2), posY + (FONT_12X16_GLYPH_SIZE_Y * 2));
+
+                posX += glyphWidth * 2;
+
+                u0 = (glyphIdx % FONT_12X16_ATLAS_COLUMN_COUNT) * FONT_12X16_GLYPH_SIZE_X;
+
+                setUV0ClutWord(glyphPoly, u0 + (0xF000 + (0x7FD3 << 16)));
+                setUV1TPageWord(glyphPoly, u0 + (((((glyphIdx / FONT_12X16_ATLAS_COLUMN_COUNT) & 0xF) | 16) << 16) | 0xFF00));
+                setUV2Word(glyphPoly, u0 - 0xFF4);
+                setUV3Word(glyphPoly, u0 - 0xF4);
+
+                addPrim(ot, glyphPoly);
+                packet += sizeof(POLY_FT4);
+            }
+#endif
             else
             {
                 posXCpy = (u16)posX;
