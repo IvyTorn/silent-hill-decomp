@@ -197,8 +197,8 @@ bool func_800CE164(POLY_FT4** poly, s32 idx) // 0x800CE164
 
     PSX_ST_UV((*poly), u0, ((sharedData_800DFB7C_0_s00[idx].field_C.s_1.field_2 << 13) + 0xE0000));
     PSX_ST_UV((*poly), u1, ((sharedData_800DFB7C_0_s00[idx].field_C.s_1.field_2 << 13) + 0x2D003F));
-    *(u16*)&(*poly)->u2 = ((sharedData_800DFB7C_0_s00[idx].field_C.s_1.field_2 << 13) | 0x1F00);
-    *(u16*)&(*poly)->u3 = ((sharedData_800DFB7C_0_s00[idx].field_C.s_1.field_2 << 13) | 0x1F3F);
+    setUV2Word((*poly), ((sharedData_800DFB7C_0_s00[idx].field_C.s_1.field_2 << 13) | 0x1F00));
+    setUV3Word((*poly), ((sharedData_800DFB7C_0_s00[idx].field_C.s_1.field_2 << 13) | 0x1F3F));
 
     setSemiTrans(*poly, true);
 

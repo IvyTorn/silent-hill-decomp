@@ -801,10 +801,10 @@ PACKET* func_800DF6C4(GsOT_TAG* ot, PACKET* packet, MATRIX* mat) // 0x800DF6C4
 
             setPolyG4(poly);
 
-            *(s32*)&poly->x0 = *(s32*)&sp48[0];
-            *(s32*)&poly->x1 = *(s32*)&sp48[1];
-            *(s32*)&poly->x2 = *(s32*)&sp48[2];
-            *(s32*)&poly->x3 = *(s32*)&sp48[3];
+            PSX_ST_XY(poly, x0, PSX_LD_XY(&sp48[0]));
+            PSX_ST_XY(poly, x1, PSX_LD_XY(&sp48[1]));
+            PSX_ST_XY(poly, x2, PSX_LD_XY(&sp48[2]));
+            PSX_ST_XY(poly, x3, PSX_LD_XY(&sp48[3]));
 
             PSX_ST_RGBC(poly, temp_s0);
             PSX_ST_RGB(poly, r1, var_s6);
@@ -995,10 +995,10 @@ void* func_800DFD3C(GsOT_TAG* ot, PACKET* packet, MATRIX* mat, s32 arg3, s32 arg
 
             setPolyG4(poly);
 
-            *(s32*)&poly->x0 = *(s32*)&sp48[0];
-            *(s32*)&poly->x1 = *(s32*)&sp48[1];
-            *(s32*)&poly->x2 = *(s32*)&sp48[2];
-            *(s32*)&poly->x3 = *(s32*)&sp48[3];
+            PSX_ST_XY(poly, x0, PSX_LD_XY(&sp48[0]));
+            PSX_ST_XY(poly, x1, PSX_LD_XY(&sp48[1]));
+            PSX_ST_XY(poly, x2, PSX_LD_XY(&sp48[2]));
+            PSX_ST_XY(poly, x3, PSX_LD_XY(&sp48[3]));
 
             PSX_ST_RGBC(poly, temp_s0);
             PSX_ST_RGB(poly, r1, var_s6);

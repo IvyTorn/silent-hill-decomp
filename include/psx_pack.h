@@ -78,6 +78,14 @@ typedef unsigned int SH_PACK_U32;
  * in the LOW byte, i.e. what every packed colour STORE macro above takes. */
 #define PSX_LD_CVEC(ptr)     SH_BSWAP32(*(const SH_PACK_U32*)(ptr))
 
+/* Load of an (s16 x, s16 y) PAIR as the LE-composed word the ST macros take
+ * (x in the LOW half). A raw 32-bit read of that pair on big-endian yields
+ * x in the HIGH half, so the halves must be exchanged -- NOT byte-reversed,
+ * which would also flip the bytes inside each coordinate. Pairs with a packed
+ * store fed by a packed load were only half-fixed without this: aligned, but
+ * with x and y swapped. */
+#define PSX_LD_XY(ptr)       ((SH_PACK_U32)(((*(const SH_PACK_U32*)(ptr)) << 16) |                                             ((*(const SH_PACK_U32*)(ptr)) >> 16)))
+
 #else
 
 #define PSX_ST_RGBC(p, w)    (*(SH_PACK_U32*)&(p)->r0 = (SH_PACK_U32)(w))
@@ -85,6 +93,7 @@ typedef unsigned int SH_PACK_U32;
 #define PSX_ST_UV(p, f, w)   (*(SH_PACK_U32*)&(p)->f  = (SH_PACK_U32)(w))
 #define PSX_ST_XY(p, f, w)   (*(SH_PACK_U32*)&(p)->f  = (SH_PACK_U32)(w))
 #define PSX_LD_CVEC(ptr)     (*(const SH_PACK_U32*)(ptr))
+#define PSX_LD_XY(ptr)       (*(const SH_PACK_U32*)(ptr))
 
 #endif /* big-endian */
 

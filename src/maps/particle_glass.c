@@ -308,9 +308,9 @@ bool sharedFunc_800CD1F8_0_s01(POLY_FT4** poly, s32 idx)
     temp_v0_23          = sharedData_800DFB7C_0_s00[idx].field_B;
     PSX_ST_UV((*poly), u1, ((temp_v0_23 & 3) << 4) + 15 + (((temp_v0_23 << 0xA) & 0x3000)) + 0x2D0000);
     temp_v0_24          = sharedData_800DFB7C_0_s00[idx].field_B;
-    *(u16*)&(*poly)->u2 = ((temp_v0_24 & 3) << 4) + ((((temp_v0_24 * 4) & 0x30) + 15) << 8);
+    setUV2Word((*poly), ((temp_v0_24 & 3) << 4) + ((((temp_v0_24 * 4) & 0x30) + 15) << 8));
     temp_v0_25          = sharedData_800DFB7C_0_s00[idx].field_B;
-    *(u16*)&(*poly)->u3 = ((temp_v0_25 & 3) << 4) + 15 + ((((temp_v0_25 * 4) & 0x30) + 15) << 8);
+    setUV3Word((*poly), ((temp_v0_25 & 3) << 4) + 15 + ((((temp_v0_25 * 4) & 0x30) + 15) << 8));
 
     temp_s1_3 = sharedData_800DFB7C_0_s00[idx].field_A - 23;
 
@@ -404,7 +404,7 @@ bool sharedFunc_800CD1F8_0_s01(POLY_FT4** poly, s32 idx)
     func_80055A90(&ptr->field_1B8, &ptr->field_1BC, 0x80, ptr->field_1C4 * 0x10);
 
     PSX_ST_RGBC((*poly), (ptr->field_1BC.r + (ptr->field_1BC.g << 8) + (ptr->field_1BC.b << 16) + 0x2E000000));
-    *(s32*)&(*poly)->x3 = *(s32*)&ptr->field_1D4.vx;
+    PSX_ST_XY((*poly), x3, PSX_LD_XY(&ptr->field_1D4.vx));
 
     addPrimFast(&g_OrderingTable0[g_ActiveBufferIdx].org[((ptr->field_1C4 - Q12(1.5f)) >= Q12(0.0f)) ? (ptr->field_1C4 - Q12(1.5f)) >> 3 : 0], *poly, 9);
 

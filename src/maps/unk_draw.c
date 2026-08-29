@@ -174,9 +174,9 @@ bool sharedFunc_800CB040_1_s05(POLY_FT4** poly, s32 idx)
 
         PSX_ST_UV((*poly), u1, ((sharedData_800DFB7C_0_s00[idx].field_B >= 2) ? 0x7F : 0x3F) + (sharedData_800DFB7C_0_s00[idx].field_B >= 3 ? 0x6DC000 : 0x6D8000));
 
-        *(s16*)&(*poly)->u2 = ((sharedData_800DFB7C_0_s00[idx].field_B >= 2) << 6) | ((sharedData_800DFB7C_0_s00[idx].field_B >= 3) ? 0xFF00 : 0xBF00);
+        setUV2Word((*poly), ((sharedData_800DFB7C_0_s00[idx].field_B >= 2) << 6) | ((sharedData_800DFB7C_0_s00[idx].field_B >= 3) ? 0xFF00 : 0xBF00));
 
-        *(s16*)&(*poly)->u3 = ((sharedData_800DFB7C_0_s00[idx].field_B >= 2) ? 0x7F : 0x3F) | ((sharedData_800DFB7C_0_s00[idx].field_B >= 3) ? 0xFF00 : 0xBF00);
+        setUV3Word((*poly), ((sharedData_800DFB7C_0_s00[idx].field_B >= 2) ? 0x7F : 0x3F) | ((sharedData_800DFB7C_0_s00[idx].field_B >= 3) ? 0xFF00 : 0xBF00));
 
         // TODO: Might be single line statements / macros like above?
         if ((u16)sharedData_800DFB7C_0_s00[idx].field_C.s_0.field_0 < 0xE00)
@@ -198,8 +198,8 @@ bool sharedFunc_800CB040_1_s05(POLY_FT4** poly, s32 idx)
     {
         PSX_ST_UV((*poly), u0, 0x024E7800);
         PSX_ST_UV((*poly), u1, 0x4D7807);
-        *(u16*)&(*poly)->u2 = 0x7F00;
-        *(u16*)&(*poly)->u3 = 0x7F07;
+        setUV2Word((*poly), 0x7F00);
+        setUV3Word((*poly), 0x7F07);
 
         setRGBC0(*poly, 0x78, 0x80, 0x80, PRIM_POLY | RECT_BLEND | RECT_TEXTURE | RECT_SIZE_1);
     }
@@ -311,10 +311,10 @@ bool sharedFunc_800CB040_1_s05(POLY_FT4** poly, s32 idx)
     halfSizeCeil  = (var_s1 + 1) >> 1;
     halfSizeFloor = -(var_s1 >> 1);
 
-    *(s32*)&(*poly)->x0 = *(s32*)&ptr->field_140 + halfSizeCeil + (halfSizeCeil << 16);
-    *(s32*)&(*poly)->x1 = *(s32*)&ptr->field_140 + halfSizeFloor + (halfSizeCeil << 16);
-    *(s32*)&(*poly)->x2 = *(s32*)&ptr->field_140 + halfSizeCeil + (halfSizeFloor << 16);
-    *(s32*)&(*poly)->x3 = *(s32*)&ptr->field_140 + halfSizeFloor + (halfSizeFloor << 16);
+    PSX_ST_XY((*poly), x0, PSX_LD_XY(&ptr->field_140 + halfSizeCeil + (halfSizeCeil << 16)));
+    PSX_ST_XY((*poly), x1, PSX_LD_XY(&ptr->field_140 + halfSizeFloor + (halfSizeCeil << 16)));
+    PSX_ST_XY((*poly), x2, PSX_LD_XY(&ptr->field_140 + halfSizeCeil + (halfSizeFloor << 16)));
+    PSX_ST_XY((*poly), x3, PSX_LD_XY(&ptr->field_140 + halfSizeFloor + (halfSizeFloor << 16)));
 
     addPrimFast(&g_OrderingTable0[g_ActiveBufferIdx].org[ptr->field_13C >> 3], *poly, 9);
     *poly += 1;
@@ -344,8 +344,8 @@ bool sharedFunc_800CB884_1_s05(POLY_FT4** poly, s32 idx) // 0x800CCF50
     {
         PSX_ST_UV((*poly), u0, 0x024EC000);
         PSX_ST_UV((*poly), u1, 0x4DC03F);
-        *(u16*)&(*poly)->u2 = 0xFF00;
-        *(u16*)&(*poly)->u3 = 0xFF3F;
+        setUV2Word((*poly), 0xFF00);
+        setUV3Word((*poly), 0xFF3F);
 
         ptr->field_144 = (sharedData_800DFB7C_0_s00[idx].field_C.s_2.field_0 >> 6) + 0x24;
 
@@ -357,8 +357,8 @@ bool sharedFunc_800CB884_1_s05(POLY_FT4** poly, s32 idx) // 0x800CCF50
     {
         PSX_ST_UV((*poly), u0, 0x020E7800);
         PSX_ST_UV((*poly), u1, 0xD7807);
-        *(u16*)&(*poly)->u2 = 0x7F00;
-        *(u16*)&(*poly)->u3 = 0x7F07;
+        setUV2Word((*poly), 0x7F00);
+        setUV3Word((*poly), 0x7F07);
 
         ptr->field_144 = 2;
 

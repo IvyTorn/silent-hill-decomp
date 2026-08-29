@@ -805,10 +805,10 @@ void func_800D1D3C(GsOT_TAG* tag, SVECTOR3* arg1, MATRIX* worldMat, s32 arg3) //
 
     /* Packed-word stores: BE-portable forms (the r0 word store is misaligned
      * by layout on BE and traps on MIPS; XY words halfword-swap). */
-    PSX_ST_XY(poly2, x0, *(s32*)&sp4C);
-    PSX_ST_XY(poly2, x1, *(s32*)&sp50);
-    PSX_ST_XY(poly2, x2, *(s32*)&sp54);
-    PSX_ST_XY(poly2, x3, *(s32*)&sp58);
+    PSX_ST_XY(poly2, x0, PSX_LD_XY(&sp4C));
+    PSX_ST_XY(poly2, x1, PSX_LD_XY(&sp50));
+    PSX_ST_XY(poly2, x2, PSX_LD_XY(&sp54));
+    PSX_ST_XY(poly2, x3, PSX_LD_XY(&sp58));
     PSX_ST_RGBC(poly2, PSX_LD_CVEC(&sp48));
 
     setPolyFT4(poly2);
@@ -829,10 +829,10 @@ void func_800D1D3C(GsOT_TAG* tag, SVECTOR3* arg1, MATRIX* worldMat, s32 arg3) //
 
     /* Packed-word stores: BE-portable forms (the r0 word store is misaligned
      * by layout on BE and traps on MIPS; XY words halfword-swap). */
-    PSX_ST_XY(poly, x0, *(s32*)&sp4C);
-    PSX_ST_XY(poly, x1, *(s32*)&sp50);
-    PSX_ST_XY(poly, x2, *(s32*)&sp54);
-    PSX_ST_XY(poly, x3, *(s32*)&sp58);
+    PSX_ST_XY(poly, x0, PSX_LD_XY(&sp4C));
+    PSX_ST_XY(poly, x1, PSX_LD_XY(&sp50));
+    PSX_ST_XY(poly, x2, PSX_LD_XY(&sp54));
+    PSX_ST_XY(poly, x3, PSX_LD_XY(&sp58));
     PSX_ST_RGBC(poly, PSX_LD_CVEC(&sp48));
 
     setPolyFT4(poly);

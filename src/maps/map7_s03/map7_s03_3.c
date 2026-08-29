@@ -901,15 +901,15 @@ void func_800E2C28(s_800F4B40_118* arg0, s32 colCount, s32 rowCount, s32 zDepth,
             /* x words are struct-pair to struct-pair (same layout, plain copy
              * is right on both endians); the colour quartets go through the
              * portable stores -- &r0 is misaligned by layout on BE. */
-            *(s32*)&poly->x0 = *(s32*)&colData[0].x_0;
+            PSX_ST_XY(poly, x0, PSX_LD_XY(&colData[0].x_0));
             PSX_ST_RGBC(poly, PSX_LD_CVEC(&colData[0].color_4));
-            *(s32*)&poly->x1 = *(s32*)&colData[1].x_0;
+            PSX_ST_XY(poly, x1, PSX_LD_XY(&colData[1].x_0));
             PSX_ST_RGB(poly, r1, PSX_LD_CVEC(&colData[1].color_4));
 
             // Fetch x2/x3 from same column in next row
-            *(s32*)&poly->x2 = *(s32*)&colData[colCount + 0].x_0;
+            PSX_ST_XY(poly, x2, PSX_LD_XY(&colData[colCount + 0].x_0));
             PSX_ST_RGB(poly, r2, PSX_LD_CVEC(&colData[colCount + 0].color_4));
-            *(s32*)&poly->x3 = *(s32*)&colData[colCount + 1].x_0;
+            PSX_ST_XY(poly, x3, PSX_LD_XY(&colData[colCount + 1].x_0));
             PSX_ST_RGB(poly, r3, PSX_LD_CVEC(&colData[colCount + 1].color_4));
 
             setPolyG4(poly);

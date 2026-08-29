@@ -851,11 +851,11 @@ void func_800D1D3C(GsOT_TAG* tag, SVECTOR3* arg1, MATRIX* arg2, s32 arg3) // 0x8
            0xE0, 0xE0,
            0xFF, 0xE0);
 
-    *(s32*)&poly2->x0 = *(s32*)&sp4C;
-    *(s32*)&poly2->x1 = *(s32*)&sp50;
-    *(s32*)&poly2->x2 = *(s32*)&sp54;
-    *(s32*)&poly2->x3 = *(s32*)&sp58;
-    *(s32*)&poly2->r0 = *(s32*)&sp48;
+    PSX_ST_XY(poly2, x0, PSX_LD_XY(&sp4C));
+    PSX_ST_XY(poly2, x1, PSX_LD_XY(&sp50));
+    PSX_ST_XY(poly2, x2, PSX_LD_XY(&sp54));
+    PSX_ST_XY(poly2, x3, PSX_LD_XY(&sp58));
+    PSX_ST_RGBC(poly2, *(s32*)&sp48);
 
     setPolyFT4(poly2);
     setSemiTrans(poly2, true);
@@ -884,10 +884,10 @@ void func_800D1D3C(GsOT_TAG* tag, SVECTOR3* arg1, MATRIX* arg2, s32 arg3) // 0x8
            0xFF, 0xE0);
 
     /* Same BE-portable conversion as twinfeeler.c. */
-    PSX_ST_XY(poly, x0, *(s32*)&sp4C);
-    PSX_ST_XY(poly, x1, *(s32*)&sp50);
-    PSX_ST_XY(poly, x2, *(s32*)&sp54);
-    PSX_ST_XY(poly, x3, *(s32*)&sp58);
+    PSX_ST_XY(poly, x0, PSX_LD_XY(&sp4C));
+    PSX_ST_XY(poly, x1, PSX_LD_XY(&sp50));
+    PSX_ST_XY(poly, x2, PSX_LD_XY(&sp54));
+    PSX_ST_XY(poly, x3, PSX_LD_XY(&sp58));
     PSX_ST_RGBC(poly, PSX_LD_CVEC(&sp48));
 
     setPolyFT4(poly);
@@ -4711,13 +4711,13 @@ void func_800D88C8(s_800E06A0* arg0, u8 arg1) // 0x800D88C8
             setPolyFT4(poly);
             setRGB0(poly, arg1, arg1, arg1);
 
-            *(s32*)&poly->x0 = *(s32*)&sp10[0];
-            *(s32*)&poly->x1 = *(s32*)&sp10[1];
+            PSX_ST_XY(poly, x0, PSX_LD_XY(&sp10[0]));
+            PSX_ST_XY(poly, x1, PSX_LD_XY(&sp10[1]));
 
             do {} while (0); // @hack
 
-            *(s32*)&poly->x2 = *(s32*)&sp10[2];
-            *(s32*)&poly->x3 = *(s32*)&sp10[3];
+            PSX_ST_XY(poly, x2, PSX_LD_XY(&sp10[2]));
+            PSX_ST_XY(poly, x3, PSX_LD_XY(&sp10[3]));
 
             setUV4(poly,
                    temp_s6, temp_s4,
@@ -4794,10 +4794,10 @@ void func_800D88C8(s_800E06A0* arg0, u8 arg1) // 0x800D88C8
                     setPolyFT4(poly2);
                     setRGB0(poly2, arg1, arg1, arg1);
 
-                    *(s32*)&poly2->x0 = *(s32*)&sp30[j][k];
-                    *(s32*)&poly2->x1 = *(s32*)&sp30[j][k + 1];
-                    *(s32*)&poly2->x2 = *(s32*)&sp30[j + 1][k];
-                    *(s32*)&poly2->x3 = *(s32*)&sp30[j + 1][k + 1];
+                    PSX_ST_XY(poly2, x0, PSX_LD_XY(&sp30[j][k]));
+                    PSX_ST_XY(poly2, x1, PSX_LD_XY(&sp30[j][k + 1]));
+                    PSX_ST_XY(poly2, x2, PSX_LD_XY(&sp30[j + 1][k]));
+                    PSX_ST_XY(poly2, x3, PSX_LD_XY(&sp30[j + 1][k + 1]));
 
                     setUV4(poly2,
                            sp30[j][k].field_8, sp30[j][k].field_A,

@@ -130,7 +130,7 @@ bool func_800CB25C(POLY_FT4** poly, s32 idx) // 0x800CB25C
             return false;
         }
 
-        *(s32*)&(*poly)->x3 = *(s32*)&ptr->field_144;
+        PSX_ST_XY((*poly), x3, PSX_LD_XY(&ptr->field_144));
         setSemiTrans(*poly, 1);
 
         if (CLAMP_LOW(Q12_MULT_PRECISE(Q12(1.0f) - sharedData_800DFB7C_0_s00[idx].field_C.s_2.field_0, 32), 0) < 16)
@@ -208,7 +208,7 @@ bool func_800CB25C(POLY_FT4** poly, s32 idx) // 0x800CB25C
 
                 setSemiTrans(*poly, 1);
 
-                *(u16*)&(*poly)->r0 = ptr->field_160;
+                do { u32 _pv = (u32)(ptr->field_160); ((*poly))->r0 = (u8)_pv; ((*poly))->g0 = (u8)(_pv >> 8); } while (0);
                 (*poly)->b0         = 0;
 
                 setUV0AndClutSum(*poly, 224 + (j * 8), (i * 8) + 160 + (sharedData_800DFB7C_0_s00[idx].field_C.s_1.field_2 << 5), 0x0293);

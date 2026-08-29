@@ -4358,9 +4358,16 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
              * source words, test, then decompose through the portable
              * writers. */
             {
-                s32 xy0 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0];
-                s32 xy1 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_1];
-                s32 xy2 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_2];
+                /* PSX_LD_XY, not a raw word read: screenXy_0 holds (s16 x, s16 y)
+                 * pairs, and a raw 32-bit read of one on big-endian returns x in
+                 * the HIGH half while PSX_ST_XY composes from x in the LOW half --
+                 * so every world and character vertex was stored with X AND Y
+                 * EXCHANGED. That is the wild, off-screen geometry: the values
+                 * landing in y were x. Same failure the 360 note records ('every
+                 * 2D primitive had x swapped with y'). */
+                s32 xy0 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->u.s_1.field_0]);
+                s32 xy1 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->u.s_1.field_1]);
+                s32 xy2 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->u.s_1.field_2]);
 
 #ifdef SH_PC_PORT
                 if (VERTEX_OOB(xy0) || VERTEX_OOB(xy1) || VERTEX_OOB(xy2)) {
@@ -4490,10 +4497,10 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
 
             /* Same portable-store conversion as the GT3 branch above. */
             {
-                s32 xy0 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_0];
-                s32 xy1 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_1];
-                s32 xy2 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_2];
-                s32 xy3 = *(s32*)&scratchData->screenXy_0[scratchData->u.s_1.field_3];
+                s32 xy0 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->u.s_1.field_0]);
+                s32 xy1 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->u.s_1.field_1]);
+                s32 xy2 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->u.s_1.field_2]);
+                s32 xy3 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->u.s_1.field_3]);
 
 #ifdef SH_PC_PORT
                 if (VERTEX_OOB(xy0) || VERTEX_OOB(xy1) ||
@@ -5204,12 +5211,12 @@ void Gfx_BillboardDraw(s32 arg0, q19_12 posX, q19_12 posY, q19_12 posZ, GsOT* ot
                 gte_dpcs();
                 gte_strgb((CVECTOR*)&poly_g4->r0);
 
-                *(s32*)&poly_g4->r1 = *(s32*)&poly_g4->r2 = *(s32*)&poly_g4->r3 = *(s32*)&poly_g4->r0;
+                PSX_ST_RGB(poly_g4, r1, *(s32*)&poly_g4->r2 = *(s32*)&poly_g4->r3 = *(s32*)&poly_g4->r0);
 
-                *(s32*)&poly_g4->x0 = *(s32*)&poly_gt4->x0;
-                *(s32*)&poly_g4->x1 = *(s32*)&poly_gt4->x1;
-                *(s32*)&poly_g4->x2 = *(s32*)&poly_gt4->x2;
-                *(s32*)&poly_g4->x3 = *(s32*)&poly_gt4->x3;
+                PSX_ST_XY(poly_g4, x0, PSX_LD_XY(&poly_gt4->x0));
+                PSX_ST_XY(poly_g4, x1, PSX_LD_XY(&poly_gt4->x1));
+                PSX_ST_XY(poly_g4, x2, PSX_LD_XY(&poly_gt4->x2));
+                PSX_ST_XY(poly_g4, x3, PSX_LD_XY(&poly_gt4->x3));
 
                 setPolyG4(poly_g4);
                 setSemiTrans(poly_g4, 1);

@@ -1817,10 +1817,10 @@ void func_800D8D90(s_800F3D48* arg0, s_800F3D48_0_0* arg1) // 0x800D8D90
 
     poly = GsOUT_PACKET_P;
 
-    *(s32*)&poly->x0 = *(s32*)&sp50[0];
-    *(s32*)&poly->x1 = *(s32*)&sp50[1];
-    *(s32*)&poly->x2 = *(s32*)&sp50[2];
-    *(s32*)&poly->x3 = *(s32*)&sp50[3];
+    PSX_ST_XY(poly, x0, PSX_LD_XY(&sp50[0]));
+    PSX_ST_XY(poly, x1, PSX_LD_XY(&sp50[1]));
+    PSX_ST_XY(poly, x2, PSX_LD_XY(&sp50[2]));
+    PSX_ST_XY(poly, x3, PSX_LD_XY(&sp50[3]));
 
     setUV4(poly, arg1->field_0, arg1->field_2, arg1->field_0 + arg1->field_4, arg1->field_2,
            arg1->field_0, arg1->field_2 + arg1->field_6, arg1->field_0 + arg1->field_4, arg1->field_2 + arg1->field_6);
