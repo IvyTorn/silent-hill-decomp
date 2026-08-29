@@ -2688,6 +2688,24 @@ void vcRenewalCamData(VC_WORK* w_p, VC_CAM_MV_PARAM* cam_mv_prm_p) // 0x80084BD8
     w_p->cam_pos.vx += Math_MulFixed(w_p->cam_velo.vx, g_DeltaTime, Q12_SHIFT);
     w_p->cam_pos.vy += Math_MulFixed(w_p->cam_velo.vy, g_DeltaTime, Q12_SHIFT);
     w_p->cam_pos.vz += Math_MulFixed(w_p->cam_velo.vz, g_DeltaTime, Q12_SHIFT);
+#ifdef SH_N64_PORT
+    /* The camera's height JUMPS from the correct -320 (Q8, matching PC) to
+     * about -200570 -- roughly -783 world units -- when the angle changes,
+     * and then holds. Holding rules out runaway integration and points at
+     * either the TARGET the camera is chasing or the authored position it was
+     * handed. Print position, target and velocity together so the next log
+     * says which of the three went wrong, and dt because every one of these
+     * is integrated against it. */
+    {
+        static int _cp;
+        if ((_cp++ & 63) == 0)
+            SH_DBG("[CAMPOS] pos=(%d,%d,%d) tgt=(%d,%d,%d) velo=(%d,%d,%d) dt=%d",
+                   (int)w_p->cam_pos.vx, (int)w_p->cam_pos.vy, (int)w_p->cam_pos.vz,
+                   (int)w_p->cam_tgt_pos.vx, (int)w_p->cam_tgt_pos.vy, (int)w_p->cam_tgt_pos.vz,
+                   (int)w_p->cam_velo.vx, (int)w_p->cam_velo.vy, (int)w_p->cam_velo.vz,
+                   (int)g_DeltaTime);
+    }
+#endif
 }
 
 void vcRenewalCamMatAng(VC_WORK* w_p, VC_WATCH_MV_PARAM* watch_mv_prm_p, VC_CAM_MV_TYPE cam_mv_type,
