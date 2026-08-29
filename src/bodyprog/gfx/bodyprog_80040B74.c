@@ -24,6 +24,13 @@
 #include "main/fsqueue.h"
 #include "types.h"
 
+/* 1 = use the game's ORIGINAL subcell PVS for interiors (see Ipd_ChunkDraw). */
+#ifdef SH_N64_PORT
+#define SH_N64_STOCK_PVS 1
+#else
+#define SH_N64_STOCK_PVS 0
+#endif
+
 /* Forward decl: called before its definition below; clang errors on the
  * conflicting implicit declaration otherwise (gcc only warns). */
 void IpdHeader_FixOffsets(s_IpdHeader* ipdHdr, s_LmHeader** lmHdrs, s32 lmHdrCount, s_ActiveChunkTextures* fullPageActiveTexs, s_ActiveChunkTextures* halfPageActiveTexs, e_FsFile fileIdx);
@@ -3182,7 +3189,14 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                 }
             }
         }
-    } else if (!g_Map.isExterior) {
+    } else if (!g_Map.isExterior && !SH_N64_STOCK_PVS) {
+        /* NOT ON N64 (SH_N64_STOCK_PVS): the reasoning below is specific to
+         * the PC port's ORBITING camera. This port runs the game's original
+         * FIXED cameras, which are exactly what the subcell rectangles were
+         * baked for, so the prefilter is valid here and skipping it submits
+         * every model buffer in the chunk. Hardware measured 5145 prims per
+         * frame against the PC port's 363 for this same room. Fall through to
+         * the stock subcell-filtered path instead. */
         /* Interior maps: PSX subcell visibility rectangles were baked for
          * fixed-angle cameras. TPS camera orbits Harry and can fall outside
          * those rectangles, causing in-frustum model buffers to be dropped.
