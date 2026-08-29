@@ -1,4 +1,7 @@
 #include "game.h"
+#ifdef SH_N64_PORT
+#include "anm_endian.h"   /* convert-at-use, see Anim_BoneUpdate */
+#endif
 #include "inline_no_dmpsx.h"
 
 #include <psyq/strings.h>
@@ -150,6 +153,19 @@ void Anim_BoneUpdate(s_AnmHeader* anmHdr, GsCOORDINATE2* boneCoords, s32 keyfram
     GsCOORDINATE2* curBoneCoord;
     s_AnmBindPose* curBindPose;
 
+#ifdef SH_N64_PORT
+    /* CONVERT AT THE POINT OF USE. The hardware log caught this header still
+     * little-endian at read time -- kfSize=39936 and dataOff=37889, which are
+     * exactly the byte-swaps of the real 156 and 404 -- so the keyframe
+     * pointer and every size were garbage and no bone could be written.
+     * Fs_QueuePostLoadAnm converts what IT loads, but the player's animation
+     * buffer evidently arrives by another route, so trusting a single loader
+     * path is what let this through. This call is idempotent (it returns
+     * immediately once dataOffset reads 404 big-endian) and validating (a
+     * headerless HB_WEP/HB_M keyframe bank fails its checks and is left
+     * untouched), so doing it here is safe no matter who filled the buffer. */
+    Anm_SwapForBigEndian((void*)anmHdr);
+#endif
     boneCount     = anmHdr->boneCount;
 #ifdef SH_PC_PORT
     /* PSX did no bounds check on keyframe; an out-of-range NPC keyframe

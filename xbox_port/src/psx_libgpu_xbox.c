@@ -260,7 +260,7 @@ int VSync(int mode)
         SH_DBG("[SH-XBOX] vblank %d", s_vblanks);
         Xbox_MemReport("tick");     /* leak watch: free RAM should stay flat */
         Pgxp_CovDump();             /* [PGXP] cov full/mixed per 10s window */
-#ifdef SH_XBOX360_PORT
+#if defined(SH_N64_PORT)
         /* Backstop for a HANG, where nothing gets to report anything: without a
          * periodic flush the 256KB log buffer means the file ends wherever the
          * last explicit flush was, which on 360 was boot -- so a hang produced a

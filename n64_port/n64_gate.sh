@@ -44,7 +44,10 @@ rm -f "$OUT"/*.o
 # the 32-bit big-endian corrections, and the whole surface is 8 files. There is
 # deliberately no SH_PSP_PORT here -- the PSP port's gates mean "32-bit little
 # endian", which is the opposite of what this target needs.
-DEFS="-DSH_N64_PORT -DSH_XBOX360_PORT -DSH_XBOX_PORT -DSH_PC_PORT"
+# NO SH_XBOX360_PORT: this port is not a 360 and must not inherit its code
+# paths. It was also actively misleading -- the pointer guards below test
+# SH_XBOX360_PORT first, so N64 was silently taking 360 branches.
+DEFS="-DSH_N64_PORT -DSH_XBOX_PORT -DSH_PC_PORT"
 DEFS="$DEFS -DVER_USA -DSKIP_ASM -DUSE_PGXP=0 -DN64"
 # newlib's bare-metal <dirent.h> is a single #error. Turns off the loose-file
 # case-insensitive resolver in fsqueue_3.c, which a console does not want anyway.

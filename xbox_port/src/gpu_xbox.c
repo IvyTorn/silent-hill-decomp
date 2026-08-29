@@ -228,7 +228,7 @@ static inline unsigned int* TexLookup(int tpage, int clut)
          * draw nothing. Decline and let the prim go untextured instead. */
         r   = 0;
 #else
-        r   = PsxVram_GetTexture(tpage, clut);
+        r   = PsxVram_GetTexture(tpage, clut);
 #endif
     }
     s_pendingPal = pal;
@@ -451,7 +451,7 @@ void PsyX_ForceItemDepthEnd(void)
      * output has been a constant wrote=0/6 min=16777215 max=0. Kept behind the
      * diag flag rather than deleted so the question is still answerable, but the
      * default path must never stall the GPU for a diagnostic. */
-#ifndef SH_XBOX360_PORT   /* pbkit is nxdk/NV2A; the Xenos zeta buffer is not
+#if !defined(SH_N64_PORT) /* pbkit is nxdk/NV2A: no N64 equivalent, and this
                            * plain RAM at a pb_ address, so this probe has no
                            * 360 equivalent and its question is NV2A-specific. */
     {
@@ -492,7 +492,7 @@ void PsyX_ForceItemDepthEnd(void)
         }
     }
     }
-#endif /* !SH_XBOX360_PORT */
+#endif /* !SH_N64_PORT */
     /* Hand this bracket's SZ range to the next one for normalization. */
     if (s_izHit > 0 && s_izZMax > s_izZMin) {
         s_izPrevMin = s_izZMin;

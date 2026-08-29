@@ -228,7 +228,7 @@ static McFileHandle s_handles[16] = { 0 };
  * literally called "save\0.MCD" in the parent directory, which cannot be
  * created -- every card_info/card_clear returned IOE, and the memory-card state
  * machine then wedged in state 3 forever, which is what stopped the boot. */
-#ifdef SH_XBOX360_PORT
+#if defined(SH_N64_PORT)
 #define MC_PATH_SEP "/"
 #else
 #define MC_PATH_SEP "\\"
@@ -602,6 +602,14 @@ int _card_format(int chan)
 
 /* ----- PSX-style file ops on "buXX:NAME" paths ----- */
 
+#if !defined(SH_N64_PORT)
+/* SH_N64_PORT: libdragonsys defines the real open/close/lseek/read/write for
+ * its own filesystem, and two definitions of each is a link error -- the same
+ * reason ioctl below is already ceded. These are the PSX "buXX:NAME" memory
+ * card ops, and the card path is not wired on N64 (XboxFs_ResolveSaveDir
+ * reports no save location), so nothing here is reachable anyway.
+ * This only surfaced once SH_XBOX360_PORT was removed, because that define had
+ * been keeping libdragon's system.o out of the link by another route. */
 int open(char* path, unsigned int flags)
 {
     int         chan = 0;
@@ -726,6 +734,7 @@ int write(int handle, void* buf, int bytes)
     return bytes;
 }
 
+#endif  /* !SH_N64_PORT: PSX-style file ops */
 #if !defined(SH_N64_PORT)
 int ioctl(int fd, int req, int arg)
 {
