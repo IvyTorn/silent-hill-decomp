@@ -388,6 +388,23 @@ void vbSetRefView(VbRVIEW* rview) // 0x800498D8
     pos.vy      = rview->vr.vy - rview->vp.vy;
     pos.vz      = rview->vr.vz - rview->vp.vz;
     vwVectorToAngle(&rot, &pos);
+#ifdef SH_N64_PORT
+    /* Directly comparable to the PC port's [CAMSNAP]: vp == camPos,
+     * vr == watch, matAng == this rot. The angle math itself is now
+     * known-good (the GTE and a 64-bit reference agree to rounding), so if
+     * the view is still pitched the fault is in these INPUTS -- PC and N64
+     * agree on the look vector's X and Z and differ on Y by exactly 2048, so
+     * print both endpoints rather than only their difference. */
+    {
+        static int _cs;
+        if ((_cs++ & 63) == 0)
+            SH_DBG("[CAMSNAP] vp=(%d,%d,%d) vr=(%d,%d,%d) vec=(%d,%d,%d) matAng=(%d,%d,%d)",
+                   (int)rview->vp.vx, (int)rview->vp.vy, (int)rview->vp.vz,
+                   (int)rview->vr.vx, (int)rview->vr.vy, (int)rview->vr.vz,
+                   (int)pos.vx, (int)pos.vy, (int)pos.vz,
+                   (int)rot.vx, (int)rot.vy, (int)rot.vz);
+    }
+#endif
     Math_RotMatrixZxyNegGte(&rot, &coord.coord);
 
     coord.coord.t[0] = rview->vp.vx;

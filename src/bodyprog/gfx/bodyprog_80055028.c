@@ -4511,6 +4511,26 @@ void func_8005AC50(s_MeshHeader* meshHdr, s_GteScratchData2* scratchData, GsOT_T
                     continue;
                 }
 #endif
+#ifdef SH_N64_PORT
+                /* [GOLD]: identical fields and order to the PC port's probe so
+                 * the two logs diff line-for-line -- model vertex in, screen
+                 * vertex and depth out, for this prim's first vertex. */
+                {
+                    static int _gold; static int _goldFrame = -1;
+                    extern int g_Nv2aFrameCount;
+                    int _v = scratchData->u.s_1.field_0;
+                    if (_goldFrame != g_Nv2aFrameCount) { _goldFrame = g_Nv2aFrameCount; _gold = 0; }
+                    if (_gold < 8) {
+                        SH_DBG("[GOLD] prim=%d tpage=%04x model=(%d,%d,%d) screen=(%d,%d) z=%d",
+                               _gold, (unsigned)prim->field_6.flags,
+                               (int)meshHdr->verticesXy[_v].vx, (int)meshHdr->verticesXy[_v].vy,
+                               (int)meshHdr->verticesZ[_v],
+                               (int)scratchData->screenXy_0[_v].vx, (int)scratchData->screenXy_0[_v].vy,
+                               (int)scratchData->screenZ_168[_v]);
+                        _gold++;
+                    }
+                }
+#endif
                 PSX_ST_XY(poly.gt4, x0, xy0);
                 PSX_ST_XY(poly.gt4, x1, xy1);
                 PSX_ST_XY(poly.gt4, x2, xy2);
