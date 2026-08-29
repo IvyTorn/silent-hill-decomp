@@ -2984,6 +2984,24 @@ void vcMakeCamMatAndCamAngByBaseAngAndOfsAng(SVECTOR* cam_mat_ang, MATRIX* cam_m
     Math_RotMatrixZxyNeg(ofs_cam_ang, &ofs_mat);
     MulMatrix0(&base_mat, &ofs_mat, cam_mat);
     vwMatrixToAngleYXZ(cam_mat_ang, cam_mat);
+#ifdef SH_N64_PORT
+    /* THE live camera matrix. The gameplay path is vwSetViewInfoDirectMatrix
+     * with this lookAtMat, not the angle path, so this is what to compare
+     * against the PC port's [CAMSNAP] camMat/matAng. The port's yaw already
+     * matches PC exactly (m[0][0] 1515 both) while the pitch does not
+     * (m[1][1] 1385 here vs 4057 there), so the fault is in one of these two
+     * inputs: print base and ofs alongside the product to say which. */
+    {
+        static int _cm;
+        if ((_cm++ & 63) == 0)
+            SH_DBG("[CAMMAT] base=[%d,%d,%d] ofs=[%d,%d,%d] cam=[%d,%d,%d] t=(%d,%d,%d) ang=(%d,%d,%d)",
+                   (int)base_mat.m[0][0], (int)base_mat.m[1][1], (int)base_mat.m[2][2],
+                   (int)ofs_mat.m[0][0],  (int)ofs_mat.m[1][1],  (int)ofs_mat.m[2][2],
+                   (int)cam_mat->m[0][0], (int)cam_mat->m[1][1], (int)cam_mat->m[2][2],
+                   (int)cam_mat->t[0], (int)cam_mat->t[1], (int)cam_mat->t[2],
+                   (int)cam_mat_ang->vx, (int)cam_mat_ang->vy, (int)cam_mat_ang->vz);
+    }
+#endif
 }
 
 void vcSetDataToVwSystem(VC_WORK* w_p, VC_CAM_MV_TYPE cam_mv_type) // 0x80085884
