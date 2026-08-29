@@ -3200,6 +3200,24 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                     modelCoord.workm.t[0] += cellBoundX;
                     modelCoord.workm.t[2] += cellBoundZ;
                     Vw_CoordToWorldAndViewMatrices(&modelCoord, &worldMat, &viewMat);
+#ifdef SH_N64_PORT
+                    /* TEMP: world chunks land at screen y~500-1200 ([BIGPRIM])
+                     * while characters project correctly, so the camera-relative
+                     * step is the suspect. Vw_CoordToWorldAndViewMatrices
+                     * subtracts D_800C3868.t (the camera) before composing the
+                     * view matrix; if that translation is wrong the chunk is
+                     * drawn at ABSOLUTE world position. Print all four. */
+                    {
+                        extern MATRIX D_800C3868;
+                        static int s_wmt = 0;
+                        if ((s_wmt++ & 1023) == 0)
+                            SH_DBG("[WMAT] cam=%d,%d,%d inst=%d,%d,%d world=%d,%d,%d view=%d,%d,%d",
+                                   (int)D_800C3868.t[0], (int)D_800C3868.t[1], (int)D_800C3868.t[2],
+                                   (int)modelCoord.workm.t[0], (int)modelCoord.workm.t[1], (int)modelCoord.workm.t[2],
+                                   (int)worldMat.t[0], (int)worldMat.t[1], (int)worldMat.t[2],
+                                   (int)viewMat.t[0], (int)viewMat.t[1], (int)viewMat.t[2]);
+                    }
+#endif
                     func_80057090(&modelInfo, ot, arg4, &viewMat, &worldMat, 0);
                 }
             }
