@@ -179,6 +179,23 @@ static void BuildTlut(void)
                                (((c >> 8)  & 0xF8) << 3) |
                                (((c)       & 0xF8) >> 2) |
                                ((c >> 31) & 1));
+#ifdef SH_N64_PORT
+        /* [TLUT]: how many palette entries are TRANSPARENT. Menu glyph cells
+         * are 12 wide but the font advances only 9-13, so neighbouring
+         * letters overlap by design and the cell's spare columns MUST be
+         * transparent or every letter paints over the next -- which is what
+         * the garbled menu looks like. opaque==256 means nothing is
+         * transparent and the alpha test can never discard. */
+        if (i == 255) {
+            int _t = 0, _k;
+            for (_k = 0; _k < 256; _k++) if ((s_tlut[_k] & 1) == 0) _t++;
+            {
+                static int _tl;
+                if ((_tl++ & 31) == 0)
+                    SH_DBG("[TLUT] transparent=%d opaque=%d entry0=%04x", _t, 256 - _t, s_tlut[0]);
+            }
+        }
+#endif
     }
 }
 
