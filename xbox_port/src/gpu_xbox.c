@@ -1118,6 +1118,28 @@ static int ProcessSprtTile(P_TAG* tag)
                        (int)((float)w * s_scaleX), (int)((float)h * s_scaleY));
         }
 #endif
+#ifdef SH_N64_PORT
+        /* [MGLY2]: the menu-text question in numbers -- the glyph rect the
+         * game asked for, the env applied to it, and where it lands. An
+         * off-screen x, or a row pitch smaller than the glyph height, says
+         * which of the two is wrong without another guess. */
+        if (w == 12 && h == 16 && v0 >= 224) {
+            static int _mg; static int _mgState = -1;
+            extern int g_N64GameState;
+            if (_mgState != g_N64GameState) { _mgState = g_N64GameState; _mg = 0; }
+            if (_mg < 10) {
+                _mg++;
+                SH_DBG("[MGLY2] st=%d psx=(%d,%d %dx%d) disp=%dx%d ofs=%d,%d scl=%d,%d -> scr=(%d,%d %dx%d)",
+                       g_N64GameState, x0, y0, w, h,
+                       (int)g_activeDispEnv.disp.w, (int)g_activeDispEnv.disp.h,
+                       (int)s_ofsX, (int)s_ofsY,
+                       (int)(s_scaleX * 1000.0f), (int)(s_scaleY * 1000.0f),
+                       (int)(((float)x0 + s_ofsX) * s_scaleX),
+                       (int)(((float)y0 + s_ofsY) * s_scaleY),
+                       (int)((float)w * s_scaleX), (int)((float)h * s_scaleY));
+            }
+        }
+#endif
         if (w == 12 && h == 16 && v0 >= 224) {
             /* Dump the atlas bitmap ONCE per state: at the menu (where text is
              * correct) and again in-game (where it is garbled). Identical dumps
@@ -1841,22 +1863,6 @@ static void RecomputeTransform(void)
     int dw = g_activeDispEnv.disp.w;
     int dh = g_activeDispEnv.disp.h;
 
-#if defined(SH_N64_PORT)
-    /* The interlaced 2D screens (title, menus, load) allocate a 448-line
-     * display buffer, but Screen_Init clips DRAWING to
-     * FRAMEBUFFER_HEIGHT_PROGRESSIVE and every string is authored in the same
-     * 320x240 logical space as the in-game screens (Gfx_StringSetPosition
-     * subtracts 160/112 regardless of mode). Scaling by the 448 buffer
-     * therefore squashes all 2D to 53% height and halves the row pitch: menu
-     * rows 20 apart land ~10 apart under 16-tall glyphs, i.e. printed on top
-     * of each other, which is exactly the reported main menu. In-game screens
-     * report 224 here and are already correct, so fold the interlaced case
-     * onto the same footing instead of special-casing the text. */
-    if (dh > 240) {
-        dh /= 2;
-        g_activeDrawEnv.ofs[1] /= 2;
-    }
-#endif
     if (dw > 0 && dh > 0) {
         s_ofsX   = (float)(g_activeDrawEnv.ofs[0] - g_activeDispEnv.disp.x);
         s_ofsY   = (float)(g_activeDrawEnv.ofs[1] - g_activeDispEnv.disp.y);
