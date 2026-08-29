@@ -2530,11 +2530,11 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
                     }
 
                     temp_a3 = scratchData->field_380.s_0.field_0;
-                    temp_a2 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_10];
+                    temp_a2 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_10]);
 
-                    temp_a1   = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_11];
-                    temp_a0   = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_12];
-                    temp_v1_5 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_13];
+                    temp_a1   = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_11]);
+                    temp_a0   = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_12]);
+                    temp_v1_5 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_13]);
                     temp_t0   = temp_a3 * 2;
                     temp_a2_2 = temp_a2;
 
@@ -2779,11 +2779,11 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
                 }
 
                 temp_a3_2 = scratchData->field_380.s_0.field_0;
-                temp_a2_3 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_10];
+                temp_a2_3 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_10]);
 
-                temp_a1_2  = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_11];
-                temp_a0_5  = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_12];
-                temp_v1_11 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_13];
+                temp_a1_2 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_11]);
+                temp_a0_5 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_12]);
+                temp_v1_11 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_13]);
                 temp_t0_2  = temp_a3_2 * 2;
                 temp2      = temp_a2_3;
 
@@ -2947,11 +2947,11 @@ void Gfx_MeshDraw(s_MeshHeader* meshHdr, s_GteScratchData* scratchData, GsOT_TAG
             }
 
             temp_a3_4 = scratchData->field_380.s_0.field_0;
-            temp_a2_5 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_10];
+            temp_a2_5 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_10]);
 
-            temp_a1_4  = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_11];
-            temp_a0_9  = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_12];
-            temp_v1_21 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_13];
+            temp_a1_4 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_11]);
+            temp_a0_9 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_12]);
+            temp_v1_21 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_13]);
             temp_t0_4  = temp_a3_4 * 2;
             temp_a2_6  = temp_a2_5;
 
@@ -3209,11 +3209,11 @@ __block1530:
         }
 
         temp_a3_3 = scratchData->field_380.s_0.field_0;
-        temp_a2_4 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_10];
+        temp_a2_4 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_10]);
 
-        temp_a1_3  = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_11];
-        temp_a0_7  = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_12];
-        temp_v1_16 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_13];
+        temp_a1_3 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_11]);
+        temp_a0_7 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_12]);
+        temp_v1_16 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_13]);
         temp_t0_3  = temp_a3_3 * 2;
         temp3      = temp_a2_4;
 
@@ -3439,11 +3439,11 @@ __block19CC:
         }
 
         temp_a3_5 = scratchData->field_380.s_0.field_0;
-        temp_a2_7 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_10];
+        temp_a2_7 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_10]);
 
-        temp_a1_5  = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_11];
-        temp_a0_13 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_12];
-        temp_v1_27 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_13];
+        temp_a1_5 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_11]);
+        temp_a0_13 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_12]);
+        temp_v1_27 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_13]);
         temp_t0_5  = temp_a3_5 * 2;
         temp       = temp_a2_7;
 
@@ -3641,10 +3641,10 @@ void func_80059E34(u32 arg0, s_MeshHeader* meshHdr, s_GteScratchData* scratchDat
         }
         }
 
-        temp = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_10];
-        x1 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_11];
-        x2 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_12];
-        x3 = *(s32*)&scratchData->screenXy_0[scratchData->field_380.s_0.field_13];
+        temp = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_10]);
+        x1 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_11]);
+        x2 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_12]);
+        x3 = PSX_LD_XY(&scratchData->screenXy_0[scratchData->field_380.s_0.field_13]);
 
         temp_t0 = scratchData->field_380.s_0.field_0;
         temp_t1 = temp_t0 * 2;
