@@ -1841,6 +1841,22 @@ static void RecomputeTransform(void)
     int dw = g_activeDispEnv.disp.w;
     int dh = g_activeDispEnv.disp.h;
 
+#if defined(SH_N64_PORT)
+    /* The interlaced 2D screens (title, menus, load) allocate a 448-line
+     * display buffer, but Screen_Init clips DRAWING to
+     * FRAMEBUFFER_HEIGHT_PROGRESSIVE and every string is authored in the same
+     * 320x240 logical space as the in-game screens (Gfx_StringSetPosition
+     * subtracts 160/112 regardless of mode). Scaling by the 448 buffer
+     * therefore squashes all 2D to 53% height and halves the row pitch: menu
+     * rows 20 apart land ~10 apart under 16-tall glyphs, i.e. printed on top
+     * of each other, which is exactly the reported main menu. In-game screens
+     * report 224 here and are already correct, so fold the interlaced case
+     * onto the same footing instead of special-casing the text. */
+    if (dh > 240) {
+        dh /= 2;
+        g_activeDrawEnv.ofs[1] /= 2;
+    }
+#endif
     if (dw > 0 && dh > 0) {
         s_ofsX   = (float)(g_activeDrawEnv.ofs[0] - g_activeDispEnv.disp.x);
         s_ofsY   = (float)(g_activeDrawEnv.ofs[1] - g_activeDispEnv.disp.y);
