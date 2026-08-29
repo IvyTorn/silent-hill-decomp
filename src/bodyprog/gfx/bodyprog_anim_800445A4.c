@@ -184,6 +184,22 @@ void Anim_BoneUpdate(s_AnmHeader* anmHdr, GsCOORDINATE2* boneCoords, s32 keyfram
         activeBoneIdxs = anmHdr->activeBones;
     }
 
+#ifdef SH_N64_PORT
+    /* The three inputs that can silently write NOTHING: a zero active mask
+     * (no bone selected), boneCount<=1 (loop never runs), or an empty
+     * keyframe block. Report them with the header pointer so a bad/unswapped
+     * ANM is distinguishable from a masking problem. */
+    {
+        extern int g_N64AnimUpd;
+        static int s_ab;
+        g_N64AnimUpd++;
+        if ((s_ab++ & 127) == 0)
+            SH_DBG("[ANIMB] bones=%d kfSize=%d dataOff=%d active=%08x kf=%d,%d player=%d hdr=%p",
+                   (int)boneCount, (int)anmHdr->keyframeDataSize, (int)anmHdr->dataOffset,
+                   (unsigned)activeBoneIdxs, (int)keyframe0, (int)keyframe1,
+                   (int)isPlayer, (void*)anmHdr);
+    }
+#endif
     // Skip root bone (index 0) and start processing from bone 1.
     boneCoords  = &boneCoords[1];
     curBindPose = &anmHdr->bindPoses[1];
@@ -370,6 +386,14 @@ void Anim_PlaybackOnce(s_Model* model, s_AnmHeader* anmHdr, GsCOORDINATE2* boneC
 
     // Update skeleton.
     alpha = Q12_FRACT(newTime);
+#ifdef SH_N64_PORT
+    /* Every bone matrix in the hardware log reads zero while the ROOT bone is
+     * correct, so the writer either never runs or writes nothing. Count both
+     * sides of this gate: playback entries vs actual bone updates. */
+    { extern int g_N64AnimLoop, g_N64AnimGated; g_N64AnimLoop++;
+      if (!((model->anim.flags & AnimFlag_Unlocked) || (model->anim.flags & AnimFlag_Visible)))
+          g_N64AnimGated++; }
+#endif
     if ((model->anim.flags & AnimFlag_Unlocked) || (model->anim.flags & AnimFlag_Visible))
     {
         Anim_BoneUpdate(anmHdr, boneCoords, newKeyframeIdx, newKeyframeIdx + 1, alpha);

@@ -675,11 +675,15 @@ void GpuNv2a_FrameEnd(void)
                 extern int g_N64ZeroBoneCount, g_N64BoneCount;
                 extern int g_N64ZeroModelMat, g_N64ModelMat;
                 extern int g_N64InstSpread[4];
+                extern int g_N64AnimLoop, g_N64AnimGated, g_N64AnimUpd;
                 SH_DBG("[PIPE] bones=%d zero=%d models=%d zero=%d instX=%d..%d instZ=%d..%d",
                        g_N64BoneCount, g_N64ZeroBoneCount,
                        g_N64ModelMat, g_N64ZeroModelMat,
                        g_N64InstSpread[0], g_N64InstSpread[1],
                        g_N64InstSpread[2], g_N64InstSpread[3]);
+                SH_DBG("[PIPE2] animLoop=%d gated=%d boneUpd=%d",
+                       g_N64AnimLoop, g_N64AnimGated, g_N64AnimUpd);
+                g_N64AnimLoop = g_N64AnimGated = g_N64AnimUpd = 0;
                 g_N64BoneCount = g_N64ZeroBoneCount = 0;
                 g_N64ModelMat = g_N64ZeroModelMat = 0;
                 g_N64InstSpread[0] = g_N64InstSpread[2] = 0x7FFFFFF;

@@ -29,6 +29,7 @@ int g_N64CamProbe[4];
  * "rescuing" a zero matrix: the rescue made every unwritten bone/model render
  * as an unrotated piece at one spot, which is the coagulated pile on screen. */
 int g_N64ZeroBoneCount, g_N64BoneCount;
+int g_N64AnimLoop, g_N64AnimGated, g_N64AnimUpd;
 int g_N64ZeroModelMat, g_N64ModelMat;
 int g_N64InstSpread[4];   /* min/max of instance world X and Z this frame */
 int g_N64VbSnap[6];
