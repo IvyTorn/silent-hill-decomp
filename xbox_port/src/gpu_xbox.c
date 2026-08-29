@@ -1863,9 +1863,29 @@ static void RecomputeTransform(void)
     int dw = g_activeDispEnv.disp.w;
     int dh = g_activeDispEnv.disp.h;
 
+#if defined(SH_N64_PORT)
+    /* The interlaced 2D screens report a 448-line buffer but only 320 across,
+     * which scales Y by 0.535 while leaving X at 1.0 -- the axes disagree, so
+     * every glyph lands 12x8 instead of 12x16 (measured) and the whole layout
+     * is squashed to half height at full width. The content is authored for
+     * the hi-res 640x448 space: menu strings sit at x=132..189 from centre,
+     * which only fits inside 640. Treat a 448-tall screen as 640 wide so both
+     * axes carry the same halving. Computed LOCALLY -- an earlier version
+     * wrote the halved value back into the draw env, and since this function
+     * re-runs on every PutDrawEnv it halved again each time and walked the
+     * picture off the top of the screen. */
+    if (dh > 240 && dw <= 320)
+        dw *= 2;
+#endif
     if (dw > 0 && dh > 0) {
         s_ofsX   = (float)(g_activeDrawEnv.ofs[0] - g_activeDispEnv.disp.x);
         s_ofsY   = (float)(g_activeDrawEnv.ofs[1] - g_activeDispEnv.disp.y);
+#if defined(SH_N64_PORT)
+        /* ofs is the game's centre for the space it thinks it has; if we
+         * doubled the width above, the centre doubles with it. */
+        if (dh > 240 && g_activeDispEnv.disp.w <= 320)
+            s_ofsX *= 2.0f;
+#endif
         s_scaleX = (float)g_Nv2aContentW / (float)dw;
         s_scaleY = (float)g_Nv2aContentH / (float)dh;
     } else {

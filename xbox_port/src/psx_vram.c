@@ -82,8 +82,14 @@ typedef struct {
  * the whole machine twice over. Four pages is 256 KB and still holds the
  * working set of a single room's tpages; the LRU in this file was written to
  * thrash gracefully and now gets to prove it. */
-#define PAGE_N      4                         /* 4 * 64KB = 256KB of index pages */
-#define PAL_N       16                        /* 16 * 1KB  = 16KB of palettes */
+/* 8, not 4: a room's working set is more than four tpages, so four slots
+ * evict and re-decode continuously and a page can be recycled while the RDP
+ * still references it -- the reported texture flicker, surfaces swapping
+ * between each other's art frame to frame. The extra 256KB comes out of the
+ * ~560KB free when this cache is built, and any slot whose allocation fails
+ * is skipped by every scan in this file. */
+#define PAGE_N      8                         /* 8 * 64KB = 512KB of index pages */
+#define PAL_N       32                        /* 32 * 1KB  = 32KB of palettes */
 #else
 #define PAGE_N      64                        /* 64 * 64KB = 4MB of index pages */
 #define PAL_N       128                       /* 128 * 1KB  = 128KB of palettes */
