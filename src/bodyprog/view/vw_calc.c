@@ -1192,6 +1192,38 @@ q19_12 vwVectorToAngle(SVECTOR* ang, const SVECTOR* vec) // 0x8004A714
     ang->vx = ratan2(-vec->vy, SquareRoot0(localVec.vx + localVec.vz));
     ang->vy = ratan2(vec->vx, vec->vz);
     ang->vz = Q12_ANGLE(0.0f);
+#ifdef SH_N64_PORT
+    /* PITCH, COMPUTED WITHOUT THE GTE. vbSetRefView feeds this (target - eye)
+     * and uses ang->vx as the camera pitch. Square0/SquareRoot0 are emulated
+     * GTE ops whose intermediates saturate at 16 bits, so squaring a real
+     * world delta (the police station look vector is -16258,-1792,6483)
+     * clamps and collapses the horizontal distance -- 17503 becomes a few
+     * hundred -- and ratan2 then reports a near-vertical pitch. That is the
+     * top-down camera: PC logs matAng=(-90,...) and camMat m[1][1]=4057
+     * (level) where this port produced m[1][1]=1518 (~68 degrees down), from
+     * an identical camera position. 64-bit integer math cannot overflow at
+     * these magnitudes; the discrepancy is logged so the GTE path is judged
+     * from data rather than assumed. */
+    {
+        long long _x = (long long)vec->vx, _y = (long long)vec->vy, _z = (long long)vec->vz;
+        long long _h2 = _x * _x + _z * _z, _r2 = _h2 + _y * _y;
+        long long _h = 0, _r = 0, _b;
+        s32 _pitch;
+        for (_b = 1LL << 31; _b; _b >>= 1) { long long t = _h + _b; if (t * t <= _h2) _h = t; }
+        for (_b = 1LL << 31; _b; _b >>= 1) { long long t = _r + _b; if (t * t <= _r2) _r = t; }
+        _pitch = ratan2(-vec->vy, (s32)_h);
+        {
+            static int _vlog = 0;
+            if (_pitch != ang->vx && (_vlog++ & 127) == 0)
+                SH_DBG("[VANG] vec=%d,%d,%d gteH=%d cH=%d gtePitch=%d cPitch=%d",
+                       (int)vec->vx, (int)vec->vy, (int)vec->vz,
+                       (int)SquareRoot0(localVec.vx + localVec.vz), (int)_h,
+                       (int)ang->vx, (int)_pitch);
+        }
+        ang->vx = _pitch;
+        ret_r   = (s32)_r;
+    }
+#endif
     return ret_r;
 }
 
