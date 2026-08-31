@@ -205,7 +205,26 @@ while IFS= read -r f; do
         *.cpp) TOOL="$CXX"; FLAGS="$CXXFLAGS"; LANGDEFS="" ;;
         *)     TOOL="$CC";  FLAGS="$TARGETFLAGS"; LANGDEFS="$CDEFS" ;;
     esac
-    if err=$("$TOOL" $FLAGS $INLINEFLAG $DEFS $LANGDEFS $USE_INCS $WARN $EXTRA -c "$f" -o "$obj" 2>&1); then
+    # -O2 for the files [PROF] names, -Os for everything else. The frame lives
+    # in four inner loops -- world transform, character transform, primitive
+    # submit and the software mixer -- and -Os on MIPS declines exactly the
+    # inlining they need (every GTE op is a macro, and the mixer's sample fetch
+    # and envelope are calls). This is a LIST and not a switch because .text
+    # competes with a 1.5 MB heap and 5 MB of .bss on an 8 MB machine: the whole
+    # tree at -O2 buys frame rate with memory the game needs to load a map.
+    # A later -O flag wins, so -fno-strict-aliasing/-fwrapv from SH_OPT survive.
+    HOT=""
+    case "$f" in
+        */src/bodyprog/gfx/world_draw.c|\
+        */src/bodyprog/gfx/bodyprog_80040B74.c|\
+        */src/bodyprog/gfx/bodyprog_80055028.c|\
+        */xbox_port/src/gpu_xbox.c|\
+        */xbox_port/src/psx_vram.c|\
+        */xbox_port/src/audio_xbox.c|\
+        */n64_port/src/gpu_rdp.c)
+            HOT="${SH_HOT_OPT:--O2}" ;;
+    esac
+    if err=$("$TOOL" $FLAGS $INLINEFLAG $DEFS $LANGDEFS $USE_INCS $WARN $EXTRA $HOT -c "$f" -o "$obj" 2>&1); then
         pass=$((pass+1))
         # Warnings from a SUCCESSFUL compile are kept: a green gate that threw
         # them away is how an uninitialised blob reached Xbox hardware twice.

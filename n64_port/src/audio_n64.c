@@ -6,7 +6,7 @@
  * produces PCM via Audio_RenderInto(); this file owns the hardware ring and is
  * pumped from VSync on the main thread, so the mixer's state needs no locking.
  *
- * 22050 Hz, not 48000: the mix is CPU-side C on a 93 MHz VR4300, and the rate
+ * 11025 Hz, not 48000: the mix is CPU-side C on a 93 MHz VR4300, and the rate
  * is the single biggest term in its cost. audio_xbox.c derives every pitch and
  * envelope step from OUT_HZ, so the lower rate stays time-correct.
  *
@@ -17,6 +17,7 @@
  */
 #include <libdragon.h>
 
+#include "pc_config.h"    /* g_PcConfig.n64AudioPumpBudgetMs */
 #include "sh_log.h"
 
 #define N64_AUDIO_HZ   11025
@@ -43,6 +44,9 @@ void Audio_XboxPump(void)
      * audible underrun gap on exactly the frames that are already struggling. */
     {
         int wrote = 0, peak = 0;
+        unsigned long long t0       = get_ticks();
+        unsigned           budgetUs = (unsigned)g_PcConfig.n64AudioPumpBudgetMs * 1000u;
+
         while (audio_can_write())
         {
             short* buf = audio_write_begin();
@@ -58,6 +62,18 @@ void Audio_XboxPump(void)
             }
             audio_write_end();
             wrote++;
+
+            /* Bounded catch-up. A slow frame drains the whole ring, so the next
+             * pump refills ALL of it -- the mixer's cost per frame grows with
+             * how slow the frame already was, which is a spiral, not a
+             * recovery. Past the budget the rest of the ring waits for the next
+             * pump: the audio gaps (it already does at this frame rate) instead
+             * of the frame rate paying for audio that arrives late anyway. One
+             * buffer always goes out. audio_pump_budget_ms=0 restores the
+             * unbounded fill. */
+            if (budgetUs != 0 &&
+                (unsigned)TICKS_TO_US((unsigned)(get_ticks() - t0)) >= budgetUs)
+                break;
         }
 
         /* TEMP diagnostic: where does silence come from - no voices keyed

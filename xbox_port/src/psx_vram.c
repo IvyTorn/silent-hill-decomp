@@ -111,7 +111,19 @@ typedef struct {
     uint8_t*  data;                           /* swizzled indices */
     unsigned  lastUse, seq, hits;
     int       px0, py0, px1, py1;             /* source page rect (invalidation) */
+    uint8_t   fmt4;                           /* stored CI4 (2 texels/byte), not CI8 */
 } PageEntry;
+
+/* A 4-bit PSX page can be stored in the RDP's own CI4 instead of being expanded
+ * to one byte per texel. Everything about that is better on this console --
+ * half the decode stores, half the page in RAM, half of every tile DMA, and
+ * TWICE the texels per TMEM window -- so it is the default, with a config key
+ * to fall back if a page ever comes out wrong on hardware. */
+#if defined(SH_N64_PORT)
+#define PAGE_WANT_CI4(tp)  ((tp) == 0 && g_PcConfig.n64TexCi4)
+#else
+#define PAGE_WANT_CI4(tp)  0
+#endif
 
 typedef struct {
     int       key;                            /* clut, or -1 */
@@ -463,6 +475,55 @@ static void PageDecodeIndicesResident(const uint16_t* src, const s_XbResidentDes
     memcpy(out, s_swzScratch, PAGE_BYTES);
     SH_STORE_BARRIER();
 }
+
+#if defined(SH_N64_PORT)
+/* The same two pages, stored as the RDP's native CI4: two texels per byte, the
+ * EVEN s in the HIGH nibble. The PSX packs the identical 16-colour data four
+ * texels to a VRAM word with the LOW nibble first, so one source word becomes
+ * two bytes with each pair's nibbles swapped -- two stores where the CI8
+ * expansion did four, and no scratch buffer: s_swzScratch exists for the NV2A's
+ * Morton scatter, and this console's layout is linear, so writing straight to
+ * the page skips a 64 KB copy per decode as well. Rows are 128 bytes. */
+static void PageDecodeIndices4(int tpage, uint8_t* out)
+{
+    const int tx = (tpage & 0x0F) * 64;
+    const int ty = ((tpage >> 4) & 1) * 256;
+    int u, v;
+
+    for (v = 0; v < TEX_DIM; v++) {
+        const uint16_t* row = &s_vram[((ty + v) & (VRAM_H - 1)) * VRAM_W];
+        uint8_t*        o   = out + v * (TEX_DIM / 2);
+        int             i   = 0;
+
+        for (u = 0; u < TEX_DIM / 2; u += 2, i++) {
+            uint16_t w = VRAM_RD(row[(tx + i) & (VRAM_W - 1)]);
+            o[u]     = (uint8_t)(((w & 0x000F) << 4) | ((w >>  4) & 0x0F));
+            o[u + 1] = (uint8_t)(((w & 0x0F00) >> 4) | ((w >> 12) & 0x0F));
+        }
+    }
+    SH_STORE_BARRIER();
+}
+
+static void PageDecodeIndicesResident4(const uint16_t* src, const s_XbResidentDesc* d,
+                                       uint8_t* out)
+{
+    int u, v;
+
+    memset(out, 0, PAGE_BYTES / 2);
+    for (v = 0; v < TEX_DIM && v < d->h; v++) {
+        const uint16_t* row = src + (size_t)v * d->pitchWords;
+        uint8_t*        o   = out + v * (TEX_DIM / 2);
+        int             i   = 0;
+
+        for (u = 0; u < TEX_DIM / 2 && i < d->pitchWords; u += 2, i++) {
+            uint16_t w = VRAM_RD(row[i]);
+            o[u]     = (uint8_t)(((w & 0x000F) << 4) | ((w >>  4) & 0x0F));
+            o[u + 1] = (uint8_t)(((w & 0x0F00) >> 4) | ((w >> 12) & 0x0F));
+        }
+    }
+    SH_STORE_BARRIER();
+}
+#endif
 
 /* Palette row `row` of a resident slab. Rows past what the TIM shipped fall back
  * to row 0, matching the PC pool's behaviour for a missing row. */
@@ -1059,7 +1120,20 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
              * of the mode — this page cannot be stolen or overwritten. */
             s_pages[victim].px0 = s_pages[victim].px1 = 0;
             s_pages[victim].py0 = s_pages[victim].py1 = 0;
-            { unsigned long long _t0 = SH_CYCLES(); PageDecodeIndicesResident(resWords, &resDesc, s_pages[victim].data); g_PsxVramDecodeTicks += SH_CYCLES() - _t0; g_PsxVramDecodes++; SH_DMA_WRITEBACK(s_pages[victim].data, PAGE_BYTES); }
+            {
+                unsigned long long _t0 = SH_CYCLES();
+                s_pages[victim].fmt4 = (uint8_t)PAGE_WANT_CI4(resDesc.bpp == 4 ? 0 : 1);
+#if defined(SH_N64_PORT)
+                if (s_pages[victim].fmt4)
+                    PageDecodeIndicesResident4(resWords, &resDesc, s_pages[victim].data);
+                else
+#endif
+                    PageDecodeIndicesResident(resWords, &resDesc, s_pages[victim].data);
+                g_PsxVramDecodeTicks += SH_CYCLES() - _t0;
+                g_PsxVramDecodes++;
+                SH_DMA_WRITEBACK(s_pages[victim].data,
+                                 s_pages[victim].fmt4 ? (PAGE_BYTES / 2) : PAGE_BYTES);
+            }
         } else {
             {   /* record the source rect so texel writes invalidate this page */
                 int px = (tpage & 0x0F) * 64;
@@ -1069,7 +1143,20 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
                 s_pages[victim].px1 = px + ((tp == 0) ? 64 : 128);
                 s_pages[victim].py1 = py + 256;
             }
-            { unsigned long long _t0 = SH_CYCLES(); PageDecodeIndices(tpage, s_pages[victim].data); g_PsxVramDecodeTicks += SH_CYCLES() - _t0; g_PsxVramDecodes++; SH_DMA_WRITEBACK(s_pages[victim].data, PAGE_BYTES); }
+            {
+                unsigned long long _t0 = SH_CYCLES();
+                s_pages[victim].fmt4 = (uint8_t)PAGE_WANT_CI4(tp);
+#if defined(SH_N64_PORT)
+                if (s_pages[victim].fmt4)
+                    PageDecodeIndices4(tpage, s_pages[victim].data);
+                else
+#endif
+                    PageDecodeIndices(tpage, s_pages[victim].data);
+                g_PsxVramDecodeTicks += SH_CYCLES() - _t0;
+                g_PsxVramDecodes++;
+                SH_DMA_WRITEBACK(s_pages[victim].data,
+                                 s_pages[victim].fmt4 ? (PAGE_BYTES / 2) : PAGE_BYTES);
+            }
         }
         s_pages[victim].key  = pageKey;
         s_pages[victim].hits = 1;
@@ -1141,3 +1228,18 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
     }
     return s_pages[best].data;
 }
+
+#if defined(SH_N64_PORT)
+/* The RDP backend binds by page POINTER and needs the stored format to pick
+ * FMT_CI4 vs FMT_CI8. PAGE_N is 8, and this runs once per page change rather
+ * than per triangle, so a scan beats threading a second out-parameter through
+ * every caller of PsxVram_GetPaletted. */
+int PsxVram_PageIs4bpp(const void* page)
+{
+    int i;
+    for (i = 0; i < PAGE_N; i++)
+        if (s_pages[i].data == (const uint8_t*)page)
+            return s_pages[i].fmt4 != 0;
+    return 0;
+}
+#endif

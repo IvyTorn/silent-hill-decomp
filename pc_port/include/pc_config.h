@@ -156,6 +156,8 @@ typedef struct {
     int minimapRequireMap;   /* 1 = only draw the map once the area's paper map has been found; 0 = always draw it (config-only key: minimap_require_map); default 1 */
     float minimapOpacity;    /* minimap opacity percentage, 0..100 (config key: minimap_opacity); default 100 */
     int   xboxPalettedTex; /* Xbox only: 1 = cache index pages + GPU palettes (default, ~4x texture capacity); 0 = the old per-(tpage,clut) ARGB cache. Config key: texture_paletted. Escape hatch if the paletted path misbehaves -- no rebuild needed. */
+    int   n64TexCi4;        /* N64 only: 1 = store 4-bit PSX pages as native CI4 (default; half the page, half each tile DMA, twice the TMEM window), 0 = expand to CI8. Config key: texture_ci4. */
+    int   n64AudioPumpBudgetMs; /* N64 only: max ms one audio pump may spend refilling the ring; 0 = unbounded. Config key: audio_pump_budget_ms; default 16. */
     int   xboxVideo720p;    /* Xbox only: 0 = 480p (default), 1 = 1280x720 pillarboxed 4:3 (config key: video_720p; applied at boot, reboot to change) */
     int   logDiag;          /* Xbox only: 0 = quiet log (default; per-frame diag probes gated), 1 = full diagnostic stream (config key: log_diag) */
     int   cutsceneLineGapMs; /* minimum silence (ms) between cutscene voice lines so they don't run together; 0 = off, 300 = default (config key: cutscene_line_gap_ms) */

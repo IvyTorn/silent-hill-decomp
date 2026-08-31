@@ -4693,7 +4693,12 @@ static bool Pc_MaterialNeedsVramSlot(const s_Material* mat)
 s_Texture* Texture_Get(s_Material* mat, s_ActiveChunkTextures* activeTexs, void* fsBuffer9, e_FsFile fileIdx, s32 arg4)
 {
     s8         filename[12];
-    s8         debugStr[12];
+    /* 13, not 12: the missing-texture path below writes debugStr[12] = 0 to
+     * terminate the 12 characters strncpy then fills, which is one past the end
+     * of a 12-byte array. -Os let the store land in stack padding; -O2 is
+     * entitled to assume the UB never happens and reorder or drop it. The extra
+     * byte makes the terminator real and changes nothing that is drawn. */
+    s8         debugStr[13];
     s32        fileId;
     s32        i;
     s32        smallestQueueIdx;

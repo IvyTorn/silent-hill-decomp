@@ -68,6 +68,7 @@ extern unsigned long long g_PsxVramDecodeTicks, g_PsxVramDrainTicks;
 extern unsigned g_PsxVramPalGen;
 /* world_draw.c: game-side draw phases, in SH_CYCLES ticks (== get_ticks here). */
 extern unsigned long long g_XbChunkDrawCycles, g_XbCharaCycles;
+extern int PsxVram_PageIs4bpp(const void* page);   /* psx_vram.c */
 extern unsigned           g_XbCharaCount;
 /* sh_log_n64.c: what logging cost this frame. */
 extern unsigned long long g_ProfLogStderrTicks, g_ProfLogSdTicks;
@@ -115,12 +116,18 @@ static int s_modeDirty = 1;
  * and fits with room to spare. Shape does not matter; padded area does. */
 #define TEX_TMEM_BYTES 2048
 
+/* Set at bind time from the page's stored format. A CI4 page packs two texels
+ * per byte, so TMEM's 2 KB holds 4096 of its texels instead of 2048 and the
+ * RDP's 8-byte row granularity lands every 16 texels instead of every 8. */
+static int s_pageIs4;
+
 static int TexBoxFits(int s0, int t0, int s1, int t1)
 {
     int w    = s1 - s0;
     int h    = t1 - t0;
-    int padW = (w + 7) & ~7;
-    return w > 0 && h > 0 && padW * h <= TEX_TMEM_BYTES;
+    int padW = s_pageIs4 ? ((w + 15) & ~15) : ((w + 7) & ~7);
+    int cost = s_pageIs4 ? (padW * h) / 2 : (padW * h);
+    return w > 0 && h > 0 && cost <= TEX_TMEM_BYTES;
 }
 
 static const uint8_t*  s_texPage;
@@ -166,6 +173,7 @@ static unsigned long long s_cnSubmitTicks;
 static int s_cnUploads;
 static int s_cnTlutWrap;
 static int s_cnBinds;
+static int s_cnBinds4;   /* of those, pages bound as CI4 */
 
 static const rdpq_trifmt_t TRIFMT_SH_SHADE = {
     .pos_offset   = 0,
@@ -278,7 +286,11 @@ static void UploadTlut(void)
     }
     else
         s_cnTlutReuse++;
-    rdpq_tex_upload_tlut(s_tlutRing[k], 0, 256);
+    /* CI4 indexes a 16-entry bank (palette 0), and a 4-bit PSX page only ever
+     * had 16 real colours anyway -- the other 240 entries PaletteBuild wrote
+     * are whatever VRAM sat past the CLUT row. Uploading them was a 480-byte
+     * DMA per bind for texels that cannot address them. */
+    rdpq_tex_upload_tlut(s_tlutRing[k], 0, s_pageIs4 ? 16 : 256);
     s_tlutDirty = 0;
 }
 
@@ -438,26 +450,34 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
     {
         unsigned long long _t0 = get_ticks();
         int w, h, ws0, wt0;
+        /* Window arithmetic is in TEXELS; a CI4 page gets twice the budget and
+         * twice the row granularity, which is the whole point of storing it. */
+        const int align  = s_pageIs4 ? 16 : 8;
+        const int budget = s_pageIs4 ? (TEX_TMEM_BYTES * 2) : TEX_TMEM_BYTES;
 
         /* Grow the box to the largest window that still fits TMEM, wide
          * first: the triangles that follow a wall quad's first half share
          * its rows far more often than its columns. */
-        w = (s1 - s0 + 7) & ~7;
-        if (w < 8) w = 8;
+        w = (s1 - s0 + align - 1) & ~(align - 1);
+        if (w < align) w = align;
         h = t1 - t0;
-        while (w < 128 && (w * 2) * h <= TEX_TMEM_BYTES)
+        while (w < 128 && (w * 2) * h <= budget)
             w *= 2;
         if (w > TEX_PAGE_DIM) w = TEX_PAGE_DIM;
-        h = TEX_TMEM_BYTES / w;
+        h = budget / w;
         if (h > TEX_PAGE_DIM) h = TEX_PAGE_DIM;
         if (h < t1 - t0)
         {
-            w = (s1 - s0 + 7) & ~7;   /* the bare box; TexBoxFits proved it fits */
+            w = (s1 - s0 + align - 1) & ~(align - 1);   /* the bare box; TexBoxFits proved it fits */
             h = t1 - t0;
         }
         ws0 = s0 - (w - (s1 - s0)) / 2;
         if (ws0 < 0) ws0 = 0;
         if (ws0 + w > TEX_PAGE_DIM) ws0 = TEX_PAGE_DIM - w;
+        /* A CI4 load snaps s0 DOWN to the byte and s1 UP (rdpq_tex.c), which
+         * would widen the rect past the budget just computed. w is a multiple
+         * of 16, so an even ws0 keeps both edges on byte boundaries. */
+        if (s_pageIs4) ws0 &= ~1;
         wt0 = t0 - (h - (t1 - t0)) / 2;
         if (wt0 < 0) wt0 = 0;
         if (wt0 + h > TEX_PAGE_DIM) wt0 = TEX_PAGE_DIM - h;
@@ -620,9 +640,9 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
     if (s_tlutDirty)
         UploadTlut();
 
-    for (t = t0; t < t1; t++)
-        data_cache_hit_writeback((void*)(s_texPage + t * TEX_PAGE_DIM + s0),
-                                 (unsigned)(s1 - s0));
+    /* No cache work here: psx_vram.c writes the page back when it decodes it
+     * (SH_DMA_WRITEBACK), exactly as on the triangle path. This loop also
+     * assumed a CI8 row pitch, which a CI4 page does not have. */
 
     /* PutVertUV ALREADY applied the PSX 0x80=1.0 modulation (r <<= 1, clamped),
      * so col is the final factor -- doubling it again blew every blit to white. */
@@ -729,6 +749,7 @@ void GpuNv2a_FrameBegin(void)
     s_cnWaitFbTicks = 0;
     s_cnSubmitTicks = 0;
     s_cnUploads  = 0;
+    s_cnBinds4   = 0;
     s_cnTlutWrap = 0;
     s_cnBinds    = 0;
     s_cnWinHits  = 0;
@@ -857,11 +878,11 @@ void GpuNv2a_FrameEnd(void)
              * submit = tile uploads + triangle issue; vram dec/drain = page
              * decodes and full GPU drains the texture cache had to do. What is
              * left of `frame` after these is the game update + OT walk ([OTT]). */
-            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms",
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms",
                    (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
                    (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
                    (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
-                   s_cnUploads, s_cnWinHits, s_cnBinds, s_cnTlutWrap, s_cnTlutReuse,
+                   s_cnUploads, s_cnWinHits, s_cnBinds, s_cnBinds4, s_cnTlutWrap, s_cnTlutReuse,
                    g_PsxVramDecodes, (unsigned)TICKS_TO_US((unsigned)g_PsxVramDecodeTicks),
                    g_PsxVramDrains, (unsigned)TICKS_TO_US((unsigned)g_PsxVramDrainTicks),
                    g_PsxVramPalBuilds,
@@ -928,6 +949,7 @@ void GpuNv2a_BindPaletted(const void* page, const void* pal)
         s_texEnabled = 0;
         s_texPage    = NULL;
         s_texPal     = NULL;
+        s_pageIs4    = 0;
     }
     else
     {
@@ -937,7 +959,22 @@ void GpuNv2a_BindPaletted(const void* page, const void* pal)
             s_cnBinds++;
         s_texPage    = (const uint8_t*)page;
         s_texPal     = (const uint32_t*)pal;
-        s_pageSurf   = surface_make_linear((void*)page, FMT_CI8, TEX_PAGE_DIM, TEX_PAGE_DIM);
+        {
+            /* The TLUT upload LENGTH follows the page format (16 entries for
+             * CI4, 256 for CI8), so a format change has to re-upload even when
+             * the palette pointer is unchanged. Only a format change: dirtying
+             * unconditionally would put a 1 KB palette DMA on every one of the
+             * ~100 binds in a frame, which is what the ring dedup exists to
+             * avoid. */
+            int was4  = s_pageIs4;
+            s_pageIs4 = PsxVram_PageIs4bpp(page);
+            if (s_pageIs4 != was4)
+                s_tlutDirty = 1;
+            if (s_pageIs4)
+                s_cnBinds4++;
+        }
+        s_pageSurf   = surface_make_linear((void*)page, s_pageIs4 ? FMT_CI4 : FMT_CI8,
+                                           TEX_PAGE_DIM, TEX_PAGE_DIM);
         s_texEnabled = 1;
     }
     s_modeDirty = 1;

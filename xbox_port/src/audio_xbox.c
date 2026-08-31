@@ -466,8 +466,10 @@ static int   s_revDepthL = 0, s_revDepthR = 0;   /* SpuReverbAttr depth (<<8) */
 static float s_wet       = 0.0f;
 #define REV_NCOMB 8
 #define REV_NAP   4
+#if !defined(SH_N64_PORT)
 static const int REV_COMB_L[REV_NCOMB] = { 1214, 1293, 1390, 1476, 1548, 1623, 1695, 1760 };
 static const int REV_AP_L[REV_NAP]     = { 605, 480, 371, 245 };
+#endif
 #if defined(SH_N64_PORT)
 /* 114KB of reverb comb lines for an output stage that is not wired on this
  * port yet (Audio_XboxPump is a no-op; the RSP mixer replaces all of this).
@@ -479,7 +481,14 @@ static float s_combBuf[2][REV_NCOMB][8]; static int s_combIdx[2][REV_NCOMB]; sta
 static float s_combBuf[2][REV_NCOMB][1792]; static int s_combIdx[2][REV_NCOMB]; static float s_combLP[2][REV_NCOMB];
 #define REV_COMB_LEN 1792
 #endif
+#if defined(SH_N64_PORT)
+/* Stubbed with the comb lines: nothing reads these once RevProcess is compiled
+ * out below, and the real ones are 21 KB of .bss on a machine whose heap has
+ * been down to 24 KB free. Kept addressable so the reset memsets still hold. */
+static float s_apBuf[2][REV_NAP][8];        static int s_apIdx[2][REV_NAP];
+#else
 static float s_apBuf[2][REV_NAP][672];      static int s_apIdx[2][REV_NAP];
+#endif
 #define REV_FEEDBACK 0.84f
 #define REV_DAMP1    0.20f
 #define REV_DAMP2    0.80f
@@ -502,6 +511,7 @@ static void RevRecomputeWet(void)
     s_wet = s_reverbOn ? w : 0.0f;
 }
 
+#if !defined(SH_N64_PORT)
 static float RevProcess(int ch, float in)   /* one sample, one channel */
 {
     int   i, spread = ch ? 25 : 0;   /* stereo decorrelation on the right */
@@ -536,6 +546,7 @@ static float RevProcess(int ch, float in)   /* one sample, one channel */
     }
     return out;
 }
+#endif
 
 void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
 {
@@ -702,12 +713,18 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
          * int16 before scaling. */
         L = (int)(((long long)L * s_masterL) >> 14);
         R = (int)(((long long)R * s_masterR) >> 14);
-        haflerL = (int)(((long long)haflerL * s_masterL) >> 14);  /* same scaling as the front */
-        haflerR = (int)(((long long)haflerR * s_masterR) >> 14);
-        pFL = (int)(((long long)pFL * s_masterL) >> 14);
-        pFR = (int)(((long long)pFR * s_masterR) >> 14);
-        pRL = (int)(((long long)pRL * s_masterL) >> 14);
-        pRR = (int)(((long long)pRR * s_masterR) >> 14);
+        /* Only the surround feeds consume these, and every one of them is zero
+         * when there is no rear buffer -- six multiplies per sample, four of
+         * them 64-bit, to scale zeroes. Audio_RenderInto passes rear = NULL, so
+         * on a stereo-only console that was the whole cost. */
+        if (rear) {
+            haflerL = (int)(((long long)haflerL * s_masterL) >> 14);  /* same scaling as the front */
+            haflerR = (int)(((long long)haflerR * s_masterR) >> 14);
+            pFL = (int)(((long long)pFL * s_masterL) >> 14);
+            pFR = (int)(((long long)pFR * s_masterR) >> 14);
+            pRL = (int)(((long long)pRL * s_masterL) >> 14);
+            pRR = (int)(((long long)pRR * s_masterR) >> 14);
+        }
 
         /* Reverb wet return: run the send through the network and fold into the
          * fronts BEFORE the Hafler reads L/R, so the diffuse tail also spreads to
@@ -715,6 +732,16 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
          * the wet so fades/pause-duck carry it. Always step the network (even at
          * wet 0) so the delay lines keep flushing and a later note has no stale
          * tail. This wash is what restores the "missing layers" of SH BGM. */
+#if defined(SH_N64_PORT)
+        /* NOT on N64. REV_COMB_LEN is 8 here -- the delay lines are stubs,
+         * because the real ones are 1792 floats x 16 -- so this network cannot
+         * produce a tail, only a ~0.7 ms metallic comb, and s_wet is 0 unless
+         * the game asks for reverb. It ran ~100 float ops per sample per
+         * channel UNCONDITIONALLY for that. At 11025 Hz on a 93 MHz VR4300
+         * that is a real slice of every frame spent on an effect that is
+         * silent when it is right and wrong when it is not. */
+        (void)revInL; (void)revInR;
+#else
         {
             float wl = RevProcess(0, revInL);
             float wr = RevProcess(1, revInR);
@@ -730,6 +757,7 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
                 haflerR += iwr;
             }
         }
+#endif
 
         /* Derived surround feeds — from the post-master, pre-clamp fronts so
          * pause-ducking/fades hit every speaker. */
