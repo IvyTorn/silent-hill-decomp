@@ -951,8 +951,10 @@ void SpuSetKey(int on_off, unsigned int voice_bit)
                 /* TEMP diagnostic: the first block of the first key-ons. A
                  * flag byte with bit 0 set on block 0 is a one-block sample. */
                 static int s_spuwLog = 0;
-                if (s_spuwLog < 6) {
-                    const unsigned char* b = &s_spuRam[v->addr & (SPU_RAM_SIZE - 1)];
+                const unsigned char* b = &s_spuRam[v->addr & (SPU_RAM_SIZE - 1)];
+                /* Boot-time key-ons fire before any VAB body is uploaded and
+                 * all read zeros; only the ones with data say anything. */
+                if (s_spuwLog < 6 && (b[0] | b[1] | b[2] | b[3] | b[4] | b[5])) {
                     s_spuwLog++;
                     SH_DBG("[SPUW] keyon v=%d addr=%u blk0=%02x %02x %02x%02x%02x%02x pitch=%d vol=%d,%d adsr=%04x/%04x",
                            i, (unsigned)v->addr, b[0], b[1], b[2], b[3], b[4], b[5],

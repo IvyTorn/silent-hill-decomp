@@ -41,12 +41,39 @@ extern void PGXP_StoreAddr(void* addr, int slot);
  * from a contiguous array of 3 SVECTORs (24 bytes).
  * PSX: lwc2 $0-$5 from r0. PsyCross doesn't define this. */
 #undef gte_ldv3c
+/* Through GTE_P32, the half-composition gte_ldv0 / gte_ldv3 already use: a
+ * raw word read of {s16 x, s16 y} equals the PSX (y<<16)|x only on
+ * little-endian. Raw here loaded VX=y, VY=x, VZ=pad on big-endian for every
+ * caller -- the unlit model transform (func_80057B7C), the lit path's
+ * lighting normals, the particle emitters -- while the lit VERTEX path
+ * composed its pairs and was fine: Harry rendered, the world and his gun
+ * came out as stretched blobs. Value-identical on little-endian. */
 #define gte_ldv3c( r0 ) do { \
-    uint *_p = (uint*)((char*)(r0)); \
-    MTC2(_p[0], 0); MTC2(_p[1], 1); \
-    MTC2(_p[2], 2); MTC2(_p[3], 3); \
-    MTC2(_p[4], 4); MTC2(_p[5], 5); \
+    char *_b = (char*)(r0); \
+    MTC2(GTE_P32(_b + 0), 0);  MTC2(GTE_P32(_b + 4), 1); \
+    MTC2(GTE_P32(_b + 8), 2);  MTC2(GTE_P32(_b + 12), 3); \
+    MTC2(GTE_P32(_b + 16), 4); MTC2(GTE_P32(_b + 20), 5); \
 } while(0)
+
+/* PSX swc2 of SZ1..3: a 32-bit store of a zero-extended 16-bit depth whose
+ * LOW half lands AT the address, and the caller reads the s16 there
+ * (func_80057B7C reads m[0][2] / m[2][0] back). On big-endian the low half
+ * of a word store is two bytes further on, so the depth must be placed in
+ * the high half to sit at the address. Value-identical on little-endian. */
+#undef gte_stsz3
+#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define gte_stsz3( r0, r1, r2 ) do { \
+    *(uint*)((char*)(r0)) = (MFC2(17) & 0xFFFFu) << 16; \
+    *(uint*)((char*)(r1)) = (MFC2(18) & 0xFFFFu) << 16; \
+    *(uint*)((char*)(r2)) = (MFC2(19) & 0xFFFFu) << 16; \
+} while(0)
+#else
+#define gte_stsz3( r0, r1, r2 ) do { \
+    *(uint*)((char*)(r0)) = MFC2(17); \
+    *(uint*)((char*)(r1)) = MFC2(18); \
+    *(uint*)((char*)(r2)) = MFC2(19); \
+} while(0)
+#endif
 
 /* gte_ReadGeomScreen - read projection distance H (COP2 control reg 26)
  * into *r0. PSX: cfc2 $12,$26; sw $12,0(r0). Neither PsyCross nor

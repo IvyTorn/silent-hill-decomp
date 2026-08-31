@@ -2225,11 +2225,30 @@ void func_80057B7C(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
     gte_rtpt();
     gte_stsxy3c(screenXy);
     gte_stsz3(&scratchData->field_380.field_0.m[0][2], &scratchData->field_380.field_0.m[2][0], &scratchData->field_380.field_0.t[0]);
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: the unlit path's first vertex, in and out. in = the
+     * model-space triple as loaded, out = the raw screen word (PSX
+     * convention, y in the high half) and the depth read back; tz = the
+     * model's view-space z. A depth of 0 or an out word in the thousands
+     * means this path is still wrong. */
+    {
+        static int s_ulLog = 0;
+        if (s_ulLog < 6)
+        {
+            s_ulLog++;
+            SH_DBG("[ULIT] vc=%d off=%d in=(%d,%d,%d) out=%08x z=%d tz=%d m00=%d",
+                   (int)meshHdr->vertexCount, (int)offset,
+                   (int)meshHdr->verticesXy[0].vx, (int)meshHdr->verticesXy[0].vy, (int)meshHdr->verticesZ[0],
+                   (unsigned)*(u32*)&screenXy[0], (int)scratchData->field_380.field_0.m[0][2],
+                   (int)mat->t[2], (int)mat->m[0][0]);
+        }
+    }
+#endif
 
 
     temp_a2[0] = scratchData->field_380.field_0.m[0][2];
     temp_a2[1] = scratchData->field_380.field_0.m[2][0];
-    temp_a2[2] = scratchData->field_380.field_0.t[0];
+    temp_a2[2] = *(s16*)&scratchData->field_380.field_0.t[0]; /* the s16 AT the address: see gte_stsz3 */
 
     screenXy += 3;
     var_t1  += 3;
@@ -2267,7 +2286,7 @@ void func_80057B7C(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
 
             temp_a2[0] = scratchData->field_380.field_0.m[0][2];
             temp_a2[1] = scratchData->field_380.field_0.m[2][0];
-            temp_a2[2] = scratchData->field_380.field_0.t[0];
+            temp_a2[2] = *(s16*)&scratchData->field_380.field_0.t[0]; /* the s16 AT the address: see gte_stsz3 */
         }
 
 #ifdef SH_PC_PORT
@@ -2299,7 +2318,7 @@ void func_80057B7C(s_MeshHeader* meshHdr, s32 offset, s_GteScratchData* scratchD
 
             temp_a2[0] = scratchData->field_380.field_0.m[0][2];
             temp_a2[1] = scratchData->field_380.field_0.m[2][0];
-            temp_a2[2] = scratchData->field_380.field_0.t[0];
+            temp_a2[2] = *(s16*)&scratchData->field_380.field_0.t[0]; /* the s16 AT the address: see gte_stsz3 */
         }
     }
 }

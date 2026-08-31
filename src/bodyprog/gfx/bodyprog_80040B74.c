@@ -984,7 +984,14 @@ void Ipd_ActiveChunksClear(s_MapTerrain* map, s32 arg1) // 0x80042300
 #else
                 enum { XBOX_OWNED_SLOT_CAP = 24 };
 #endif
+#if defined(SH_N64_PORT)
+                /* Slots at or past the map's active count are never loaded
+                 * into (every load/draw loop runs to activeChunkCount), so
+                 * their buffers were 88 KB each of pure loss. */
+                if (i >= XBOX_OWNED_SLOT_CAP || i >= arg1)
+#else
                 if (i >= XBOX_OWNED_SLOT_CAP)
+#endif
                 {
                     curChunk->ipdHdr = NULL;
                     continue;

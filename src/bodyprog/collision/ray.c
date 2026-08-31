@@ -591,7 +591,10 @@ void func_8006E78C(s_RayState* state, s_IpdCollSubcell* subcell, SVECTOR3* split
         {
             if (state->field_0 == true)
             {
-                gte_ldsxy3(0, *(s32*)&sp0.vx, *(s32*)&sp8.vx);
+                /* gte_stMAC12 wrote sp0/sp8 field-wise, so compose the
+ * PSX word (GTE_P32) rather than reading it raw -- a raw
+ * read swaps the halves on big-endian. Identical on LE. */
+                gte_ldsxy3(0, GTE_P32(&sp0.vx), GTE_P32(&sp8.vx));
                 gte_nclip();
 
                 if (gte_stMAC0() >= 0)

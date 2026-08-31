@@ -253,11 +253,17 @@ void Ipd_PlayerChunkInit(s_MapOverlayHdr* mapHdr, s32 playerPosX, s32 playerPosZ
      * still mid-load — floating neighbor rooms, void where the current
      * room should be, popping floor patches, and no collision for
      * visible-but-unloaded neighbors. */
+#if !defined(SH_N64_PORT)
+    /* Not on N64: its load window is the exact cell for interiors (the
+     * SH_XBOX_PORT branch in Map_ChunkLoad), so the extra resident slots
+     * would never be loaded into, and each is an 88 KB calloc from a heap
+     * that was down to 24 KB free. PSX counts (1/2/4) are the budget. */
     if (flags & MapFlag_Interior) {
         activeIpdCount = 16;
     } else if (activeIpdCount < 4) {
         activeIpdCount = 4;
     }
+#endif
 #endif
 
 
