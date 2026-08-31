@@ -111,6 +111,14 @@ typedef struct {
      * blocks and around loops. */
     unsigned int   blkAddr;
     unsigned int   loopBlk;     /* block that carried LOOP_START; 0 = none yet */
+    /* Fixed-point play cursor (integer sample + 16-bit fraction) and step
+     * (16.16). SRC_HZ is an exact multiple of OUT_HZ on this port, so
+     * step16 = pitch << 6 loses nothing. The double cursor cost the mixer
+     * dearly on the VR4300: converts and double adds per voice per sample
+     * were most of a 38 ms pump. */
+    int            posInt;
+    unsigned int   posFrac16;   /* low 16 bits used */
+    unsigned int   step16;
     float          fp1, fp2;
     short          win[56];
     int            winBase;
@@ -592,12 +600,14 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
             if (!v->active)
                 continue;
 
-            idx = (int)v->pos;
 #if SPU_STREAM_DECODE
+            idx = v->posInt;
             if (idx < 0 || !VagStreamEnsure(v, idx)) { v->active = 0; continue; }
             s0 = v->win[idx - v->winBase];
             s1 = (idx + 1 < v->winBase + v->winFilled) ? v->win[idx + 1 - v->winBase] : s0;
+            s  = s0 + (((s1 - s0) * (int)(v->posFrac16 >> 8)) >> 8);
 #else
+            idx = (int)v->pos;
             if (idx < 0 || idx >= v->pcmLen) { v->active = 0; continue; }
 
             /* Linear interpolation between the two nearest samples (was
@@ -606,17 +616,22 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
             if (v->looping && idx + 1 >= v->loopEnd) s1 = v->pcm[v->loopStart];
             else if (idx + 1 < v->pcmLen)            s1 = v->pcm[idx + 1];
             else                                     s1 = s0;
-#endif
             frac = v->pos - (double)idx;
             s = s0 + (int)((s1 - s0) * frac);
+#endif
 
             /* ADSR: scale by the envelope level (Q15), advanced at 44100Hz. */
             if (v->hasEnv) {
+#if SPU_STREAM_DECODE
+                /* SRC/OUT is a whole number here; no fractional accumulator. */
+                EnvelopeAdvance(v, SRC_HZ / OUT_HZ);
+#else
                 int ticks;
                 v->envTickAcc += envRate;
                 ticks = (int)v->envTickAcc;
                 v->envTickAcc -= ticks;
                 if (ticks) EnvelopeAdvance(v, ticks);
+#endif
                 if (v->envPhase == ENV_OFF) { v->active = 0; continue; }
                 s = (s * v->envLevel) >> 15;
             }
@@ -653,11 +668,14 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
                 if (v->reverb) { revInL += (float)dl; revInR += (float)dr; }
             }
 
-            v->pos += v->step;
 #if SPU_STREAM_DECODE
-            if (v->ended && (int)v->pos >= v->endIdx)
+            v->posFrac16 += v->step16;
+            v->posInt    += (int)(v->posFrac16 >> 16);
+            v->posFrac16 &= 0xFFFFu;
+            if (v->ended && v->posInt >= v->endIdx)
                 v->active = 0;
 #else
+            v->pos += v->step;
             if (v->looping) {
                 if (v->pos >= (double)v->loopEnd)
                     v->pos -= (double)(v->loopEnd - v->loopStart);
@@ -884,6 +902,9 @@ void SpuSetVoiceAttr(SpuVoiceAttr* a)
         if (a->mask & SPU_VOICE_PITCH) {
             v->pitch = a->pitch;
             v->step  = ((double)SRC_HZ / (double)OUT_HZ) * ((double)a->pitch / 4096.0);
+            /* (SRC_HZ/OUT_HZ) * pitch/4096 in 16.16: exact while SRC is a
+             * whole multiple of OUT (44100 = 4 * 11025). */
+            v->step16 = (unsigned int)a->pitch * ((SRC_HZ / OUT_HZ) << 16 >> 12);
         }
         /* Capture the ADSR registers the sequencer programs (key_on mask 0x6019F,
          * adsr_set, rr_off). A voice with a programmed envelope runs the ADSR. */
@@ -946,6 +967,8 @@ void SpuSetKey(int on_off, unsigned int voice_bit)
             v->ended     = 0;
             v->endIdx    = 0x7FFFFFFF;
             v->pos       = 0.0;
+            v->posInt    = 0;
+            v->posFrac16 = 0;
             v->active    = 1;
             {
                 /* TEMP diagnostic: the first block of the first key-ons. A

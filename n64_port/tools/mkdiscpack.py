@@ -72,6 +72,34 @@ def merge_runs(entries, wanted, files_re=None):
     return runs
 
 
+def extract_loose(bin_path, out_dir, entries, wanted, files_re):
+    """Write each selected file as loose bytes, exactly the blockCount*256 the
+    engine reads, decoded from the raw sectors. The tree mirrors what the
+    engine's loose-file loader probes: gamedata/load/<TOPDIR>/<NAME>."""
+    seen = set()
+    n = 0
+    total = 0
+    with open(bin_path, "rb") as src:
+        for lba, blocks, top, path in entries:
+            if blocks <= 0 or path in seen:
+                continue
+            if not (top in wanted or (files_re and files_re.search(path))):
+                continue
+            seen.add(path)
+            size = blocks * 256                       # blockCount is 256-byte blocks
+            out = os.path.join(out_dir, "gamedata", "load", *path.split("/"))
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            data = bytearray()
+            for s in range((size + DATA_SIZE - 1) // DATA_SIZE):
+                src.seek((lba + s) * RAW_SECTOR + DATA_OFFSET)
+                data += src.read(DATA_SIZE)
+            with open(out, "wb") as f:
+                f.write(bytes(data[:size]))
+            n += 1
+            total += size
+    print(f"extracted : {n} files, {total / 1048576:.1f} MB -> {out_dir}/gamedata/load/")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("bin", help="disc image (2352-byte raw sectors)")
@@ -84,6 +112,12 @@ def main():
                          "'SND/(FIRST|MAP00|MEP0|.*KDT)')")
     ap.add_argument("--dirs", default=DEFAULT_DIRS,
                     help=f"comma-separated disc directories to include (default: {DEFAULT_DIRS})")
+    ap.add_argument("--extract", default=None, metavar="DIR",
+                    help="instead of packing, write every selected file as a "
+                         "loose file under DIR/gamedata/load/<TOPDIR>/<NAME> -- "
+                         "the tree the engine's loose-file loader probes "
+                         "(copy it to sd:/silenthill/). Use --dirs ALL for "
+                         "every non-XA directory.")
     args = ap.parse_args()
 
     ft = args.filetable
@@ -98,6 +132,12 @@ def main():
 
     entries = load_filetable(ft)
     files_re = re.compile(args.files) if args.files else None
+
+    if args.extract:
+        if "ALL" in wanted:
+            wanted = {d for _, _, d, _ in entries if d != "XA"}
+        extract_loose(args.bin, args.extract, entries, wanted, files_re)
+        return
     runs = merge_runs(entries, wanted, files_re)
     total = sum(hi - lo for lo, hi in runs)
 

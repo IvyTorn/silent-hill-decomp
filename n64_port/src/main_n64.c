@@ -159,6 +159,11 @@ int main(void)
      * overrides win only where they must. main_psp.c has always done this;
      * omitting it here was the mistake. */
     Sh_Say("config");
+    /* Loose files ON by default here (the PC defaults it off): the asset
+     * pipeline's output is a loose tree under sd:/silenthill/gamedata/load/,
+     * and a user who has not extracted anything just pays a handful of fopen
+     * misses per file load. The cfg (allow_loose_files=0) can turn it off. */
+    g_PcConfig.allowLooseFiles = 1;
     PcConfig_Load("sd:/silenthill/silenthill.cfg");
     XboxConfig_ApplyOverrides();
 

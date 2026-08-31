@@ -302,6 +302,19 @@ static int Loose_ResolveCase(const char* path, char* out, size_t outSize)
  * compiled out / never taken. */
 static FILE* Loose_FOpen(const char* path, const char* mode)
 {
+#if defined(SH_N64_PORT)
+    /* N64 FIRST -- this port defines SH_XBOX_PORT too, and the Xbox branch
+     * below would prefix Q:\. Loose paths are relative
+     * ("gamedata/load/CHARA/DOB.TIM"); user data on this console lives under
+     * sd:/silenthill/. On a miss return NULL without trying the bare relative
+     * path: a flashcart has no working directory. libdragon's FAT accepts
+     * forward slashes. */
+    {
+        char q[300];
+        snprintf(q, sizeof(q), "sd:/silenthill/%s", path);
+        return fopen(q, mode);
+    }
+#endif
 #ifdef SH_XBOX_PORT
     /* Every loose path in this file is RELATIVE ("gamedata/load/CHARA/DOB.TIM").
      * There is no useful current directory on Xbox -- it is whatever the

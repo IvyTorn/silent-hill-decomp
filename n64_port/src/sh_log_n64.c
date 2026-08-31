@@ -187,6 +187,20 @@ int Sh_LogAllow(const char* fmt)
 static FILE* s_sdMirror;
 static int   s_sdWanted;   /* mirror requested: reopen attempts may continue */
 
+/* The mirror's stdio buffer. With the default (tiny) buffer, mid-frame
+ * fwrites spilled to the card whenever it happened to fill: 14 ms frame
+ * stalls at random. 16 KB holds over a second of log; the card is touched
+ * only by the once-per-second commit below. */
+static char  s_sdBuf[16 * 1024];
+
+static FILE* ShLogN64_SdOpen(const char* mode)
+{
+    FILE* f = fopen("sd:/silenthill/silenthill.log", mode);
+    if (f != NULL)
+        setvbuf(f, s_sdBuf, _IOFBF, sizeof(s_sdBuf));
+    return f;
+}
+
 /* What the log costs the frame, per sink (reset each frame, read by [PROF]).
  * stderr is libdragon's IS-Viewer + USB writers; on a flashcart with no host
  * attached the USB writer can wait for its timeout. */
@@ -249,7 +263,7 @@ static int ShLog_Write(void* cookie, const char* buf, int len)
                 s_lastCommitMs = nowMs;
                 if (s_sdMirror != NULL)
                     fclose(s_sdMirror);
-                s_sdMirror = fopen("sd:/silenthill/silenthill.log", "a");
+                s_sdMirror = ShLogN64_SdOpen("a");
             }
         }
         g_ProfLogSdTicks += get_ticks() - _t0;
@@ -267,7 +281,7 @@ void ShLogN64_EnableSdMirror(void)
     if (s_sdMirror != NULL)
         return;
     s_sdWanted = 1;
-    s_sdMirror = fopen("sd:/silenthill/silenthill.log", "w");
+    s_sdMirror = ShLogN64_SdOpen("w");
     if (s_sdMirror != NULL)
         SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log");
 }
@@ -284,10 +298,16 @@ void SH_DebugLogInit(void)
     if (g_ShDebugLog == NULL)
         g_ShDebugLog = stderr;
 
-    /* Unbuffered: the session ends by the user pulling power on a console, so
-     * anything still sitting in a buffer is lost. That exposure is the one that
-     * cost the 360 port a zero-byte log. */
-    setvbuf(g_ShDebugLog, NULL, _IONBF, 0);
+    /* LINE buffered, not unbuffered: newlib hands an unbuffered stream to the
+     * writer once per printf SEGMENT (~15 calls for one [PROF] line), and each
+     * call paid the IS-Viewer/USB write. [PROF] measured the logger at ~1 ms
+     * stderr + up to 14 ms SD per frame in the MENU. A line buffer still
+     * flushes on every newline, so the power-pull exposure is one partial
+     * line, same as before. */
+    {
+        static char s_mainBuf[512];
+        setvbuf(g_ShDebugLog, s_mainBuf, _IOLBF, sizeof(s_mainBuf));
+    }
 }
 
 void SH_DebugLogFlush(void)
@@ -306,5 +326,5 @@ void SH_DebugLogFlush(void)
      * lands exactly at the boot [VIB] read) used to NULL the mirror forever,
      * which is why every hardware log died at ~200 lines at the same spot. */
     if (s_sdWanted)
-        s_sdMirror = fopen("sd:/silenthill/silenthill.log", "a");
+        s_sdMirror = ShLogN64_SdOpen("a");
 }
