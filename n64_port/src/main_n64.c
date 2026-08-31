@@ -23,6 +23,7 @@
 #include "sh_log.h"
 #include "sh_log_n64.h"
 #include "psx_memory.h"   /* PSX_ADDR, PsxMemory_Init -- includes only <stdint.h> */
+#include "pc_config.h"    /* g_PcConfig: the loose-files default below */
 
 /* --------------------------------------------------------------- game */
 
