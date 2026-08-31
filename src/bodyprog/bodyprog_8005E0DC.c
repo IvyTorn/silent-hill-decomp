@@ -2582,8 +2582,16 @@ bool func_80063A50(POLY_FT4** poly, s32 idx) // 0x80063A50
 
         for (ptr->field_1D8 = 0; ptr->field_1D8 < 4; ptr->field_1D8++)
         {
+#ifdef SH_N64_PORT
+            /* Packed vx/vy write -- transposes on big-endian. The value only
+             * ever sets the LOW half (vx); vy is left as the high half, zero. */
+            ptr->field_14C[0].vx = (s16)((ptr->field_1D8 & 1) ? (u16)ptr->field_1E4
+                                                             : (u16)(-((u16)ptr->field_1E4)));
+            ptr->field_14C[0].vy = 0;
+#else
             *(u32*)&ptr->field_14C[0].vx = (ptr->field_1D8 & 1) ? (u16)ptr->field_1E4 :
                                                                  -((u16)ptr->field_1E4) & 0xFFFF;
+#endif
 
             ptr->field_14C[0].vz = (ptr->field_1D8 < 2) ? ptr->field_1E0 : 0;
 

@@ -1062,6 +1062,15 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
         s_pages[victim].key  = pageKey;
         s_pages[victim].hits = 1;
         best = victim;
+#if defined(SH_N64_PORT)
+        /* A recycled slot keeps its ADDRESS while its CONTENT changes, and the
+         * RDP backend memoises its last bind by POINTER -- so the next draw
+         * from this page compares equal, skips the re-upload, and rasterises
+         * the PREVIOUS texture out of TMEM. That is surfaces "warping into"
+         * each other's art. Drop the memo so the next bind re-uploads. */
+        { extern void GpuNv2a_BindPaletted(const void*, const void*);
+          GpuNv2a_BindPaletted(NULL, NULL); }
+#endif
     }
     s_pages[best].lastUse = thisFrame;
     s_pages[best].seq     = ++s_bindSeq;

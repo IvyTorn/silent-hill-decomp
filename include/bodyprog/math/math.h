@@ -221,8 +221,31 @@
  * @param x X component.
  * @param y Y component.
  */
+/* THESE PACK TWO 16-BIT FIELDS INTO ONE 32-BIT STORE, WHICH ONLY WORKS ON
+ * LITTLE-ENDIAN. The value is composed with x in the LOW half, but a 32-bit
+ * store places the HIGH half at the FIRST address on big-endian, so vx
+ * receives Y and vy receives X: every write through these transposes the
+ * vector, silently.
+ *
+ * Math_DVectorSetFast is what Gfx_StringDraw uses to save its pen position,
+ * and the main menu draws each row as three calls ("[", the label, "]") --
+ * the first call transposed the pen, so the label landed in another corner
+ * of the screen. The copyright line is a SINGLE call, which is exactly why
+ * it rendered correctly while the menu did not.
+ *
+ * Math_SetSVectorFast/Sum are used in 107 places for positions, rotations
+ * and velocities, so the same transposition was scattered through the game.
+ *
+ * Field-wise under big-endian; the little-endian forms are byte-for-byte
+ * unchanged so PC codegen does not move. */
+#if defined(__BIG_ENDIAN__) || \
+    (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define Math_DVectorSetFast(vec, x, y) \
+    ((vec)->vx = (s16)(x), (vec)->vy = (s16)(y))
+#else
 #define Math_DVectorSetFast(vec, x, y) \
     *((s32*)&(vec)->vx) = ((x) & 0xFFFF) + ((y) << 16)
+#endif
 
 /** @brief Sets an `SVECTOR` using a fast bitwise method.
  *
@@ -231,9 +254,15 @@
  * @param y Y component.
  * @param z Z component.
  */
+#if defined(__BIG_ENDIAN__) || \
+    (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define Math_SetSVectorFast(vec, x, y, z)                         \
+    ((vec)->vx = (s16)(x), (vec)->vy = (s16)(y), (vec)->vz = (s16)(z))
+#else
 #define Math_SetSVectorFast(vec, x, y, z)                         \
     *(s32*)&((vec)->vx) = (s32)((x) & 0xFFFF) | (s32)((y) << 16); \
     *(s16*)&((vec)->vz) = (z)
+#endif
 
 /** @brief Sets an `SVECTOR` using a fast bitwise method. Variant of `Math_SetSVectorFast`.
  *
@@ -242,9 +271,15 @@
  * @param y Y component.
  * @param z Z component.
  */
+#if defined(__BIG_ENDIAN__) || \
+    (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define Math_SetSVectorFastSum(vec, x, y, z)                      \
+    ((vec)->vx = (s16)(x), (vec)->vy = (s16)(y), (vec)->vz = (s16)(z))
+#else
 #define Math_SetSVectorFastSum(vec, x, y, z)                      \
     *(s32*)&((vec)->vx) = (s32)((x) & 0xFFFF) + (s32)((y) << 16); \
     ((vec)->vz) = (z)
+#endif
 
 /** @brief Clears an `SVECTOR`'s components.
  *

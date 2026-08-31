@@ -1372,7 +1372,14 @@ void Map_WorldObjectsInit(void) // 0x800DBE68
     D_800E3AAC.vz = 0;
 
     Savegame_EventFlagClear(EventFlag_188);
+#ifdef SH_N64_PORT
+    /* Packed (x | y<<16) into a vx/vy pair transposes on big-endian --
+     * same class as the Math_*Fast macros. Write the fields. */
+    D_800E3AAC.vx = (s16)(rotXy & 0xFFFF);
+    D_800E3AAC.vy = (s16)((rotXy >> 16) & 0xFFFF);
+#else
     *(s32*)&D_800E3AAC.vx = rotXy;
+#endif
 }
 
 void Map_WorldObjectsUpdate(void) // 0x800DBF08
