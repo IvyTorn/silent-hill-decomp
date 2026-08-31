@@ -66,6 +66,17 @@ void xbox_log(const char* fmt, ...)
 #endif
 #define SPU_ALLOC_BASE  0x1010         /* PSX reserves 0..0x100F */
 
+/* Decode ADPCM one block at a time as the voice plays (what the SPU does)
+ * instead of decoding the whole sample into a per-voice cache at key-on. The
+ * cache is 24 x VOICE_PCM_CAP shorts, and on the N64 the cap had to be cut to
+ * 0x800 samples (46 ms) to fit, which truncated every SFX at key-on. Xbox keeps
+ * the cache path until this one has been heard there. */
+#if defined(SH_N64_PORT)
+#define SPU_STREAM_DECODE 1
+#else
+#define SPU_STREAM_DECODE 0
+#endif
+
 static unsigned char  s_spuRam[SPU_RAM_SIZE];
 static unsigned char* s_xferPtr = s_spuRam;     /* SpuSetTransferStartAddr cursor */
 static int            s_allocTop = SPU_ALLOC_BASE;
@@ -94,6 +105,19 @@ typedef struct {
     volatile int   active;
     short*         pcm;         /* VOICE_PCM_CAP decoded samples */
 
+    /* Streaming decode state (SPU_STREAM_DECODE): a two-block window of
+     * decoded samples covering stream indices [winBase, winBase+winFilled),
+     * the next block address, and the filter history that must carry across
+     * blocks and around loops. */
+    unsigned int   blkAddr;
+    unsigned int   loopBlk;     /* block that carried LOOP_START; 0 = none yet */
+    float          fp1, fp2;
+    short          win[56];
+    int            winBase;
+    int            winFilled;
+    int            ended;       /* LOOP_END without REPEAT decoded */
+    int            endIdx;      /* one past the last real sample once ended */
+
     /* ADSR envelope (ported from PsyCross PsyX_SPUAL.cpp / nocash psx-spx). The
      * game programs adsr1/adsr2 on every key-on (smf_io.c key_on mask 0x6019F),
      * so hasEnv is set for all sequenced/SFX voices; without it notes clicked
@@ -121,7 +145,9 @@ typedef struct {
 } Voice;
 
 static Voice s_v[SPU_VOICES];
+#if !SPU_STREAM_DECODE
 static short s_voicePcm[SPU_VOICES][VOICE_PCM_CAP];  /* ~3 MB BSS, CPU-only */
+#endif
 
 /* --- PSX VAG ADPCM decode (ported from PsyCross PsyX_SPUAL.cpp) ------------ */
 
@@ -197,6 +223,69 @@ static int decodeVag(unsigned int byteAddr, short* out, int cap,
     }
     return k;
 }
+
+#if SPU_STREAM_DECODE
+/* --- streaming ADPCM --------------------------------------------------------
+ * The SPU decodes one 16-byte block (28 samples) at a time as the voice plays;
+ * so does this. A voice keeps a two-block window of decoded samples, refilled
+ * as the play cursor advances, and the filter history carries across blocks
+ * and around loops exactly as the hardware's does. */
+
+/* Decode the block at v->blkAddr into out[28] and advance (or loop / end).
+ * Returns 0 only when the address has run off SPU RAM. */
+static int VagStreamBlock(Voice* v, short* out)
+{
+    unsigned int  i = v->blkAddr;
+    unsigned char sp, flag;
+    int           j, k = 0;
+
+    if (i + 16 > SPU_RAM_SIZE)
+        return 0;
+    sp   = s_spuRam[i];
+    flag = s_spuRam[i + 1];
+    if (flag & ADPCM_LOOP_START)
+        v->loopBlk = i;
+    for (j = 2; j < 16; j++) {
+        int b = s_spuRam[i + j];
+        out[k++] = vagToPcm(sp, b & 0x0F, &v->fp1, &v->fp2);
+        out[k++] = vagToPcm(sp, (b >> 4) & 0x0F, &v->fp1, &v->fp2);
+    }
+    if (flag & ADPCM_LOOP_END) {
+        if (flag & ADPCM_REPEAT)
+            v->blkAddr = v->loopBlk ? v->loopBlk : v->addr;
+        else
+            v->ended = 1;
+    } else {
+        v->blkAddr = i + 16;
+    }
+    return 1;
+}
+
+/* Make v->win cover stream samples idx and idx+1. Returns 0 once idx is past
+ * the end of a non-looping sample. */
+static int VagStreamEnsure(Voice* v, int idx)
+{
+    while (idx + 1 >= v->winBase + v->winFilled) {
+        if (v->ended)
+            return idx < v->endIdx;
+        if (v->winFilled == 56) {
+            /* idx+1 >= winBase+56 here, so the oldest block is behind the cursor. */
+            memmove(v->win, v->win + 28, 28 * sizeof(short));
+            v->winBase  += 28;
+            v->winFilled = 28;
+        }
+        if (!VagStreamBlock(v, v->win + v->winFilled)) {
+            v->ended  = 1;
+            v->endIdx = v->winBase + v->winFilled;
+            continue;
+        }
+        v->winFilled += 28;
+        if (v->ended)
+            v->endIdx = v->winBase + v->winFilled;
+    }
+    return 1;
+}
+#endif
 
 /* --- mixer ---------------------------------------------------------------- */
 
@@ -504,6 +593,11 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
                 continue;
 
             idx = (int)v->pos;
+#if SPU_STREAM_DECODE
+            if (idx < 0 || !VagStreamEnsure(v, idx)) { v->active = 0; continue; }
+            s0 = v->win[idx - v->winBase];
+            s1 = (idx + 1 < v->winBase + v->winFilled) ? v->win[idx + 1 - v->winBase] : s0;
+#else
             if (idx < 0 || idx >= v->pcmLen) { v->active = 0; continue; }
 
             /* Linear interpolation between the two nearest samples (was
@@ -512,6 +606,7 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
             if (v->looping && idx + 1 >= v->loopEnd) s1 = v->pcm[v->loopStart];
             else if (idx + 1 < v->pcmLen)            s1 = v->pcm[idx + 1];
             else                                     s1 = s0;
+#endif
             frac = v->pos - (double)idx;
             s = s0 + (int)((s1 - s0) * frac);
 
@@ -559,12 +654,17 @@ void Audio_RenderInto6(short* out, short* rear, short* cenLfe, int frames)
             }
 
             v->pos += v->step;
+#if SPU_STREAM_DECODE
+            if (v->ended && (int)v->pos >= v->endIdx)
+                v->active = 0;
+#else
             if (v->looping) {
                 if (v->pos >= (double)v->loopEnd)
                     v->pos -= (double)(v->loopEnd - v->loopStart);
             } else if ((int)v->pos >= v->pcmLen) {
                 v->active = 0;
             }
+#endif
         }
 
         /* XA stream (voices / streamed cutscene audio) joins the voice sum.
@@ -699,7 +799,9 @@ void SpuInit(void)
     memset(s_combLP,  0, sizeof(s_combLP));
     memset(s_apBuf,   0, sizeof(s_apBuf));   memset(s_apIdx,   0, sizeof(s_apIdx));
     for (i = 0; i < SPU_VOICES; i++) {
+#if !SPU_STREAM_DECODE
         s_v[i].pcm       = s_voicePcm[i];
+#endif
         s_v[i].loopStart = -1;
         s_v[i].loopEnd   = -1;
         s_v[i].volL      = 0x3FFF;
@@ -829,44 +931,43 @@ void SpuSetKey(int on_off, unsigned int voice_bit)
         v = &s_v[i];
 
         if (on_off == SPU_ON) {
-            int ls, le;
-            v->pcmLen = decodeVag(v->addr, v->pcm, VOICE_PCM_CAP, &ls, &le);
-#if defined(SH_N64_PORT)
-            /* TEMP diagnostic: 428 key-ons and never a nonzero output sample.
-             * Is there VAG data at the voice address (SPU RAM upload), and
-             * does the decoder produce anything from it? */
+#if SPU_STREAM_DECODE
+            /* Streaming decode: one 28-sample block at a time as the mixer
+             * consumes it -- no per-voice decode cache and no cap on sample
+             * length. The 0x800-sample cap this replaces truncated every SFX
+             * longer than 46 ms at key-on: gunshots played as a garbled burst,
+             * footsteps as clicks. */
+            v->blkAddr   = v->addr;
+            v->loopBlk   = 0;
+            v->fp1       = 0.0f;
+            v->fp2       = 0.0f;
+            v->winBase   = 0;
+            v->winFilled = 0;
+            v->ended     = 0;
+            v->endIdx    = 0x7FFFFFFF;
+            v->pos       = 0.0;
+            v->active    = 1;
             {
-                /* Sample the FAILURES, not the first 8 key-ons: those all fire
-                 * at boot before any VAB body is uploaded, so this probe has
-                 * never once caught an in-game silent voice. A voice with
-                 * pcmLen==0 is exactly the "keyons rise, live stays 0" case --
-                 * all-zero bytes mean the sample never reached SPU RAM, while
-                 * real bytes with pcmLen==0 mean the decoder rejected them. */
-                static int s_spuwBad = 0;
-                if (v->pcmLen == 0 && s_spuwBad < 12) {
+                /* TEMP diagnostic: the first block of the first key-ons. A
+                 * flag byte with bit 0 set on block 0 is a one-block sample. */
+                static int s_spuwLog = 0;
+                if (s_spuwLog < 6) {
                     const unsigned char* b = &s_spuRam[v->addr & (SPU_RAM_SIZE - 1)];
-                    s_spuwBad++;
-                    SH_DBG("[SPUW] SILENT addr=%u bytes=%02x%02x%02x%02x%02x%02x%02x%02x pitch=%d",
-                           (unsigned)v->addr, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-                           (int)(v->step * 4096.0));
-                    g_N64SilentKeyOns++;
-                }
-                else if (v->pcmLen > 0)
-                {
-                    static int s_spuwOk = 0;
-                    if (s_spuwOk < 4) {
-                        s_spuwOk++;
-                        SH_DBG("[SPUW] OK addr=%u pcmLen=%d loop=%d..%d pitch=%d",
-                               (unsigned)v->addr, v->pcmLen, ls, le, (int)(v->step * 4096.0));
-                    }
+                    s_spuwLog++;
+                    SH_DBG("[SPUW] keyon v=%d addr=%u blk0=%02x %02x %02x%02x%02x%02x pitch=%d vol=%d,%d adsr=%04x/%04x",
+                           i, (unsigned)v->addr, b[0], b[1], b[2], b[3], b[4], b[5],
+                           (int)(v->step * 4096.0), v->volL, v->volR, v->adsr1, v->adsr2);
                 }
             }
-#endif
+#else
+            int ls, le;
+            v->pcmLen = decodeVag(v->addr, v->pcm, VOICE_PCM_CAP, &ls, &le);
             v->loopStart = ls;
             v->loopEnd   = le;
             v->looping   = (le > 0 && ls >= 0 && le <= v->pcmLen);
             v->pos       = 0.0;
             v->active    = (v->pcmLen > 0);
+#endif
             if (v->hasEnv) {                 /* start the ADSR from silence (attack) */
                 v->envPhase   = ENV_ATTACK;
                 v->envLevel   = 0;

@@ -369,7 +369,11 @@ void Gfx_2dEffectsDraw(void) // 0x800550D0
         poly            = (POLY_G4*)GsOUT_PACKET_P;
         GsOUT_PACKET_P += sizeof(POLY_G4);
 
-        color2           = *(s32*)&g_WorldEnvWork.fog.color;
+        /* CVECTOR bytes read as one word: on big-endian that puts the pad
+         * byte in red and swaps g/b, and this full-screen fog quad tinted
+         * every frame teal. PSX_LD_CVEC composes the word PSX_ST_RGB expects
+         * on both ends. */
+        color2           = PSX_LD_CVEC(&g_WorldEnvWork.fog.color);
         PSX_ST_RGB(poly, r3, color2);
         PSX_ST_RGB(poly, r2, color2);
         PSX_ST_RGB(poly, r1, color2);
@@ -410,7 +414,7 @@ void Gfx_2dEffectsDraw(void) // 0x800550D0
     poly           = (POLY_G4*)(packet + 0xC);
     GsOUT_PACKET_P = packet + 0x30;
 
-    color2           = *(s32*)&g_WorldEnvWork.fog.color;
+    color2           = PSX_LD_CVEC(&g_WorldEnvWork.fog.color);
     PSX_ST_RGB(poly, r3, color2);
     PSX_ST_RGB(poly, r2, color2);
     PSX_ST_RGB(poly, r1, color2);

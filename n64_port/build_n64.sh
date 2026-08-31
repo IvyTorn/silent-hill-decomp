@@ -16,6 +16,31 @@ OUT="$SCRIPT_DIR/bin"
 GATE="$SCRIPT_DIR/build/gate"
 mkdir -p "$OUT"
 
+# The overlays are separate link units compiled against the same headers as
+# the main binary. A struct changed in include/ after the last overlay build
+# leaves the two disagreeing on layout, and nothing reports it: the camera read
+# every road as garbage for a week of header fixes this way. Rebuild them when
+# anything they compile from is newer than the oldest overlay.
+OLDEST_DSO=$(ls -t "$SCRIPT_DIR"/filesystem/maps/*.dso 2>/dev/null | tail -1)
+STALE=0
+if [ -z "$OLDEST_DSO" ] || [ "$SCRIPT_DIR/build_maps.sh" -nt "$OLDEST_DSO" ]; then
+    STALE=1
+else
+    for d in "$SCRIPT_DIR/../include" "$SCRIPT_DIR/../src/maps" \
+             "$SCRIPT_DIR/../pc_port/include" "$SCRIPT_DIR/../xbox_port/include" \
+             "$SCRIPT_DIR/include" "$SCRIPT_DIR/../pc_port/build_gen/extracted_data"; do
+        [ -d "$d" ] || continue
+        if [ -n "$(find "$d" \( -name '*.h' -o -name '*.c' \) -newer "$OLDEST_DSO" -print -quit)" ]; then
+            STALE=1
+            break
+        fi
+    done
+fi
+if [ "$STALE" = 1 ]; then
+    echo "=== map overlays stale: rebuilding ==="
+    bash "$SCRIPT_DIR/build_maps.sh" || { echo "MAP OVERLAY BUILD FAILED"; exit 1; }
+fi
+
 echo "=== compile ==="
 # -Os, not the gate's default -O0: text is the budget here. See README.
 SH_OPT="${SH_OPT:--Os -fno-strict-aliasing -fwrapv}" bash "$SCRIPT_DIR/n64_gate.sh"

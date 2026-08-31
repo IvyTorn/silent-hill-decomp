@@ -45,6 +45,69 @@ static inline u16 rd16(const u8* p) { return p[0] | (p[1] << 8); }
 static inline s16 rds16(const u8* p) { return (s16)(p[0] | (p[1] << 8)); }
 static inline s32 rds32(const u8* p) { return (s32)rd32(p); }
 
+#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+/* Big-endian in-place swap of the IPD's little-endian s16 arrays. rd16/rd32
+ * make the parsed HEADER fields endian-proof, but the arrays the header points
+ * at stay raw disc bytes and are read through struct pointers by the game:
+ * subcellPositions is the per-room visibility rectangle, and read byte-swapped
+ * it rejects every room (an interior with a loaded chunk and nothing in the
+ * ordering table); the collision arrays are Harry's floor and walls. Swapped
+ * once per parse -- the caller guarantees one parse per disc load -- with a
+ * pointer dedup so a shared array is never swapped twice. Structs with
+ * trailing u8s are swapped per element, never as a flat span. */
+#define IPD_SWAP_DEDUP_MAX 512
+static const void* s_ipdSwapped[IPD_SWAP_DEDUP_MAX];
+static int         s_ipdSwappedCount;
+
+static void IpdSwap_Reset(void) { s_ipdSwappedCount = 0; }
+
+static int IpdSwap_FirstTime(const void* p)
+{
+    int i;
+    if (p == NULL)
+        return 0;
+    for (i = 0; i < s_ipdSwappedCount; i++)
+        if (s_ipdSwapped[i] == p)
+            return 0;
+    if (s_ipdSwappedCount >= IPD_SWAP_DEDUP_MAX) {
+        SH_DBG("[IPD-SWAP] dedup table FULL - an array was left unswapped");
+        return 0;
+    }
+    s_ipdSwapped[s_ipdSwappedCount++] = p;
+    return 1;
+}
+
+/* `count` elements of `stride` bytes; the first `words` u16s of each swapped. */
+static void IpdSwap_Elems(void* base, int count, int stride, int words)
+{
+    u8* p = (u8*)base;
+    int i, w;
+    if (count <= 0 || !IpdSwap_FirstTime(base))
+        return;
+    for (i = 0; i < count; i++, p += stride)
+        for (w = 0; w < words; w++) {
+            u8 t = p[w * 2]; p[w * 2] = p[w * 2 + 1]; p[w * 2 + 1] = t;
+        }
+}
+
+/* Elements of `stride` that fit between array k and the nearest array after
+ * it (or the LM header); a header count can never swap into a neighbour. */
+static int IpdColl_SpanElems(const u32* offs, int n, int k, u32 cap, int stride)
+{
+    u32 end = cap;
+    int j;
+    for (j = 0; j < n; j++)
+        if (j != k && offs[j] > offs[k] && offs[j] < end)
+            end = offs[j];
+    if (end <= offs[k])
+        return 0x7FFFFFFF;
+    return (int)((end - offs[k]) / (u32)stride);
+}
+#else
+static void IpdSwap_Reset(void) { }
+static void IpdSwap_Elems(void* base, int count, int stride, int words) { (void)base; (void)count; (void)stride; (void)words; }
+#endif
+
 #ifdef SH_XBOX_PORT
 /* Xbox (64MB) heap-leak fix. IPD reformats on EVERY chunk stream (walking the
  * world) and the stock code frees NONE of: modelInfos, modelBuffers, each
@@ -192,6 +255,78 @@ static void ParseIpdModelBuffer(s_IpdModelBuffer* dst, const u8* src, u8* base)
 
     /* subcellPositions: SVECTOR bounding box array, field_2 entries */
     dst->subcellPositions = (SVECTOR*)(base + field14_off);
+
+    /* Read through SVECTOR* by Ipd_ChunkDraw / Gfx_ChunkSubcellVisibleCheck. */
+    IpdSwap_Elems(dst->field_10, dst->field_1, 8, 4);
+    IpdSwap_Elems(dst->subcellPositions, dst->subcellCount, 8, 4);
+}
+
+static void IpdColl_SwapBigEndian(s_IpdCollisionData* dst, const u8* collraw, u32 lmHdrOff)
+{
+#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+    u32 offs[7];
+    u32 cap = (lmHdrOff > 0x54) ? (lmHdrOff - 0x54) : 0xFFFFFFFFu;
+    int n;
+
+    offs[0] = rd32(&collraw[0x0C]);
+    offs[1] = rd32(&collraw[0x10]);
+    offs[2] = rd32(&collraw[0x14]);
+    offs[3] = rd32(&collraw[0x18]);
+    offs[4] = rd32(&collraw[0x20]);
+    offs[5] = rd32(&collraw[0x28]);
+    offs[6] = rd32(&collraw[0x2C]);
+
+    /* An offset of 0 is an absent array (the pointer would be the collision
+     * struct itself). ptr_28 / ptr_2C / subcellCheckIdx are u8: nothing to do. */
+    if (offs[0]) {
+        n = (int)dst->splitVertexCount;
+        if (n > IpdColl_SpanElems(offs, 7, 0, cap, 6)) n = IpdColl_SpanElems(offs, 7, 0, cap, 6);
+        IpdSwap_Elems(dst->splitVertices, n, 6, 3);
+    }
+    if (offs[1]) {
+        n = (int)dst->surfaceCount;
+        if (n > IpdColl_SpanElems(offs, 7, 1, cap, 12)) n = IpdColl_SpanElems(offs, 7, 1, cap, 12);
+        IpdSwap_Elems(dst->surfaces, n, 12, 6);
+    }
+    if (offs[2]) {
+        n = (int)dst->subcellCount;
+        if (n > IpdColl_SpanElems(offs, 7, 2, cap, 10)) n = IpdColl_SpanElems(offs, 7, 2, cap, 10);
+        IpdSwap_Elems(dst->subcells, n, 10, 3);
+    }
+    if (offs[3]) {
+        n = (int)dst->field_8_24;
+        if (n > IpdColl_SpanElems(offs, 7, 3, cap, 10)) n = IpdColl_SpanElems(offs, 7, 3, cap, 10);
+        IpdSwap_Elems(dst->ptr_18, n, 10, 5);
+    }
+    if (offs[4]) {
+        /* The grid walk reads one range past the last cell (func_8006B1C8
+         * looks at [1] of the current cell). */
+        n = (int)dst->subcellCountX * (int)dst->subcellCountZ + 1;
+        if (n > IpdColl_SpanElems(offs, 7, 4, cap, 4)) n = IpdColl_SpanElems(offs, 7, 4, cap, 4);
+        IpdSwap_Elems(dst->subcellRanges, n, 4, 2);
+    }
+
+    /* TEMP diagnostic: the first surface and subcell after the swap. Q7.8
+     * values in the tens to low thousands and a ground type under 13 mean
+     * the swap and the reversed bitfields agree with the data. */
+    {
+        static int s_collLog = 0;
+        if (s_collLog < 3 && dst->surfaceCount > 0 && dst->subcellCount > 0 && offs[1] && offs[2]) {
+            const s_IpdCollSurface* sf = &dst->surfaces[0];
+            const s_IpdCollSubcell* sc = &dst->subcells[0];
+            s_collLog++;
+            SH_DBG("[COLLSW] surf=%d sub=%d p18=%d grid=%dx%d size=%d s0=(%d,%d,%d gt=%d dh=%d tilt=%d,%d) c0=(%d,%d,%d idx=%d,%d,%d,%d)",
+                   (int)dst->surfaceCount, (int)dst->subcellCount, (int)dst->field_8_24,
+                   (int)dst->subcellCountX, (int)dst->subcellCountZ, (int)dst->subcellSize,
+                   (int)sf->field_0, (int)sf->baseGroundHeight, (int)sf->field_4, (int)sf->groundType,
+                   (int)sf->disableHeight, (int)sf->tiltAngleX, (int)sf->tiltAngleZ,
+                   (int)sc->field_0_0, (int)sc->field_2_0, (int)sc->field_4,
+                   (int)sc->splitVertexIdx0, (int)sc->splitVertexIdx1, (int)sc->surfaceIdx0, (int)sc->surfaceIdx1);
+        }
+    }
+#else
+    (void)dst; (void)collraw; (void)lmHdrOff;
+#endif
 }
 
 static void ParseIpdCollisionData(s_IpdCollisionData* dst, const u8* collraw, u8* collbase)
@@ -367,6 +502,9 @@ bool IpdHeader_FixOffsets_PC(s_IpdHeader* ipdHdr)
         return false;
     }
 
+    /* One swap-dedup scope per parse (see IpdSwap_Elems). */
+    IpdSwap_Reset();
+
 #ifdef SH_XBOX_PORT
     /* Free this buffer's PRIOR chunk allocations before re-parsing (leak fix),
      * and reset the per-parse reloc capture that RelocateClobbered fills below. */
@@ -409,6 +547,7 @@ bool IpdHeader_FixOffsets_PC(s_IpdHeader* ipdHdr)
     memset(&collParsed, 0, sizeof(collParsed));
     ParseIpdCollisionData(&collParsed, collraw, collbase);
     IpdColl_RelocateClobbered(&collParsed, collraw, collbase, lmHdrOff);
+    IpdColl_SwapBigEndian(&collParsed, collraw, lmHdrOff);
 
     /* Parse model info array (PSX stride = 16 bytes) */
     s_IpdModelInfo* modelInfos = NULL;

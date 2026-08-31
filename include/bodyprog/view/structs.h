@@ -55,35 +55,13 @@ typedef struct _VC_ROAD_DATA
 {
     /* 0x0     */ VC_LIMIT_AREA     lim_sw;
     /* 0x8     */ VC_LIMIT_AREA     lim_rd;
-/* BITFIELD ORDER IS ENDIAN-DEPENDENT, and this struct is MAP DATA read off
- * the disc, so the bits must land where the PSX put them. A compiler packs
- * bitfields from the least significant end on little-endian and from the most
- * significant end on big-endian, so the declaration order has to be REVERSED
- * within each storage unit for the same bytes to decode the same way -- the
- * identical trap that u_Unk0 hit, where a misread byte set the world lighting
- * mode to 255 and rendered everything black.
- *
- * What rides on it here is the CAMERA: lim_rd_max_hy / lim_rd_min_hy are its
- * height limits, ofs_watch_hy its look-at height offset, and mv_y_type /
- * cam_mv_type choose how it moves. Read from the wrong bits they place the
- * eye at an absurd height -- hardware measured the camera Y jumping from the
- * correct -320 to about -200570 (roughly -783 world units) on a camera
- * change, which is the top-down view.
- *
- * The two storage units are the 32 bits at 0x10 (flags 8, area_size_type 2,
- * rd_type 3, mv_y_type 3, lim_rd_max_hy 8, lim_rd_min_hy 8) and the 16 at
- * 0x14 (ofs_watch_hy 8, lens_flare 4, cam_mv_type 4). */
-#if defined(__BIG_ENDIAN__) ||     (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    /* 0x13+0  */ q27_4             lim_rd_min_hy  : 8;
-    /* 0x12+0  */ q27_4             lim_rd_max_hy  : 8;
-    /* 0x11+10 */ u32               mv_y_type      : 3; /** `VC_CAM_MV_TYPE` */
-    /* 0x11+8  */ VC_ROAD_TYPE      rd_type        : 3; /** Path type. */
-    /* 0x11+0  */ VC_AREA_SIZE_TYPE area_size_type : 2;
-    /* 0x10+0  */ VC_ROAD_FLAGS     flags          : 8; /** `VC_ROAD_FLAGS` | Camera path flags. */
-    /* 0x14+12 */ s16               cam_mv_type    : 4; /** `VC_CAM_MV_TYPE` */
-    /* 0x14+8  */ u32               lens_flare     : 4; /** `e_LensFlareType` */
-    /* 0x14+0  */ q27_4             ofs_watch_hy   : 8;
-#else
+    /* Bitfields, but not an endian hazard: every VC_ROAD_DATA table is
+     * compiled C with designated initialisers (src/maps/<map>/vc_road_data.h
+     * and vcNullRoadArray), never bytes off the disc, so the compiler reads
+     * the bits back the way it allocated them. Do NOT reverse this under
+     * big-endian: the map overlays are separate link units, and a header the
+     * main binary and the overlays disagree on decodes every field as garbage
+     * (the camera then falls back to vcNullRoadArray's -6 m band). */
     /* 0x10+0  */ VC_ROAD_FLAGS     flags          : 8; /** `VC_ROAD_FLAGS` | Camera path flags. */
     /* 0x11+0  */ VC_AREA_SIZE_TYPE area_size_type : 2;
     /* 0x11+8  */ VC_ROAD_TYPE      rd_type        : 3; /** Path type. */
@@ -93,7 +71,6 @@ typedef struct _VC_ROAD_DATA
     /* 0x14+0  */ q27_4             ofs_watch_hy   : 8;
     /* 0x14+8  */ u32               lens_flare     : 4; /** `e_LensFlareType` | TODO: Unsure, rough name. */
     /* 0x14+12 */ s16               cam_mv_type    : 4; /** `VC_CAM_MV_TYPE` */
-#endif
     /* 0x16    */ q0_7              fix_ang_x;          /** @note Part of union in SH2 `VC_ROAD_DATA`. */
     /* 0x17    */ q0_7              fix_ang_y;
 } VC_ROAD_DATA;

@@ -2699,11 +2699,26 @@ void vcRenewalCamData(VC_WORK* w_p, VC_CAM_MV_PARAM* cam_mv_prm_p) // 0x80084BD8
     {
         static int _cp;
         if ((_cp++ & 63) == 0)
+        {
             SH_DBG("[CAMPOS] pos=(%d,%d,%d) tgt=(%d,%d,%d) velo=(%d,%d,%d) dt=%d",
                    (int)w_p->cam_pos.vx, (int)w_p->cam_pos.vy, (int)w_p->cam_pos.vz,
                    (int)w_p->cam_tgt_pos.vx, (int)w_p->cam_tgt_pos.vy, (int)w_p->cam_tgt_pos.vz,
                    (int)w_p->cam_velo.vx, (int)w_p->cam_velo.vy, (int)w_p->cam_velo.vz,
                    (int)g_DeltaTime);
+            /* Which authored path the camera is on. idx against the map's
+             * list; null=1 means the DEFAULT vcNullRoadArray (-6 m band, the
+             * top-down view) is in use instead of the map's roads. */
+            {
+                VC_ROAD_DATA* rp = w_p->cur_near_road.road_p;
+                SH_DBG("[ROAD] idx=%d hy=%d..%d mvy=%d area=%d cammv=%d flags=%02x charaTopY=%d charaY=%d chara=(%d,%d) eyeAng=%d camAng=(%d,%d) null=%d",
+                       (int)(rp - vcWork.vc_road_ary_list), (int)rp->lim_rd_min_hy, (int)rp->lim_rd_max_hy,
+                       (int)rp->mv_y_type, (int)rp->area_size_type, (int)rp->cam_mv_type, (int)rp->flags,
+                       (int)w_p->chara_top_y, (int)w_p->chara_pos.vy,
+                       (int)w_p->chara_pos.vx, (int)w_p->chara_pos.vz,
+                       (int)w_p->chara_eye_ang_y, (int)w_p->cam_mat_ang.vx, (int)w_p->cam_mat_ang.vy,
+                       (int)(rp == &vcNullRoadArray[0] || vcWork.vc_road_ary_list == vcNullRoadArray));
+            }
+        }
     }
 #endif
 }

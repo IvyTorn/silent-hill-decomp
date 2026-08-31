@@ -108,7 +108,15 @@ static int TexBoxFits(int s0, int t0, int s1, int t1)
 
 static const uint8_t*  s_texPage;
 static const uint32_t* s_texPal;
-static uint16_t        s_tlut[256];
+/* The TLUT is DMA'd by the RDP when the queued load EXECUTES, not when it is
+ * enqueued. One static table, rebuilt for the next palette while the previous
+ * load was still queued, handed the earlier triangles the LATER palette --
+ * Harry's parts flickering into each other's colours every frame. A ring gives
+ * each upload its own memory; wrapping drains the queue first. */
+#define TLUT_RING_N 32
+static uint16_t        s_tlutRing[TLUT_RING_N][256];
+static int             s_tlutIdx;
+static uint16_t*       s_tlut = s_tlutRing[0];
 static int             s_tlutDirty;
 static surface_t       s_pageSurf;
 
@@ -171,6 +179,13 @@ static void ApplyMode(void)
 static void BuildTlut(void)
 {
     int i;
+
+    if (++s_tlutIdx >= TLUT_RING_N)
+    {
+        s_tlutIdx = 0;
+        rspq_wait();
+    }
+    s_tlut = s_tlutRing[s_tlutIdx];
 
     for (i = 0; i < 256; i++)
     {
@@ -378,7 +393,7 @@ void GpuNv2a_FlushBatch(void)
             BuildTlut();
             /* Same cache rule as the page: the TLUT was just built by CPU
              * stores and the RDP will DMA it. */
-            data_cache_hit_writeback(s_tlut, sizeof(s_tlut));
+            data_cache_hit_writeback(s_tlut, 256 * sizeof(uint16_t));
             rdpq_tex_upload_tlut(s_tlut, 0, 256);
             s_tlutDirty = 0;
         }
@@ -501,7 +516,7 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
     if (s_tlutDirty)
     {
         BuildTlut();
-        data_cache_hit_writeback(s_tlut, sizeof(s_tlut));
+        data_cache_hit_writeback(s_tlut, 256 * sizeof(uint16_t));
         rdpq_tex_upload_tlut(s_tlut, 0, 256);
         s_tlutDirty = 0;
     }

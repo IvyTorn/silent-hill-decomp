@@ -57,7 +57,7 @@ MAPS="${1:-$ALL_MAPS}"
 
 # Identical to n64_gate.sh's, deliberately: a map TU is ordinary game code, and
 # any divergence here shows up as a link error rather than a compile one.
-DEFS="-DSH_N64_PORT -DSH_XBOX360_PORT -DSH_XBOX_PORT -DSH_PC_PORT"
+DEFS="-DSH_N64_PORT -DSH_XBOX_PORT -DSH_PC_PORT"
 DEFS="$DEFS -DVER_USA -DSKIP_ASM -DUSE_PGXP=0 -DN64 -DSH_NO_DIRENT -DRENDERER_OGL"
 CDEFS="-Dstatic_assert=_Static_assert"
 

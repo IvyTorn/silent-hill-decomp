@@ -135,8 +135,12 @@ void func_80040BAC(void) // 0x80040BAC
             SetPolyF4(poly_f4);
             setSemiTrans(poly_f4, true);
 
-            PSX_ST_XY(poly_f4, x2, ptr[i % 16]);
-            PSX_ST_XY(poly_f4, x3, ptr[i % 16 + 1]);
+            /* posTable is written as DVECTOR fields and read back as words:
+             * on big-endian the word carries x in the HIGH half, and the mask
+             * ring's vertices came out transposed (the streak from Harry to a
+             * fixed screen point). */
+            PSX_ST_XY(poly_f4, x2, PSX_LD_XY(&ptr[i % 16]));
+            PSX_ST_XY(poly_f4, x3, PSX_LD_XY(&ptr[i % 16 + 1]));
         }
 
         poly_g4 = packet + (sizeof(DR_TPAGE) * 2) + (sizeof(POLY_G3) * 16);
@@ -400,16 +404,17 @@ void func_800414E0(GsOT* arg0, VECTOR3* arg1, s32 arg2, q19_12 angle0, q19_12 an
     {
         poly_g3->x0         = arg1->vx;
         poly_g3->y0         = arg1->vy;
-        PSX_ST_XY(poly_g3, x1, var_t0[j]);
-        PSX_ST_XY(poly_g3, x2, var_t0[j + 1]);
+        /* Scratch DVECTORs read back as words: see func_80040BAC. */
+        PSX_ST_XY(poly_g3, x1, PSX_LD_XY(&var_t0[j]));
+        PSX_ST_XY(poly_g3, x2, PSX_LD_XY(&var_t0[j + 1]));
 
 #ifdef SH_PC_PORT
         if (!g_PsyX_FlashlightActive)
 #endif
             addPrim(arg0->org, poly_g3);
 
-        PSX_ST_XY(poly_f4, x0, var_t0[j + 51]);
-        PSX_ST_XY(poly_f4, x1, var_t0[j + 52]);
+        PSX_ST_XY(poly_f4, x0, PSX_LD_XY(&var_t0[j + 51]));
+        PSX_ST_XY(poly_f4, x1, PSX_LD_XY(&var_t0[j + 52]));
 
         addPrim(&arg0->org[1], poly_f4);
     }
@@ -423,10 +428,10 @@ void func_800414E0(GsOT* arg0, VECTOR3* arg1, s32 arg2, q19_12 angle0, q19_12 an
 
         for (j = 0; j < 16; j++, poly_g4++)
         {
-            PSX_ST_XY(poly_g4, x0, var_a1_3[j]);
-            PSX_ST_XY(poly_g4, x1, var_a1_3[j + 1]);
-            PSX_ST_XY(poly_g4, x2, var_a1_3[17 + j]);
-            PSX_ST_XY(poly_g4, x3, var_a1_3[(17 + j) + 1]);
+            PSX_ST_XY(poly_g4, x0, PSX_LD_XY(&var_a1_3[j]));
+            PSX_ST_XY(poly_g4, x1, PSX_LD_XY(&var_a1_3[j + 1]));
+            PSX_ST_XY(poly_g4, x2, PSX_LD_XY(&var_a1_3[17 + j]));
+            PSX_ST_XY(poly_g4, x3, PSX_LD_XY(&var_a1_3[(17 + j) + 1]));
 
             addPrim(&arg0->org[1], poly_g4);
         }
@@ -3260,18 +3265,41 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
     } else
 #endif
     {
+#ifdef SH_N64_PORT
+    /* TEMP diagnostic: partition "no world" between the subcell table (range),
+     * the visibility rectangles (visible) and the instance walk (instances). */
+    static int s_wdCalls, s_wdBufs, s_wdVis, s_wdInst;
+    s_wdCalls++;
+#endif
     temp_fp = &ipdHdr->textureCount + (subcellZ * 10) + (subcellX * 2);
     for (i = temp_fp[0]; i < (temp_fp[1] + temp_fp[0]); i++)
     {
         ipdModelBuf = &ipdHdr->modelBuffers[ipdHdr->modelOrderList[i]];
+#ifdef SH_N64_PORT
+        s_wdBufs++;
+        if (s_wdCalls <= 2 && ipdModelBuf->subcellCount > 0)
+            SH_DBG("[WORLD] cell=%d,%d sub=%d,%d buf#%d inst=%d rects=%d r0=(%d,%d,%d,%d) rel=(%d,%d) box=%d,%d..%d,%d",
+                   (int)ipdHdr->cellX, (int)ipdHdr->cellZ, (int)subcellX, (int)subcellZ, (int)i,
+                   (int)ipdModelBuf->modelInstanceCount, (int)ipdModelBuf->subcellCount,
+                   (int)ipdModelBuf->subcellPositions[0].vx, (int)ipdModelBuf->subcellPositions[0].vy,
+                   (int)ipdModelBuf->subcellPositions[0].vz, (int)ipdModelBuf->subcellPositions[0].pad,
+                   (int)(geomX - cellBoundX), (int)(geomZ - cellBoundZ),
+                   (int)ipdModelBuf->minX, (int)ipdModelBuf->minZ, (int)ipdModelBuf->maxX, (int)ipdModelBuf->maxZ);
+#endif
 
         if (Gfx_ChunkSubcellVisibleCheck(ipdModelBuf, geomX - cellBoundX, geomZ - cellBoundZ, cellBoundX, cellBoundZ))
         {
+#ifdef SH_N64_PORT
+            s_wdVis++;
+#endif
             for (curBufC = ipdModelBuf->modelInstances; curBufC < &ipdModelBuf->modelInstances[ipdModelBuf->modelInstanceCount]; curBufC++)
             {
                 modelInfo.modelHdr = curBufC->modelHdr;
                 if (modelInfo.modelHdr != NULL)
                 {
+#ifdef SH_N64_PORT
+                    s_wdInst++;
+#endif
                     // Set model matrix.
                     modelCoord.workm = curBufC->mat;
 
@@ -3299,6 +3327,15 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
             }
         }
     }
+#ifdef SH_N64_PORT
+    if ((s_wdCalls & 63) == 0)
+    {
+        SH_DBG("[WORLD] calls=%d bufs=%d visible=%d instances=%d range=%d+%d cell=%d,%d",
+               s_wdCalls, s_wdBufs, s_wdVis, s_wdInst, (int)temp_fp[0], (int)temp_fp[1],
+               (int)ipdHdr->cellX, (int)ipdHdr->cellZ);
+        s_wdBufs = s_wdVis = s_wdInst = 0;
+    }
+#endif
 #ifdef SH_PC_PORT
     } /* close else block */
 #endif
