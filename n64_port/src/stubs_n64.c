@@ -23,6 +23,11 @@ unsigned long long sh_cycles_(void)
     return (unsigned long long)get_ticks();
 }
 
+void sh_dma_writeback_(const void* p, unsigned n)
+{
+    data_cache_hit_writeback((void*)p, n);
+}
+
 /* TEMP diagnostic: last MainLoop call site, written by ML_TRACE in
  * game_main.c, printed by the pad watchdog. */
 const char* g_MlTraceTag = "pre-loop";

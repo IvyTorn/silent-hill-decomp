@@ -65,6 +65,13 @@ unsigned long long g_Nv2aDrawCycles = 0;
 extern int g_ProfAudioMs;                 /* psx_libgpu_xbox.c: last audio pump */
 extern int g_PsxVramDecodes, g_PsxVramDrains, g_PsxVramPalBuilds;
 extern unsigned long long g_PsxVramDecodeTicks, g_PsxVramDrainTicks;
+extern unsigned g_PsxVramPalGen;
+/* world_draw.c: game-side draw phases, in SH_CYCLES ticks (== get_ticks here). */
+extern unsigned long long g_XbChunkDrawCycles, g_XbCharaCycles;
+extern unsigned           g_XbCharaCount;
+/* sh_log_n64.c: what logging cost this frame. */
+extern unsigned long long g_ProfLogStderrTicks, g_ProfLogSdTicks;
+extern int                g_ProfLogLines;
 
 static surface_t* s_fb;
 static int        s_inited;
@@ -123,11 +130,25 @@ static const uint32_t* s_texPal;
  * load was still queued, handed the earlier triangles the LATER palette --
  * Harry's parts flickering into each other's colours every frame. A ring gives
  * each upload its own memory; wrapping drains the queue first. */
-#define TLUT_RING_N 32
+#define TLUT_RING_N 64
 static uint16_t        s_tlutRing[TLUT_RING_N][256];
+static const void*     s_tlutRingPal[TLUT_RING_N];   /* palette each slot was built from */
+static unsigned        s_tlutRingGen[TLUT_RING_N];   /* g_PsxVramPalGen at build time */
 static int             s_tlutIdx;
 static uint16_t*       s_tlut = s_tlutRing[0];
 static int             s_tlutDirty;
+static int             s_cnTlutReuse;
+
+/* Texture tile window. TMEM holds 2 KB of CI8 texels; instead of loading each
+ * triangle's own UV box, load the largest window around it that fits and let
+ * every following triangle whose box lies inside skip the load entirely --
+ * the two halves of a quad always do, neighbouring wall quads usually do. The
+ * loader is kept across triangles of one page so its per-call setup is not
+ * redone. Both reset on every page bind and every frame. */
+static tex_loader_t    s_texLoader;
+static int             s_texLoaderValid;
+static int             s_winValid, s_winS0, s_winT0, s_winS1, s_winT1;
+static int             s_cnWinHits;
 static surface_t       s_pageSurf;
 
 /* Census, so a frame that draws nothing can say why. */
@@ -232,6 +253,33 @@ static void BuildTlut(void)
         }
 #endif
     }
+}
+
+/* Bind the current palette's TLUT. A ring slot already built from this palette
+ * (same pointer, same generation) is reloaded by the RDP from the same RAM
+ * with no CPU work; otherwise the next slot is built. The dedup matters: 60-200
+ * page binds a frame cycle through ~20 palettes, and each ring wrap is a full
+ * GPU drain. */
+static void UploadTlut(void)
+{
+    int k;
+
+    for (k = 0; k < TLUT_RING_N; k++)
+        if (s_tlutRingPal[k] == (const void*)s_texPal && s_tlutRingGen[k] == g_PsxVramPalGen)
+            break;
+    if (k == TLUT_RING_N)
+    {
+        BuildTlut();                      /* advances s_tlutIdx; drains on wrap */
+        k = s_tlutIdx;
+        s_tlutRingPal[k] = (const void*)s_texPal;
+        s_tlutRingGen[k] = g_PsxVramPalGen;
+        /* Same cache rule as the page: built by CPU stores, DMA'd by the RDP. */
+        data_cache_hit_writeback(s_tlutRing[k], 256 * sizeof(uint16_t));
+    }
+    else
+        s_cnTlutReuse++;
+    rdpq_tex_upload_tlut(s_tlutRing[k], 0, 256);
+    s_tlutDirty = 0;
 }
 
 /* rdpq wants S, T and W contiguous, and ShVertex keeps W up in pos[3], so a
@@ -380,16 +428,56 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
      * colour. Write back exactly the rows this tile will read; the page can be
      * REDECODED into the same buffer at any time, so this cannot be hoisted to
      * the bind. */
+    /* The page itself was written back to RAM when it was decoded
+     * (psx_vram.c, SH_DMA_WRITEBACK), so no per-tile cache work here. */
+    if (s_winValid && s0 >= s_winS0 && t0 >= s_winT0 && s1 <= s_winS1 && t1 <= s_winT1)
+    {
+        s_cnWinHits++;
+    }
+    else
     {
         unsigned long long _t0 = get_ticks();
-        int t;
-        for (t = t0; t < t1; t++)
-            data_cache_hit_writeback((void*)(s_texPage + t * TEX_PAGE_DIM + s0),
-                                     (unsigned)(s1 - s0));
-        rdpq_tex_upload_sub(TILE0, &s_pageSurf, NULL, s0, t0, s1, t1);
+        int w, h, ws0, wt0;
+
+        /* Grow the box to the largest window that still fits TMEM, wide
+         * first: the triangles that follow a wall quad's first half share
+         * its rows far more often than its columns. */
+        w = (s1 - s0 + 7) & ~7;
+        if (w < 8) w = 8;
+        h = t1 - t0;
+        while (w < 128 && (w * 2) * h <= TEX_TMEM_BYTES)
+            w *= 2;
+        if (w > TEX_PAGE_DIM) w = TEX_PAGE_DIM;
+        h = TEX_TMEM_BYTES / w;
+        if (h > TEX_PAGE_DIM) h = TEX_PAGE_DIM;
+        if (h < t1 - t0)
+        {
+            w = (s1 - s0 + 7) & ~7;   /* the bare box; TexBoxFits proved it fits */
+            h = t1 - t0;
+        }
+        ws0 = s0 - (w - (s1 - s0)) / 2;
+        if (ws0 < 0) ws0 = 0;
+        if (ws0 + w > TEX_PAGE_DIM) ws0 = TEX_PAGE_DIM - w;
+        wt0 = t0 - (h - (t1 - t0)) / 2;
+        if (wt0 < 0) wt0 = 0;
+        if (wt0 + h > TEX_PAGE_DIM) wt0 = TEX_PAGE_DIM - h;
+
+        if (!s_texLoaderValid)
+        {
+            s_texLoader = tex_loader_init(TILE0, &s_pageSurf);
+            tex_loader_set_tmem_addr(&s_texLoader, 0);
+            s_texLoaderValid = 1;
+        }
+        tex_loader_load(&s_texLoader, ws0, wt0, ws0 + w, wt0 + h);
+        s_winS0 = ws0; s_winT0 = wt0; s_winS1 = ws0 + w; s_winT1 = wt0 + h;
+        s_winValid = 1;
+        s_cnUploads++;
+        s_cnSubmitTicks += get_ticks() - _t0;
+    }
+    {
+        unsigned long long _t0 = get_ticks();
         rdpq_triangle(&TRIFMT_SH_TEX, va, vb, vc);
         s_cnSubmitTicks += get_ticks() - _t0;
-        s_cnUploads++;
     }
     s_cnTris++;
     s_cnTexTris++;
@@ -412,14 +500,7 @@ void GpuNv2a_FlushBatch(void)
     if (s_texEnabled && s_texPage != NULL)
     {
         if (s_tlutDirty)
-        {
-            BuildTlut();
-            /* Same cache rule as the page: the TLUT was just built by CPU
-             * stores and the RDP will DMA it. */
-            data_cache_hit_writeback(s_tlut, 256 * sizeof(uint16_t));
-            rdpq_tex_upload_tlut(s_tlut, 0, 256);
-            s_tlutDirty = 0;
-        }
+            UploadTlut();
 
         for (i = s_runStart; i + 2 < s_batchUsed; i += 3)
             DrawTexturedTri(&s_batch[i], &s_batch[i + 1], &s_batch[i + 2]);
@@ -537,12 +618,7 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
     s_modeDirty = 1;
     ApplyMode();
     if (s_tlutDirty)
-    {
-        BuildTlut();
-        data_cache_hit_writeback(s_tlut, 256 * sizeof(uint16_t));
-        rdpq_tex_upload_tlut(s_tlut, 0, 256);
-        s_tlutDirty = 0;
-    }
+        UploadTlut();
 
     for (t = t0; t < t1; t++)
         data_cache_hit_writeback((void*)(s_texPage + t * TEX_PAGE_DIM + s0),
@@ -655,8 +731,17 @@ void GpuNv2a_FrameBegin(void)
     s_cnUploads  = 0;
     s_cnTlutWrap = 0;
     s_cnBinds    = 0;
+    s_cnWinHits  = 0;
+    s_cnTlutReuse = 0;
+    s_winValid   = 0;
+    s_texLoaderValid = 0;
     g_PsxVramDecodes = g_PsxVramDrains = g_PsxVramPalBuilds = 0;
     g_PsxVramDecodeTicks = g_PsxVramDrainTicks = 0;
+    g_XbChunkDrawCycles = 0;
+    g_XbCharaCycles = 0;
+    g_XbCharaCount = 0;
+    g_ProfLogStderrTicks = g_ProfLogSdTicks = 0;
+    g_ProfLogLines = 0;
     s_modeDirty  = 1;
 
     {
@@ -772,14 +857,20 @@ void GpuNv2a_FrameEnd(void)
              * submit = tile uploads + triangle issue; vram dec/drain = page
              * decodes and full GPU drains the texture cache had to do. What is
              * left of `frame` after these is the game update + OT walk ([OTT]). */
-            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d binds=%d tlutWrap=%d | dec=%d/%uus drain=%d/%uus pal=%d | audio=%dms",
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms",
                    (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
                    (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
                    (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
-                   s_cnUploads, s_cnBinds, s_cnTlutWrap,
+                   s_cnUploads, s_cnWinHits, s_cnBinds, s_cnTlutWrap, s_cnTlutReuse,
                    g_PsxVramDecodes, (unsigned)TICKS_TO_US((unsigned)g_PsxVramDecodeTicks),
                    g_PsxVramDrains, (unsigned)TICKS_TO_US((unsigned)g_PsxVramDrainTicks),
-                   g_PsxVramPalBuilds, g_ProfAudioMs);
+                   g_PsxVramPalBuilds,
+                   (unsigned)TICKS_TO_US((unsigned)g_XbChunkDrawCycles),
+                   (unsigned)TICKS_TO_US((unsigned)g_XbCharaCycles), g_XbCharaCount,
+                   g_ProfLogLines,
+                   (unsigned)TICKS_TO_US((unsigned)g_ProfLogStderrTicks),
+                   (unsigned)TICKS_TO_US((unsigned)g_ProfLogSdTicks),
+                   g_ProfAudioMs);
         }
     }
 }
@@ -829,6 +920,8 @@ void GpuNv2a_BindPaletted(const void* page, const void* pal)
         return;
 
     GpuNv2a_FlushBatch();
+    s_winValid       = 0;    /* TMEM window belongs to the previous page */
+    s_texLoaderValid = 0;
 
     if (page == NULL || pal == NULL)
     {

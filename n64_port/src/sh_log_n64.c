@@ -146,20 +146,37 @@ const char* ShLogN64_Row(int i)
  * chatty ones write straight to g_ShDebugLog with a bare fprintf. */
 int Sh_LogAllow(const char* fmt)
 {
+    /* Every per-frame or per-primitive probe, by prefix. On this port a line
+     * is an SD-card write plus a USB write, so a probe that fires per frame is
+     * a frame-time cost, not a log-size cost: the session that measured the
+     * world at 1 fps carried 22770 lines, two of them ([GOLD], [TLUT]) firing
+     * every frame. Per-window censuses ([PROF], [GPU], [OTT], [OTS], [WORLD],
+     * [CAMPOS], [ROAD]) and one-shots stay. log_diag=1 restores everything. */
+    static const char* const GATED[] = {
+        "[UPD]", "[UPD2]", "[FT]", "[MEM]",
+        "[GOLD]", "[TLUT]", "[TPGE]", "[BIGPRIM]", "[MESH]", "[MESHD]",
+        "[BF]", "[BF4]", "[XF]", "[XF0]", "[UT]", "[UT2]", "[UT3]", "[MV]",
+        "[BONE2]", "[LIT]", "[LITM]", "[TINT]", "[ANIMB]", "[CAM]",
+        "[PIPE]", "[PIPE2]", "[WVS]", "[WALLSTOP]", "[WALL-HIT]", "[PADR]",
+        "[FONTDUMP]", "[MGLY]", "[MGLY2]", "[FLEX]", "[MUZZLE]", "[TXTPG]",
+        "[TXSPR]", "[UIDIAG]", "[KO]", "[VKO2]", "[VKO3]", "[VKO4]",
+        "[FOGST]", "[FOGPAD]", "[ABR]", "[FSQ]", "[STORE]", "[MCFSM]",
+        "[RAIN]", "[SS]", "[FXDROP]", "[BATCH]", "[ZETA]", "[ITEMZ]",
+    };
+    int i;
+
     if (g_XboxLogDiag)
         return 1;
-    if (fmt == NULL)
+    if (fmt == NULL || fmt[0] != '[')
         return 1;
 
-    if (fmt[0] == '[')
+    for (i = 0; i < (int)(sizeof(GATED) / sizeof(GATED[0])); i++)
     {
-        switch (fmt[1])
-        {
-            case 'U': if (fmt[2] == 'P') return 0; break;   /* [UPD] */
-            case 'F': if (fmt[2] == 'T') return 0; break;   /* [FT]  */
-            case 'M': if (fmt[2] == 'E' && fmt[3] == 'M' && fmt[4] == ']') return 0; break;
-            default: break;
-        }
+        const char* g = GATED[i];
+        const char* f = fmt;
+        while (*g && *g == *f) { g++; f++; }
+        if (*g == '\0')
+            return 0;
     }
     return 1;
 }
@@ -169,6 +186,12 @@ int Sh_LogAllow(const char* fmt)
  * destinations get everything; neither knows about the other. */
 static FILE* s_sdMirror;
 static int   s_sdWanted;   /* mirror requested: reopen attempts may continue */
+
+/* What the log costs the frame, per sink (reset each frame, read by [PROF]).
+ * stderr is libdragon's IS-Viewer + USB writers; on a flashcart with no host
+ * attached the USB writer can wait for its timeout. */
+unsigned long long g_ProfLogStderrTicks, g_ProfLogSdTicks;
+int                g_ProfLogLines;
 
 static int ShLog_Write(void* cookie, const char* buf, int len)
 {
@@ -200,27 +223,36 @@ static int ShLog_Write(void* cookie, const char* buf, int len)
         n = 0;
     }
 
-    fwrite(buf, 1, (size_t)len, stderr);
-    if (s_sdMirror != NULL)
-        fwrite(buf, 1, (size_t)len, s_sdMirror);
-    /* Self-driven commit: the external once-per-second flush rides VSync's
-     * vblank counter, and any code path that stalls or bypasses VSync starves
-     * it -- the FAT size then freezes at the last fclose and the log READS as
-     * dead while lines keep flowing. Committing from inside the writer makes
-     * the cadence unstarvable: any line more than a second after the last
-     * commit cycles the file. Never call SH_DebugLogFlush here (fflush of the
-     * stream this callback serves would re-enter it). */
-    if (s_sdWanted)
+    g_ProfLogLines++;
     {
-        static uint32_t s_lastCommitMs;
-        uint32_t nowMs = (uint32_t)get_ticks_ms();
-        if (nowMs - s_lastCommitMs > 1000)
+        unsigned long long _t0 = get_ticks();
+        fwrite(buf, 1, (size_t)len, stderr);
+        g_ProfLogStderrTicks += get_ticks() - _t0;
+    }
+    {
+        unsigned long long _t0 = get_ticks();
+        if (s_sdMirror != NULL)
+            fwrite(buf, 1, (size_t)len, s_sdMirror);
+        /* Self-driven commit: the external once-per-second flush rides VSync's
+         * vblank counter, and any code path that stalls or bypasses VSync starves
+         * it -- the FAT size then freezes at the last fclose and the log READS as
+         * dead while lines keep flowing. Committing from inside the writer makes
+         * the cadence unstarvable: any line more than a second after the last
+         * commit cycles the file. Never call SH_DebugLogFlush here (fflush of the
+         * stream this callback serves would re-enter it). */
+        if (s_sdWanted)
         {
-            s_lastCommitMs = nowMs;
-            if (s_sdMirror != NULL)
-                fclose(s_sdMirror);
-            s_sdMirror = fopen("sd:/silenthill/silenthill.log", "a");
+            static uint32_t s_lastCommitMs;
+            uint32_t nowMs = (uint32_t)get_ticks_ms();
+            if (nowMs - s_lastCommitMs > 1000)
+            {
+                s_lastCommitMs = nowMs;
+                if (s_sdMirror != NULL)
+                    fclose(s_sdMirror);
+                s_sdMirror = fopen("sd:/silenthill/silenthill.log", "a");
+            }
         }
+        g_ProfLogSdTicks += get_ticks() - _t0;
     }
     return len;
 }

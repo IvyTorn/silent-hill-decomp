@@ -43,9 +43,15 @@ static inline unsigned long long sh_cycles_(void)
  * this header stays free of <libdragon.h>; the per-frame [OTT] split read 0
  * for every phase while this fell through to the stub below. */
 unsigned long long sh_cycles_(void);
+void               sh_dma_writeback_(const void* p, unsigned n);
 #define SH_STORE_BARRIER() __sync_synchronize()
 #define SH_CYCLES()        sh_cycles_()
 #define SH_CYCLES_TO_US(c) ((unsigned)(((unsigned long long)(c) * 8ULL) / 375ULL))
+/* Make CPU-written memory visible to a DMA reader (the RDP). The N64's data
+ * cache is write-back and the RDP reads RAM, so a buffer decoded by CPU stores
+ * has to be written back once, at decode time -- doing it per texture tile
+ * cost dozens of cache calls per triangle. */
+#define SH_DMA_WRITEBACK(p, n) sh_dma_writeback_((p), (n))
 
 #else
 
@@ -58,6 +64,9 @@ unsigned long long sh_cycles_(void);
 #ifndef SH_CYCLES_TO_US
 /* Xenon time base, ~49.875 MHz. */
 #define SH_CYCLES_TO_US(c) ((unsigned)(((unsigned long long)(c) * 8ULL) / 399ULL))
+#endif
+#ifndef SH_DMA_WRITEBACK
+#define SH_DMA_WRITEBACK(p, n) ((void)0)
 #endif
 
 #endif /* SH_HWPERF_H */
