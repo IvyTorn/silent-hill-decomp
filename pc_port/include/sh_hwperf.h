@@ -34,12 +34,30 @@ static inline unsigned long long sh_cycles_(void)
     return ((unsigned long long)hi << 32) | lo;
 }
 #define SH_CYCLES() sh_cycles_()
+/* Original Xbox: rdtsc at 733 MHz. */
+#define SH_CYCLES_TO_US(c) ((unsigned)((unsigned long long)(c) / 733ULL))
+
+#elif defined(SH_N64_PORT)
+
+/* libdragon's COUNT register, 46.875 MHz (CPU/2). Implemented in stubs_n64.c so
+ * this header stays free of <libdragon.h>; the per-frame [OTT] split read 0
+ * for every phase while this fell through to the stub below. */
+unsigned long long sh_cycles_(void);
+#define SH_STORE_BARRIER() __sync_synchronize()
+#define SH_CYCLES()        sh_cycles_()
+#define SH_CYCLES_TO_US(c) ((unsigned)(((unsigned long long)(c) * 8ULL) / 375ULL))
 
 #else
 
 #define SH_STORE_BARRIER() __sync_synchronize()
 #define SH_CYCLES()        0ULL
+#define SH_CYCLES_TO_US(c) ((unsigned)(c))
 
+#endif
+
+#ifndef SH_CYCLES_TO_US
+/* Xenon time base, ~49.875 MHz. */
+#define SH_CYCLES_TO_US(c) ((unsigned)(((unsigned long long)(c) * 8ULL) / 399ULL))
 #endif
 
 #endif /* SH_HWPERF_H */

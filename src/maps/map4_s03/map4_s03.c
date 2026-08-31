@@ -366,6 +366,10 @@ void func_800D0FD4(s32* ord, void* arg1, u8* arg2, MATRIX* arg3, s32 arg4, s32 a
 
     col = D_800DAA58[0];
     sz  = RotTransPers(&vtx, &sxy, &p, &flag);
+    /* sxy is decoded numerically below (low half x, high half y). The
+     * projection stores the pair in FIELD order, so compose the PSX word
+     * from it; a plain read of the s32 has the halves swapped on big-endian. */
+    sxy = (s32)PSX_LD_XY(&sxy);
 
     // Divide overflow.
     if (flag & 0x20000)

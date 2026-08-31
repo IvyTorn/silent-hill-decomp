@@ -15,6 +15,11 @@
 #include "gpu_nv2a.h"
 #include "sh_log.h"
 #include "sh_hwperf.h"
+
+/* Per-frame texture-cache cost, reset by the frame begin and reported in the
+ * [PROF] line: a decode is a 64 KB page rebuild, a drain is a full GPU wait. */
+int g_PsxVramDecodes, g_PsxVramDrains, g_PsxVramPalBuilds;
+unsigned long long g_PsxVramDecodeTicks, g_PsxVramDrainTicks;
 #include "pc_config.h"    /* texture_paletted escape hatch */
 #include "hires_override.h" /* HIRES_POOL_* virtual-slot clut encoding */
 #include "xbox_respool.h"   /* resident chunk textures (resident_textures) */
@@ -1036,7 +1041,10 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
         }
         if (victim < 0) {                      /* all in flight: drain, then reuse */
             extern void GpuNv2a_DrainGpu(void);
+            unsigned long long _t0 = SH_CYCLES();
             GpuNv2a_DrainGpu();
+            g_PsxVramDrainTicks += SH_CYCLES() - _t0;
+            g_PsxVramDrains++;
             s_drainedSeq = s_bindSeq;
             victim = pinned;
         }
@@ -1047,7 +1055,7 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
              * of the mode — this page cannot be stolen or overwritten. */
             s_pages[victim].px0 = s_pages[victim].px1 = 0;
             s_pages[victim].py0 = s_pages[victim].py1 = 0;
-            PageDecodeIndicesResident(resWords, &resDesc, s_pages[victim].data);
+            { unsigned long long _t0 = SH_CYCLES(); PageDecodeIndicesResident(resWords, &resDesc, s_pages[victim].data); g_PsxVramDecodeTicks += SH_CYCLES() - _t0; g_PsxVramDecodes++; }
         } else {
             {   /* record the source rect so texel writes invalidate this page */
                 int px = (tpage & 0x0F) * 64;
@@ -1057,7 +1065,7 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
                 s_pages[victim].px1 = px + ((tp == 0) ? 64 : 128);
                 s_pages[victim].py1 = py + 256;
             }
-            PageDecodeIndices(tpage, s_pages[victim].data);
+            { unsigned long long _t0 = SH_CYCLES(); PageDecodeIndices(tpage, s_pages[victim].data); g_PsxVramDecodeTicks += SH_CYCLES() - _t0; g_PsxVramDecodes++; }
         }
         s_pages[victim].key  = pageKey;
         s_pages[victim].hits = 1;
@@ -1094,7 +1102,10 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
             }
             if (victim < 0) {
                 extern void GpuNv2a_DrainGpu(void);
+                unsigned long long _t0 = SH_CYCLES();
                 GpuNv2a_DrainGpu();
+                g_PsxVramDrainTicks += SH_CYCLES() - _t0;
+                g_PsxVramDrains++;
                 s_drainedSeq = s_bindSeq;
                 victim = pinned;
             }
@@ -1113,6 +1124,7 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
                     s_pals[victim].cy1 = cy + 1;
                 }
                 PaletteBuild(clut, s_pals[victim].data);
+                g_PsxVramPalBuilds++;
             }
             s_pals[victim].key = palKey;
             p = victim;

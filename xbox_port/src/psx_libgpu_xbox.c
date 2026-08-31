@@ -14,6 +14,9 @@
 #include <libetc.h>
 #include "sh_log.h"
 
+/* Last audio pump's wall time, for the N64 [PROF] line. */
+int g_ProfAudioMs = 0;
+
 /* --- Primitive initializers (stamp code+len) --------------------------------*/
 void SetPolyF4(POLY_F4* p)   { setPolyF4(p); }
 void SetPolyFT4(POLY_FT4* p) { setPolyFT4(p); }
@@ -202,6 +205,7 @@ int VSync(int mode)
         {
             int ms = GpuNv2a_Ms() - _ap;
             static int s_apLog = 0;
+            g_ProfAudioMs = ms;
             if (ms > 5 && (s_apLog++ & 7) == 0)
                 SH_DBG("[POST] audioPumpMs=%d", ms);
         }

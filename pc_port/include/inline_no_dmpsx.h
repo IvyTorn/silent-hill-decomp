@@ -30,12 +30,31 @@ extern void PGXP_StoreAddr(void* addr, int slot);
 #undef gte_lddp
 #define gte_lddp( r0 ) { uint _v = (uint)(r0); MTC2(_v, 8); }
 
+/* A GTE screen word -- the PSX (y<<16)|x -- converted to the value that,
+ * stored as ONE 32-bit word, leaves {s16 x, s16 y} in FIELD order in memory,
+ * and back again. Identity on little-endian, a half swap on big-endian.
+ * The invariant: memory always holds field order (prim x0/y0, screenXy_0[],
+ * scratch DVECTORs); only the GTE boundary converts. Storing the numeric word
+ * raw on big-endian put y in the x field of every projected vertex, which the
+ * ordering-table walker reads as fields: the whole 3D scene came out
+ * transposed (Harry "turned 90 degrees", the room drawn on its side) while the
+ * 2D layer, which never crosses the GTE, stayed upright. */
+#ifndef SH_GTE_SXY_MEM
+#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define SH_GTE_SXY_MEM(w) ((((unsigned int)(w)) << 16) | (((unsigned int)(w)) >> 16))
+#else
+#define SH_GTE_SXY_MEM(w) ((unsigned int)(w))
+#endif
+#endif
+
+/* The value arrives as a raw word read of a {s16 x, s16 y} pair (screenXy_0,
+ * a scratch DVECTOR); memory is field order, the GTE wants the PSX word. */
 #undef gte_ldsxy0
-#define gte_ldsxy0( r0 ) { MTC2((uint)(r0), 12); }
+#define gte_ldsxy0( r0 ) { MTC2(SH_GTE_SXY_MEM((uint)(r0)), 12); }
 
 #undef gte_ldsxy3
 #define gte_ldsxy3( r0, r1, r2 ) \
-    { MTC2((uint)(r0), 12); MTC2((uint)(r2), 14); MTC2((uint)(r1), 13); }
+    { MTC2(SH_GTE_SXY_MEM((uint)(r0)), 12); MTC2(SH_GTE_SXY_MEM((uint)(r2)), 14); MTC2(SH_GTE_SXY_MEM((uint)(r1)), 13); }
 
 /* gte_ldv3c - Load 3 vertices (6 regs: VXY0,VZ0, VXY1,VZ1, VXY2,VZ2)
  * from a contiguous array of 3 SVECTORs (24 bytes).
@@ -91,7 +110,7 @@ extern void PGXP_StoreAddr(void* addr, int slot);
 #undef gte_stsxy3c
 #define gte_stsxy3c( r0 ) do { \
     uint *_p = (uint*)((char*)(r0)); \
-    _p[0] = MFC2(12); _p[1] = MFC2(13); _p[2] = MFC2(14); \
+    _p[0] = SH_GTE_SXY_MEM(MFC2(12)); _p[1] = SH_GTE_SXY_MEM(MFC2(13)); _p[2] = SH_GTE_SXY_MEM(MFC2(14)); \
     if (g_PsxUsePgxp || g_PsyX_UsePerPixelFlashlight) { PGXP_StoreAddr(&_p[0], 0); PGXP_StoreAddr(&_p[1], 1); PGXP_StoreAddr(&_p[2], 2); } \
 } while(0)
 
@@ -141,9 +160,9 @@ extern void PGXP_StoreAddr(void* addr, int slot);
  * PSX to 8/16/24 -- the two branches this replaces. */
 #define gte_stsxy3_g3( p ) do { \
     POLY_FT3 *_q = (POLY_FT3*)(void*)(p); \
-    *(uint*)&_q->x0 = MFC2(12); \
-    *(uint*)&_q->x1 = MFC2(13); \
-    *(uint*)&_q->x2 = MFC2(14); \
+    *(uint*)&_q->x0 = SH_GTE_SXY_MEM(MFC2(12)); \
+    *(uint*)&_q->x1 = SH_GTE_SXY_MEM(MFC2(13)); \
+    *(uint*)&_q->x2 = SH_GTE_SXY_MEM(MFC2(14)); \
     if (g_PsxUsePgxp || g_PsyX_UsePerPixelFlashlight) { PGXP_StoreAddr(&_q->x0, 0); PGXP_StoreAddr(&_q->x1, 1); PGXP_StoreAddr(&_q->x2, 2); } \
 } while(0)
 

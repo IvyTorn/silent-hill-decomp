@@ -1424,10 +1424,10 @@ void DrawOTag(u_long* p)
                 unsigned long long oth  = s_walkCycles > acct ? s_walkCycles - acct : 0;
                 unsigned           pr   = s_primCount ? s_primCount : 1;
                 SH_DBG("[OTT] walkUs=%d texUs=%d emitUs=%d submitUs=%d otherUs=%d prims=%u usPerPrim=%d",
-                       (int)(s_walkCycles / 733ULL), (int)(s_texCycles / 733ULL),
-                       (int)(s_emitCycles / 733ULL), (int)(sub / 733ULL),
-                       (int)(oth / 733ULL), s_primCount,
-                       (int)(s_walkCycles / 733ULL / pr));
+                       (int)SH_CYCLES_TO_US(s_walkCycles), (int)SH_CYCLES_TO_US(s_texCycles),
+                       (int)SH_CYCLES_TO_US(s_emitCycles), (int)SH_CYCLES_TO_US(sub),
+                       (int)SH_CYCLES_TO_US(oth), s_primCount,
+                       (int)(SH_CYCLES_TO_US(s_walkCycles) / pr));
             }
             s_cnPrims = 0; s_cnGt = 0; s_cnFogged = 0;
             s_cnPadMin = 999; s_cnPadMax = -1;

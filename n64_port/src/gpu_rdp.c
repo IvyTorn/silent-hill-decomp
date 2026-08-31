@@ -54,7 +54,17 @@ int g_Nv2aContentW = SCR_W;
 int g_Nv2aContentH = SCR_H;
 int g_Nv2aContentX = 0;
 int g_Nv2aFrameCount = 0;
-int g_Nv2aDrawCycles = 0;
+/* unsigned long long, matching gpu_xbox.c's extern and gpu_nv2a.c's definition.
+ * As an int it was 4 bytes, gpu_xbox.c's per-frame `g_Nv2aDrawCycles = 0`
+ * stored 8, and the next 4 were g_Nv2aFrameCount -- zeroed every frame. That
+ * was the "frame counter stuck at 0" bug, and psx_vram.c keys its page LRU on
+ * that counter: with every page's lastUse equal to a frozen frame number no
+ * page was ever evictable, so every miss past the eighth page drained the
+ * whole GPU queue and redecoded into the same slot. */
+unsigned long long g_Nv2aDrawCycles = 0;
+extern int g_ProfAudioMs;                 /* psx_libgpu_xbox.c: last audio pump */
+extern int g_PsxVramDecodes, g_PsxVramDrains, g_PsxVramPalBuilds;
+extern unsigned long long g_PsxVramDecodeTicks, g_PsxVramDrainTicks;
 
 static surface_t* s_fb;
 static int        s_inited;
@@ -126,6 +136,15 @@ static int s_cnDropped;
 static int s_cnTexTris;
 static int s_cnTexTooBig;
 static int s_cnTexSplit;
+/* Per-frame profile: where the CPU's frame goes. waitFb = display_get() (the
+ * RDP still owns every buffer = RDP-bound); submit = tile upload + triangle
+ * issue; binds = texture page changes (each is a flush); tlutWrap = ring
+ * wraps (each is an rspq_wait). */
+static unsigned long long s_cnWaitFbTicks;
+static unsigned long long s_cnSubmitTicks;
+static int s_cnUploads;
+static int s_cnTlutWrap;
+static int s_cnBinds;
 
 static const rdpq_trifmt_t TRIFMT_SH_SHADE = {
     .pos_offset   = 0,
@@ -184,6 +203,7 @@ static void BuildTlut(void)
     {
         s_tlutIdx = 0;
         rspq_wait();
+        s_cnTlutWrap++;
     }
     s_tlut = s_tlutRing[s_tlutIdx];
 
@@ -361,13 +381,16 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
      * REDECODED into the same buffer at any time, so this cannot be hoisted to
      * the bind. */
     {
+        unsigned long long _t0 = get_ticks();
         int t;
         for (t = t0; t < t1; t++)
             data_cache_hit_writeback((void*)(s_texPage + t * TEX_PAGE_DIM + s0),
                                      (unsigned)(s1 - s0));
+        rdpq_tex_upload_sub(TILE0, &s_pageSurf, NULL, s0, t0, s1, t1);
+        rdpq_triangle(&TRIFMT_SH_TEX, va, vb, vc);
+        s_cnSubmitTicks += get_ticks() - _t0;
+        s_cnUploads++;
     }
-    rdpq_tex_upload_sub(TILE0, &s_pageSurf, NULL, s0, t0, s1, t1);
-    rdpq_triangle(&TRIFMT_SH_TEX, va, vb, vc);
     s_cnTris++;
     s_cnTexTris++;
 }
@@ -627,9 +650,20 @@ void GpuNv2a_FrameBegin(void)
     s_cnTexTris  = 0;
     s_cnTexTooBig = 0;
     s_cnTexSplit = 0;
+    s_cnWaitFbTicks = 0;
+    s_cnSubmitTicks = 0;
+    s_cnUploads  = 0;
+    s_cnTlutWrap = 0;
+    s_cnBinds    = 0;
+    g_PsxVramDecodes = g_PsxVramDrains = g_PsxVramPalBuilds = 0;
+    g_PsxVramDecodeTicks = g_PsxVramDrainTicks = 0;
     s_modeDirty  = 1;
 
-    s_fb = display_get();
+    {
+        unsigned long long _t0 = get_ticks();
+        s_fb = display_get();
+        s_cnWaitFbTicks = get_ticks() - _t0;
+    }
     rdpq_attach(s_fb, NULL);
 
     /* The PSX draw-env isbg background -- the fog colour in-game. Taking it
@@ -681,7 +715,7 @@ void GpuNv2a_FrameEnd(void)
     }
     s_fb = NULL;
 
-    g_Nv2aDrawCycles = (int)(get_ticks() - s_frameStart);
+    g_Nv2aDrawCycles = get_ticks() - s_frameStart;
 
 
     {
@@ -729,9 +763,24 @@ void GpuNv2a_FrameEnd(void)
                    g_N64VbSnap[3], g_N64VbSnap[4], g_N64VbSnap[5]);
         }
         if (((s_censusTick - 1) & 63) == 0)
-        SH_DBG("[GPU] f%d tris=%d tex=%d split=%d big=%d drop=%d %dus",
-               g_Nv2aFrameCount, s_cnTris, s_cnTexTris, s_cnTexSplit, s_cnTexTooBig, s_cnDropped,
-               (int)TICKS_TO_US((unsigned)g_Nv2aDrawCycles));
+        {
+            SH_DBG("[GPU] f%d tris=%d tex=%d split=%d big=%d drop=%d %dus",
+                   g_Nv2aFrameCount, s_cnTris, s_cnTexTris, s_cnTexSplit, s_cnTexTooBig, s_cnDropped,
+                   (int)TICKS_TO_US((unsigned)g_Nv2aDrawCycles));
+            /* ONE frame's CPU budget, in microseconds. frame = FrameBegin to
+             * here; waitFb = blocked on a free framebuffer (RDP-bound if big);
+             * submit = tile uploads + triangle issue; vram dec/drain = page
+             * decodes and full GPU drains the texture cache had to do. What is
+             * left of `frame` after these is the game update + OT walk ([OTT]). */
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d binds=%d tlutWrap=%d | dec=%d/%uus drain=%d/%uus pal=%d | audio=%dms",
+                   (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
+                   (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
+                   (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
+                   s_cnUploads, s_cnBinds, s_cnTlutWrap,
+                   g_PsxVramDecodes, (unsigned)TICKS_TO_US((unsigned)g_PsxVramDecodeTicks),
+                   g_PsxVramDrains, (unsigned)TICKS_TO_US((unsigned)g_PsxVramDrainTicks),
+                   g_PsxVramPalBuilds, g_ProfAudioMs);
+        }
     }
 }
 
@@ -791,6 +840,8 @@ void GpuNv2a_BindPaletted(const void* page, const void* pal)
     {
         if (pal != s_texPal)
             s_tlutDirty = 1;
+        if (page != s_texPage)
+            s_cnBinds++;
         s_texPage    = (const uint8_t*)page;
         s_texPal     = (const uint32_t*)pal;
         s_pageSurf   = surface_make_linear((void*)page, FMT_CI8, TEX_PAGE_DIM, TEX_PAGE_DIM);

@@ -17,6 +17,12 @@
 #include "sh_log.h"
 #include "savefs_n64.h"
 
+/* sh_hwperf.h's free-running counter for this port (see SH_CYCLES). */
+unsigned long long sh_cycles_(void)
+{
+    return (unsigned long long)get_ticks();
+}
+
 /* TEMP diagnostic: last MainLoop call site, written by ML_TRACE in
  * game_main.c, printed by the pad watchdog. */
 const char* g_MlTraceTag = "pre-loop";

@@ -48,18 +48,28 @@ extern void PGXP_StoreAddr(void* addr, int slot);
  * read of {s16 x,y} ONLY on little-endian. On BE the raw read swapped x/y
  * into the GTE (and half-swapped rotation rows), which transformed the whole
  * world to garbage: every screenZ came out ~0 and the depth cull ate all of
- * it. Composing from fields is value-identical on LE, correct everywhere.
- * OUTPUT arrays (screenXy_0 etc) STAY in word convention -- FetchScreen
- * stores the raw value, and the ~87 word-read consumers stand untouched.
- * Only FIELD access into them uses SH_SXY_VX/VY (5 sites). */
+ * it. Composing from fields is value-identical on LE, correct everywhere. */
 #define SH_GTE_PAIR16(lo, hi) (((unsigned int)(unsigned short)(hi) << 16) | (unsigned short)(lo))
+/* A GTE screen word -- the PSX (y<<16)|x -- converted to the value that,
+ * stored as ONE 32-bit word, leaves {s16 x, s16 y} in FIELD order in memory,
+ * and back again. Identity on little-endian, a half swap on big-endian.
+ * The invariant: memory always holds field order (prim x0/y0, screenXy_0[],
+ * scratch DVECTORs); only the GTE boundary converts. Storing the numeric word
+ * raw on big-endian put y in the x field of every projected vertex, which the
+ * ordering-table walker reads as fields: the whole 3D scene came out
+ * transposed (Harry "turned 90 degrees", the room drawn on its side) while the
+ * 2D layer, which never crosses the GTE, stayed upright. */
+#ifndef SH_GTE_SXY_MEM
 #if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#define SH_SXY_VX(dv) ((dv).vy)
-#define SH_SXY_VY(dv) ((dv).vx)
+#define SH_GTE_SXY_MEM(w) ((((unsigned int)(w)) << 16) | (((unsigned int)(w)) >> 16))
 #else
+#define SH_GTE_SXY_MEM(w) ((unsigned int)(w))
+#endif
+#endif
+/* Memory is field order everywhere now (see SH_GTE_SXY_MEM), so field access
+ * into a projected pair is just field access. These stay as names only. */
 #define SH_SXY_VX(dv) ((dv).vx)
 #define SH_SXY_VY(dv) ((dv).vy)
-#endif
 
 /* gte_SetLightSVector - Load SVECTOR into light matrix rows */
 #undef gte_SetLightSVector
@@ -147,11 +157,11 @@ static inline unsigned int gte_stIR1_func(void) { return MFC2(9); }
     unsigned int *_xy = (unsigned int*)(xy); \
     unsigned short *_z = (unsigned short*)(z); \
     _z[0] = (unsigned short)MFC2(17); \
-    _xy[0] = MFC2(12); \
+    _xy[0] = SH_GTE_SXY_MEM(MFC2(12)); \
     _z[1] = (unsigned short)MFC2(18); \
-    _xy[1] = MFC2(13); \
+    _xy[1] = SH_GTE_SXY_MEM(MFC2(13)); \
     _z[2] = (unsigned short)MFC2(19); \
-    _xy[2] = MFC2(14); \
+    _xy[2] = SH_GTE_SXY_MEM(MFC2(14)); \
     if (g_PsxUsePgxp || g_PsyX_UsePerPixelFlashlight) { PGXP_StoreAddr(&_xy[0], 0); PGXP_StoreAddr(&_xy[1], 1); PGXP_StoreAddr(&_xy[2], 2); } \
 } while(0)
 
