@@ -160,7 +160,7 @@ int Sh_LogAllow(const char* fmt)
         "[PIPE]", "[PIPE2]", "[WVS]", "[WALLSTOP]", "[WALL-HIT]", "[PADR]",
         "[FONTDUMP]", "[MGLY]", "[MGLY2]", "[FLEX]", "[MUZZLE]", "[TXTPG]",
         "[TXSPR]", "[UIDIAG]", "[KO]", "[VKO2]", "[VKO3]", "[VKO4]",
-        "[FOGST]", "[FOGPAD]", "[ABR]", "[FSQ]", "[STORE]", "[MCFSM]",
+        "[FOGST]", "[FOGPAD]", "[FSQ]", "[STORE]", "[MCFSM]",
         "[RAIN]", "[SS]", "[FXDROP]", "[BATCH]", "[ZETA]", "[ITEMZ]",
     };
     int i;

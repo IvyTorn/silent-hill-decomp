@@ -372,6 +372,30 @@ static void MidVert(float* out, const float* p, const float* q)
  * this port (no PGXP). clip_screen=0 in silenthill.cfg turns it off. */
 static float s_clipX0, s_clipY0, s_clipX1 = (float)SCR_W, s_clipY1 = (float)SCR_H;
 static int   s_cnClipped, s_cnRejected;
+
+/* RDP probe (rdp_probe=1 in silenthill.cfg). The RDP's pipe-busy counter reads
+ * ~200 us per triangle whether the triangles are large or clipped small, and
+ * texture loading is under 5% of it. To split that time into fill, texture
+ * and raw per-command cost without three test sessions, the probe cycles the
+ * render every 64 frames -- the [PROF] period -- through: 0 normal; 1 NOFILL
+ * (every triangle is issued at one pixel: same commands, loads and syncs,
+ * no rasterisation); 2 NOTEX (flat shade, no loads: same triangle count, no
+ * texture path). Each census line names its mode. The picture flickers; it
+ * is a measurement build setting, not a way to play.
+ *
+ * The area census runs always: the summed screen-space area of every
+ * triangle after clipping is the overdraw the RDP actually rasterised. */
+static int s_probeMode;
+static unsigned long long s_cnAreaPx;
+static int s_cnBigTris;      /* > 4096 px after clipping */
+static void CountArea(const float* a, const float* b, const float* c)
+{
+    float ar = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]);
+    if (ar < 0.0f) ar = -ar;
+    ar *= 0.5f;
+    s_cnAreaPx += (unsigned long long)ar;
+    if (ar > 4096.0f) s_cnBigTris++;
+}
 #define CLIP_GUARD   8.0f
 #define CLIP_MAX_V   9      /* 3 vertices + one per plane, rounded up */
 
@@ -468,6 +492,18 @@ static void DrawTexturedTri(const ShVertex* a, const ShVertex* b, const ShVertex
         DrawStagedTri(poly, poly + i * 9, poly + (i + 1) * 9, 7);
 }
 
+static void DrawStagedTri(const float* va, const float* vb, const float* vc, int depth);
+
+/* DrawStagedTri with the probe hooks bypassed (the NOFILL mode re-enters
+ * through here so its one-pixel triangle is not shrunk again). */
+static void DrawStagedTriNoProbe(const float* va, const float* vb, const float* vc, int depth)
+{
+    int saved = s_probeMode;
+    s_probeMode = 0;
+    DrawStagedTri(va, vb, vc, depth);
+    s_probeMode = saved;
+}
+
 static void DrawStagedTri(const float* va, const float* vb, const float* vc, int depth)
 {
     int s0, t0, s1, t1;
@@ -487,6 +523,27 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
 
     if (s1 <= s0 || t1 <= t0)
         return;
+
+    CountArea(va, vb, vc);
+    if (s_probeMode == 1)
+    {
+        /* NOFILL: one-pixel triangle, texture path intact. */
+        float pb[9], pc[9];
+        memcpy(pb, va, sizeof pb); memcpy(pc, va, sizeof pc);
+        pb[0] += 1.0f; pc[1] += 1.0f;
+        if (!(s_winValid && s0 >= s_winS0 && t0 >= s_winT0 && s1 <= s_winS1 && t1 <= s_winT1))
+        {
+            /* keep the load pattern honest: same window logic as below */
+        }
+        DrawStagedTriNoProbe(va, pb, pc, depth);
+        return;
+    }
+    if (s_probeMode == 2)
+    {
+        /* NOTEX: the flat fallback below, with no texture load. */
+        s_cnTexTooBig--;    /* not a real miss; the branch below counts it */
+        goto flat_fallback;
+    }
 
     if (!TexBoxFits(s0, t0, s1, t1))
     {
@@ -532,6 +589,7 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
         /* Out of depth: degenerate UV span. Draw flat rather than wrong; the
          * mode is restored IMMEDIATELY because ApplyMode only runs at the top
          * of a flush. */
+flat_fallback:
         s_cnTexTooBig++;
         rdpq_mode_tlut(TLUT_NONE);
         rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
@@ -688,7 +746,18 @@ void GpuNv2a_FlushBatch(void)
             n = ClipTri((const float*)&s_batch[i], (const float*)&s_batch[i + 1],
                         (const float*)&s_batch[i + 2], 8, poly);
             for (k = 1; k + 1 < n; k++)
-                rdpq_triangle(&TRIFMT_SH_SHADE, poly, poly + k * 8, poly + (k + 1) * 8);
+            {
+                CountArea(poly, poly + k * 8, poly + (k + 1) * 8);
+                if (s_probeMode == 1)
+                {
+                    float pb[8], pc[8];
+                    memcpy(pb, poly, sizeof pb); memcpy(pc, poly, sizeof pc);
+                    pb[0] += 1.0f; pc[1] += 1.0f;
+                    rdpq_triangle(&TRIFMT_SH_SHADE, poly, pb, pc);
+                }
+                else
+                    rdpq_triangle(&TRIFMT_SH_SHADE, poly, poly + k * 8, poly + (k + 1) * 8);
+            }
             s_cnTris++;
         }
     }
@@ -876,6 +945,9 @@ void GpuNv2a_FrameBegin(void)
     s_cnTriMax = s_cnUpMax = 0;
     s_cnTriCalls = s_cnTriSlow = s_cnUpSlow = 0;
     s_cnClipped = s_cnRejected = 0;
+    s_cnAreaPx = 0;
+    s_cnBigTris = 0;
+    s_probeMode = g_PcConfig.n64RdpProbe ? (int)((g_Nv2aFrameCount / 64) % 3) : 0;
     s_clipX0 = 0.0f;           s_clipY0 = 0.0f;
     s_clipX1 = (float)SCR_W;   s_clipY1 = (float)SCR_H;
     s_batchUsed  = 0;
@@ -1017,7 +1089,7 @@ void GpuNv2a_FrameEnd(void)
              * submit = tile uploads + triangle issue; vram dec/drain = page
              * decodes and full GPU drains the texture cache had to do. What is
              * left of `frame` after these is the game update + OT walk ([OTT]). */
-            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d | clip=%d rej=%d",
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d | clip=%d rej=%d | px=%uK big=%d probe=%d",
                    (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
                    (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
                    (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
@@ -1034,7 +1106,8 @@ void GpuNv2a_FrameEnd(void)
                    RdpBusyUs(*DP_CLOCK), RdpBusyUs(*DP_PIPE_BUSY), RdpBusyUs(*DP_TMEM_BUSY), RdpBusyUs(*DP_BUSY),
                    s_cnTriCalls, (unsigned)TICKS_TO_US((unsigned)s_cnTriMax), s_cnTriSlow,
                    (unsigned)TICKS_TO_US((unsigned)s_cnUpMax), s_cnUpSlow,
-                   s_cnClipped, s_cnRejected);
+                   s_cnClipped, s_cnRejected,
+                   (unsigned)(s_cnAreaPx / 1000ULL), s_cnBigTris, s_probeMode);
         }
     }
 }
