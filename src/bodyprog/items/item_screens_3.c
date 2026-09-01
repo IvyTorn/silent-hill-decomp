@@ -4206,9 +4206,18 @@ void func_80054A04(u8 itemId) // 0x80054A04
                 static int s_unqLog = 0;
                 if (s_unqLog < 32)
                 {
+#if defined(SH_N64_PORT)
+                    /* The source TMD is little-endian and stays so (libgs_stub.c
+                     * swaps its private copy); decode the header for the log. */
+                    SH_DBG("[ITEMPICK] unique-item link: id=0x%x nobj=%u obj=%s",
+                           (unsigned)__builtin_bswap32((unsigned)_tmd->id),
+                           (unsigned)__builtin_bswap32((unsigned)_tmd->modelCount),
+                           _obj != NULL ? "ok" : "NULL");
+#else
                     SH_DBG("[ITEMPICK] unique-item link: id=0x%x nobj=%u obj=%s",
                            (unsigned)_tmd->id, (unsigned)_tmd->modelCount,
                            _obj != NULL ? "ok" : "NULL");
+#endif
                     s_unqLog++;
                 }
             }

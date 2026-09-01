@@ -174,6 +174,17 @@ static int s_cnUploads;
 static int s_cnTlutWrap;
 static int s_cnBinds;
 static int s_cnBinds4;   /* of those, pages bound as CI4 */
+/* Is the render phase CPU work or time BLOCKED behind the RDP? [OTT] measured
+ * ~240 us per primitive, constant across a 38-prim menu and a 507-prim room,
+ * which the per-primitive CPU path (a few float conversions) cannot explain.
+ * Two instruments settle it: the RDP's own busy counters (cleared at
+ * FrameBegin; 62.5 MHz), which say how long the pipeline and the TMEM loader
+ * actually ran during the CPU's frame, and the SPREAD of individual submit
+ * calls -- CPU cost is uniform, queue stalls are bursty. */
+static unsigned long long s_cnTriMax, s_cnUpMax;
+static int s_cnTriCalls, s_cnTriSlow, s_cnUpSlow;
+#define PROF_SLOW_TICKS (TICKS_FROM_MS(1) / 10)   /* 100 us */
+static unsigned RdpBusyUs(uint32_t counter24) { return (unsigned)(((unsigned long long)(counter24 & 0xFFFFFF) * 2u) / 125u); }
 
 static const rdpq_trifmt_t TRIFMT_SH_SHADE = {
     .pos_offset   = 0,
@@ -492,12 +503,21 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
         s_winS0 = ws0; s_winT0 = wt0; s_winS1 = ws0 + w; s_winT1 = wt0 + h;
         s_winValid = 1;
         s_cnUploads++;
-        s_cnSubmitTicks += get_ticks() - _t0;
+        {
+            unsigned long long d = get_ticks() - _t0;
+            s_cnSubmitTicks += d;
+            if (d > s_cnUpMax) s_cnUpMax = d;
+            if (d > PROF_SLOW_TICKS) s_cnUpSlow++;
+        }
     }
     {
-        unsigned long long _t0 = get_ticks();
+        unsigned long long _t0 = get_ticks(), d;
         rdpq_triangle(&TRIFMT_SH_TEX, va, vb, vc);
-        s_cnSubmitTicks += get_ticks() - _t0;
+        d = get_ticks() - _t0;
+        s_cnSubmitTicks += d;
+        s_cnTriCalls++;
+        if (d > s_cnTriMax) s_cnTriMax = d;
+        if (d > PROF_SLOW_TICKS) s_cnTriSlow++;
     }
     s_cnTris++;
     s_cnTexTris++;
@@ -739,6 +759,12 @@ void GpuNv2a_FrameBegin(void)
     g_Nv2aFrameCount++;
 
     s_frameStart = get_ticks();
+    /* The RDP's 24-bit busy counters, zeroed here so [PROF] reads one frame's
+     * worth. Wraps at 268 ms; a frame longer than that under-reports. */
+    *DP_STATUS = DP_WSTATUS_RESET_TMEM_COUNTER | DP_WSTATUS_RESET_PIPE_COUNTER |
+                 DP_WSTATUS_RESET_CMD_COUNTER  | DP_WSTATUS_RESET_CLOCK_COUNTER;
+    s_cnTriMax = s_cnUpMax = 0;
+    s_cnTriCalls = s_cnTriSlow = s_cnUpSlow = 0;
     s_batchUsed  = 0;
     s_runStart   = 0;
     s_cnTris     = 0;
@@ -878,7 +904,7 @@ void GpuNv2a_FrameEnd(void)
              * submit = tile uploads + triangle issue; vram dec/drain = page
              * decodes and full GPU drains the texture cache had to do. What is
              * left of `frame` after these is the game update + OT walk ([OTT]). */
-            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms",
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d",
                    (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
                    (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
                    (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
@@ -891,7 +917,10 @@ void GpuNv2a_FrameEnd(void)
                    g_ProfLogLines,
                    (unsigned)TICKS_TO_US((unsigned)g_ProfLogStderrTicks),
                    (unsigned)TICKS_TO_US((unsigned)g_ProfLogSdTicks),
-                   g_ProfAudioMs);
+                   g_ProfAudioMs,
+                   RdpBusyUs(*DP_CLOCK), RdpBusyUs(*DP_PIPE_BUSY), RdpBusyUs(*DP_TMEM_BUSY), RdpBusyUs(*DP_BUSY),
+                   s_cnTriCalls, (unsigned)TICKS_TO_US((unsigned)s_cnTriMax), s_cnTriSlow,
+                   (unsigned)TICKS_TO_US((unsigned)s_cnUpMax), s_cnUpSlow);
         }
     }
 }

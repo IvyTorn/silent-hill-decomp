@@ -398,11 +398,119 @@ typedef struct {
 #ifdef SH_XBOX_PORT
     size_t           copy_size;  /* for the same-content dedup memcmp */
 #endif
+#if defined(SH_N64_PORT)
+    u32              src_sum;    /* dedup key: the copy is byte-swapped, so it cannot be memcmp'd against the source */
+#endif
 } GsTmdCacheEntry;
 
 static GsTmdCacheEntry gs_tmd_cache[GS_TMD_CACHE_SLOTS];
 static int gs_tmd_cache_count = 0; /* number of valid entries (<= SLOTS) */
 static int gs_tmd_cache_head  = 0; /* ring: index of the oldest entry */
+
+#if defined(SH_N64_PORT)
+/* TMD files are little-endian on the disc and nothing upstream of here swaps
+ * them: the log's `id=0x41000000 nobj=16777216` was the TMD magic 0x41 and an
+ * object count of 1 read as big-endian words. GsMapModelingData below then saw
+ * 16 million objects, declined, GsGetTMDObject returned NULL, the pickup screen
+ * never got a model and its animation never finished -- the freeze after
+ * picking an item up.
+ *
+ * The swap is applied to the private COPY, never to the source buffer: the
+ * source is re-mapped by later calls (dedup by base pointer), and a swapped
+ * source would be double-swapped. Header and object-table fields are read
+ * through TmdLe32 for the same reason. */
+static u32 TmdLe32(u32 v) { return __builtin_bswap32(v); }
+
+static void TmdSwap16s(u8* b, size_t halfwords)
+{
+    size_t i;
+    for (i = 0; i < halfwords; i++, b += 2) { u8 t = b[0]; b[0] = b[1]; b[1] = t; }
+}
+
+/* One primitive packet: [olen ilen flag mode] then `ilen` body words. The body
+ * is, in order, the texture words (u8 u, u8 v, u16 clut/tpage/pad -- swap only
+ * the u16), the colour words (u8 r g b + u8, no swap), then vertex/normal
+ * indices (all u16 -- swap every halfword). Which of the first two are present
+ * follows the mode/flag bits exactly as the TMD_P_* structs in libgs.h lay
+ * them out; a packet whose computed length disagrees with its own ilen is left
+ * alone and counted, rather than guessed at. Returns bytes consumed. */
+static int TmdSwapPacket(u8* pk, int* unknown)
+{
+    const int ilen = pk[1];
+    const int flag = pk[2];
+    const int mode = pk[3];
+    int nv, tme, iip, lgt, grd, texW, colW, idxW, w;
+    u8* body = pk + 4;
+
+    if ((mode & 0xE0) != 0x20) { (*unknown)++; return (ilen + 1) * 4; }   /* not a polygon */
+
+    nv  = (mode & 0x08) ? 4 : 3;
+    tme = mode & 0x04;
+    iip = mode & 0x10;
+    lgt = flag & 0x01;          /* 1 = no lighting: the "N" variants */
+    grd = flag & 0x04;
+    texW = tme ? nv : 0;
+    if (tme)      colW = lgt ? (iip ? nv : 1) : 0;
+    else          colW = lgt ? (iip ? nv : 1) : (grd ? nv : 1);
+    if (lgt)      idxW = (nv + 1) / 2;                 /* [v0 v1][v2 v3|pad] */
+    else if (iip) idxW = nv;                           /* [n v] per vertex */
+    else          idxW = 1 + (nv - 1 + 1) / 2;         /* [n0 v0] then packed verts */
+
+    if (texW + colW + idxW != ilen) { (*unknown)++; return (ilen + 1) * 4; }
+
+    for (w = 0; w < texW; w++)
+        TmdSwap16s(body + w * 4 + 2, 1);
+    TmdSwap16s(body + (texW + colW) * 4, (size_t)idxW * 2);
+    return (ilen + 1) * 4;
+}
+
+/* Swap the copied object table and, once each, every pool it references. Two
+ * objects may share a pool (offsets equal), hence the seen-lists: a pool
+ * swapped twice is a pool not swapped at all. */
+static void TmdSwapCopy(u8* copy, int nobj)
+{
+    u32 seenV[GS_TMD_MAX_OBJS], seenN[GS_TMD_MAX_OBJS], seenP[GS_TMD_MAX_OBJS];
+    int nV = 0, nN = 0, nP = 0, i, k, unknown = 0;
+
+    for (i = 0; i < nobj; i++) {
+        u32* raw = (u32*)(copy + i * 28);
+        for (k = 0; k < 7; k++) raw[k] = TmdLe32(raw[k]);
+    }
+    for (i = 0; i < nobj; i++) {
+        const u32* raw = (const u32*)(copy + i * 28);
+        int seen;
+
+        for (seen = 0, k = 0; k < nV; k++) if (seenV[k] == raw[0]) seen = 1;
+        if (!seen) { seenV[nV++] = raw[0]; TmdSwap16s(copy + raw[0], (size_t)raw[1] * 4); }
+
+        for (seen = 0, k = 0; k < nN; k++) if (seenN[k] == raw[2]) seen = 1;
+        if (!seen) { seenN[nN++] = raw[2]; TmdSwap16s(copy + raw[2], (size_t)raw[3] * 4); }
+
+        for (seen = 0, k = 0; k < nP; k++) if (seenP[k] == raw[4]) seen = 1;
+        if (!seen) {
+            u8* pk = copy + raw[4];
+            u32 n;
+            seenP[nP++] = raw[4];
+            for (n = 0; n < raw[5]; n++)
+                pk += TmdSwapPacket(pk, &unknown);
+        }
+    }
+    if (unknown) {
+        static int s_logged;
+        if (s_logged < 4) { s_logged++; SH_DBG("[TMD-SWAP] %d packet(s) of unhandled layout left little-endian", unknown); }
+    }
+}
+
+static u32 TmdSourceSum(const u8* p, size_t n)
+{
+    u32 s = 0;
+    size_t i;
+    for (i = 0; i + 3 < n; i += 4) s = s * 31u + *(const u32*)(p + i);
+    return s;
+}
+#else
+#define TmdLe32(v) (v)
+#endif
 
 struct TMD_STRUCT* GsGetTMDObject(u_long *base, int index)
 {
@@ -1443,7 +1551,7 @@ void GsMapModelingData(unsigned long *p)
 
     if (!p) return;
     /* p[0] = flags, p[1] = nobj */
-    nobj = p[1];
+    nobj = TmdLe32(p[1]);
     if (nobj == 0 || nobj > GS_TMD_MAX_OBJS) return;
 
     /* Object table starts right after flags + nobj (2 u_longs = 8 bytes) */
@@ -1468,12 +1576,14 @@ void GsMapModelingData(unsigned long *p)
         int    k;
         for (i = 0; i < (int)nobj; i++) {
             u32 *raw = (u32*)(obj_table + i * 28);
-            u32 vert_end = raw[0] + raw[1] * 8;
-            u32 norm_end = raw[2] + raw[3] * 8;
-            u32 prim_end = raw[4] + raw[5] * 64;
-            if (raw[0] < xds) xds = raw[0];
-            if (raw[2] < xds) xds = raw[2];
-            if (raw[4] < xds) xds = raw[4];
+            u32 r0 = TmdLe32(raw[0]), r1 = TmdLe32(raw[1]), r2 = TmdLe32(raw[2]);
+            u32 r3 = TmdLe32(raw[3]), r4 = TmdLe32(raw[4]), r5 = TmdLe32(raw[5]);
+            u32 vert_end = r0 + r1 * 8;
+            u32 norm_end = r2 + r3 * 8;
+            u32 prim_end = r4 + r5 * 64;
+            if (r0 < xds) xds = r0;
+            if (r2 < xds) xds = r2;
+            if (r4 < xds) xds = r4;
             if (vert_end > xde) xde = vert_end;
             if (norm_end > xde) xde = norm_end;
             if (prim_end > xde) xde = prim_end;
@@ -1486,9 +1596,15 @@ void GsMapModelingData(unsigned long *p)
             GsTmdCacheEntry *e = &gs_tmd_cache[(gs_tmd_cache_head + k) % GS_TMD_CACHE_SLOTS];
             if (e->base != p)
                 continue;
+#if defined(SH_N64_PORT)
+            if (e->nobj == (int)nobj && e->data_copy && e->copy_size == xsz &&
+                e->src_sum == TmdSourceSum(obj_table, xsz))
+                return;
+#else
             if (e->nobj == (int)nobj && e->data_copy && e->copy_size == xsz &&
                 memcmp(e->data_copy, obj_table, xsz) == 0)
                 return;   /* identical content already registered — reuse it */
+#endif
             break;        /* newer content differs — fall through to a fresh slot */
         }
     }
@@ -1530,12 +1646,14 @@ void GsMapModelingData(unsigned long *p)
     data_end   = 0;
     for (i = 0; i < (int)nobj; i++) {
         u32 *raw = (u32*)(obj_table + i * 28);
-        u32 vert_end = raw[0] + raw[1] * 8;
-        u32 norm_end = raw[2] + raw[3] * 8;
-        u32 prim_end = raw[4] + raw[5] * 64; /* 64-byte upper bound per prim */
-        if (raw[0] < data_start) data_start = raw[0];
-        if (raw[2] < data_start) data_start = raw[2];
-        if (raw[4] < data_start) data_start = raw[4];
+        u32 r0 = TmdLe32(raw[0]), r1 = TmdLe32(raw[1]), r2 = TmdLe32(raw[2]);
+        u32 r3 = TmdLe32(raw[3]), r4 = TmdLe32(raw[4]), r5 = TmdLe32(raw[5]);
+        u32 vert_end = r0 + r1 * 8;
+        u32 norm_end = r2 + r3 * 8;
+        u32 prim_end = r4 + r5 * 64; /* 64-byte upper bound per prim */
+        if (r0 < data_start) data_start = r0;
+        if (r2 < data_start) data_start = r2;
+        if (r4 < data_start) data_start = r4;
         if (vert_end > data_end) data_end = vert_end;
         if (norm_end > data_end) data_end = norm_end;
         if (prim_end > data_end) data_end = prim_end;
@@ -1550,7 +1668,17 @@ void GsMapModelingData(unsigned long *p)
     entry->data_copy = (u8*)malloc(copy_size);
     if (entry->data_copy) {
         memcpy(entry->data_copy, obj_table, copy_size);
+#if defined(SH_N64_PORT)
+        entry->src_sum = TmdSourceSum(obj_table, copy_size);
+        TmdSwapCopy(entry->data_copy, (int)nobj);
+#endif
     }
+#if defined(SH_N64_PORT)
+    else {
+        static int s_noCopyLogged;
+        if (s_noCopyLogged < 4) { s_noCopyLogged++; SH_DBG("[TMD-SWAP] no memory for a %u-byte TMD copy; model stays little-endian", (unsigned)copy_size); }
+    }
+#endif
 #ifdef SH_XBOX_PORT
     entry->copy_size = copy_size;
 #endif
@@ -1558,17 +1686,23 @@ void GsMapModelingData(unsigned long *p)
     /* Parse raw 28-byte TMD objects (7 × u32).
      * Pointers resolve into data_copy so they survive buffer reuse. */
     for (i = 0; i < (int)nobj; i++) {
-        u32 *raw = (u32*)(obj_table + i * 28);
         u8  *base = entry->data_copy ? entry->data_copy : obj_table;
-        /* raw[0..6] = vertop_off, vern, nortop_off, norn, primtop_off, primn, scale
+        /* Read the table from the COPY when there is one: on N64 that is the
+         * byte-swapped image, the source stays little-endian. */
+        u32 *raw = (u32*)(base + i * 28);
+        u32  r[7];
+        int  k;
+        for (k = 0; k < 7; k++)
+            r[k] = entry->data_copy ? raw[k] : TmdLe32(raw[k]);
+        /* r[0..6] = vertop_off, vern, nortop_off, norn, primtop_off, primn, scale
          * Offsets are relative to the object table (obj_table == base of copy). */
-        entry->objs[i].vertop  = (u_long*)(base + raw[0]);
-        entry->objs[i].vern    = raw[1];
-        entry->objs[i].nortop  = (u_long*)(base + raw[2]);
-        entry->objs[i].norn    = raw[3];
-        entry->objs[i].primtop = (u_long*)(base + raw[4]);
-        entry->objs[i].primn   = raw[5];
-        entry->objs[i].scale   = raw[6];
+        entry->objs[i].vertop  = (u_long*)(base + r[0]);
+        entry->objs[i].vern    = r[1];
+        entry->objs[i].nortop  = (u_long*)(base + r[2]);
+        entry->objs[i].norn    = r[3];
+        entry->objs[i].primtop = (u_long*)(base + r[4]);
+        entry->objs[i].primn   = r[5];
+        entry->objs[i].scale   = r[6];
     }
 }
 
