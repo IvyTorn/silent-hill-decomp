@@ -36,6 +36,7 @@
 #include <stdlib.h>
 
 #include "gpu_nv2a.h"
+#include "pc_config.h"    /* g_PcConfig.n64ClipScreen */
 #include "sh_log.h"
 #include "sh_log_n64.h"
 
@@ -350,14 +351,121 @@ static void MidVert(float* out, const float* p, const float* q)
         out[i] = (p[i] + q[i]) * 0.5f;
 }
 
+/* --- screen clipping -------------------------------------------------------
+ *
+ * The RDP walks a triangle from its top scanline to its bottom one whether or
+ * not any of those scanlines cross the scissor rectangle. The PSX GPU did not:
+ * it rasterised only inside the drawing area, so PSX games hand over
+ * primitives that reach far off-screen and never paid for it. [OTS] shows the
+ * in-game ordering table spanning x -864..1120 and y -977..858 on a 320x240
+ * screen, and the RDP's own counters put its pipeline busy for ~150 ms of a
+ * 164 ms frame with only ~900 triangles -- ~10,000 RDP cycles each, which
+ * visible pixels cannot account for and off-screen scanlines can. Every N64
+ * microcode clips on the RSP for exactly this reason; here it is done on the
+ * CPU, in screen space, before rdpq_triangle ever sees the triangle.
+ *
+ * Clip rect = the live scissor plus a guard band, so the edges the clip
+ * creates always lie off-screen: no T-junction seams against unclipped
+ * neighbours, and a triangle that overhangs by a few pixels is not split at
+ * all. Attributes are interpolated linearly in screen space, which is exactly
+ * what the RDP does for shade, and exact for S,T here because W is 1.0 on
+ * this port (no PGXP). clip_screen=0 in silenthill.cfg turns it off. */
+static float s_clipX0, s_clipY0, s_clipX1 = (float)SCR_W, s_clipY1 = (float)SCR_H;
+static int   s_cnClipped, s_cnRejected;
+#define CLIP_GUARD   8.0f
+#define CLIP_MAX_V   9      /* 3 vertices + one per plane, rounded up */
+
+/* One Sutherland-Hodgman pass against x (axis 0) or y (axis 1) = bound. */
+static int ClipEdge(const float* in, int inN, float* out, int n, int axis, float bound, int keepGreater)
+{
+    int i, outN = 0;
+
+    for (i = 0; i < inN; i++)
+    {
+        const float* a  = in + i * n;
+        const float* b  = in + ((i + 1) % inN) * n;
+        float        da = keepGreater ? (a[axis] - bound) : (bound - a[axis]);
+        float        db = keepGreater ? (b[axis] - bound) : (bound - b[axis]);
+        int          ina = (da >= 0.0f), inb = (db >= 0.0f);
+
+        if (ina)
+        {
+            memcpy(out + outN * n, a, (size_t)n * sizeof(float));
+            outN++;
+        }
+        if (ina != inb)
+        {
+            float  t = da / (da - db);
+            float* o = out + outN * n;
+            int    k;
+            for (k = 0; k < n; k++)
+                o[k] = a[k] + (b[k] - a[k]) * t;
+            o[axis] = bound;   /* land exactly on the plane; no drift across passes */
+            outN++;
+        }
+    }
+    return outN;
+}
+
+/* Clip one triangle of n floats per vertex (X at 0, Y at 1). Writes the
+ * resulting convex polygon to `out` (CLIP_MAX_V * n floats) and returns its
+ * vertex count: 3 untouched, 0 nothing visible, else fan it. */
+static int ClipTri(const float* va, const float* vb, const float* vc, int n, float* out)
+{
+    const float x0 = s_clipX0 - CLIP_GUARD, y0 = s_clipY0 - CLIP_GUARD;
+    const float x1 = s_clipX1 + CLIP_GUARD, y1 = s_clipY1 + CLIP_GUARD;
+    float bufA[CLIP_MAX_V * 9], bufB[CLIP_MAX_V * 9];
+    int   cnt;
+
+    if (!g_PcConfig.n64ClipScreen)
+        goto passthrough;
+
+    if ((va[0] < x0 && vb[0] < x0 && vc[0] < x0) || (va[0] > x1 && vb[0] > x1 && vc[0] > x1) ||
+        (va[1] < y0 && vb[1] < y0 && vc[1] < y0) || (va[1] > y1 && vb[1] > y1 && vc[1] > y1))
+    {
+        s_cnRejected++;
+        return 0;
+    }
+    if (va[0] >= x0 && va[0] <= x1 && va[1] >= y0 && va[1] <= y1 &&
+        vb[0] >= x0 && vb[0] <= x1 && vb[1] >= y0 && vb[1] <= y1 &&
+        vc[0] >= x0 && vc[0] <= x1 && vc[1] >= y0 && vc[1] <= y1)
+        goto passthrough;
+
+    memcpy(bufA,         va, (size_t)n * sizeof(float));
+    memcpy(bufA + n,     vb, (size_t)n * sizeof(float));
+    memcpy(bufA + 2 * n, vc, (size_t)n * sizeof(float));
+    cnt = ClipEdge(bufA, 3, bufB, n, 0, x0, 1);
+    if (cnt) cnt = ClipEdge(bufB, cnt, bufA, n, 0, x1, 0);
+    if (cnt) cnt = ClipEdge(bufA, cnt, bufB, n, 1, y0, 1);
+    if (cnt) cnt = ClipEdge(bufB, cnt, out,  n, 1, y1, 0);
+    if (cnt < 3)
+    {
+        s_cnRejected++;
+        return 0;
+    }
+    s_cnClipped++;
+    return cnt;
+
+passthrough:
+    memcpy(out,         va, (size_t)n * sizeof(float));
+    memcpy(out + n,     vb, (size_t)n * sizeof(float));
+    memcpy(out + 2 * n, vc, (size_t)n * sizeof(float));
+    return 3;
+}
+
 static void DrawTexturedTri(const ShVertex* a, const ShVertex* b, const ShVertex* c)
 {
-    float va[9], vb[9], vc[9];
+    float va[9], vb[9], vc[9], poly[CLIP_MAX_V * 9];
+    int   n, i;
 
     StageTexVert(va, a);
     StageTexVert(vb, b);
     StageTexVert(vc, c);
-    DrawStagedTri(va, vb, vc, 7);
+    /* Clipping BEFORE the tile-window logic also shrinks the UV box it loads:
+     * only the visible part of a wall quad's texture reaches TMEM. */
+    n = ClipTri(va, vb, vc, 9, poly);
+    for (i = 1; i + 1 < n; i++)
+        DrawStagedTri(poly, poly + i * 9, poly + (i + 1) * 9, 7);
 }
 
 static void DrawStagedTri(const float* va, const float* vb, const float* vc, int depth)
@@ -575,10 +683,12 @@ void GpuNv2a_FlushBatch(void)
 
         for (i = s_runStart; i + 2 < s_batchUsed; i += 3)
         {
-            rdpq_triangle(&TRIFMT_SH_SHADE,
-                          (const float*)&s_batch[i],
-                          (const float*)&s_batch[i + 1],
-                          (const float*)&s_batch[i + 2]);
+            float poly[CLIP_MAX_V * 8];
+            int   n, k;
+            n = ClipTri((const float*)&s_batch[i], (const float*)&s_batch[i + 1],
+                        (const float*)&s_batch[i + 2], 8, poly);
+            for (k = 1; k + 1 < n; k++)
+                rdpq_triangle(&TRIFMT_SH_SHADE, poly, poly + k * 8, poly + (k + 1) * 8);
             s_cnTris++;
         }
     }
@@ -765,6 +875,9 @@ void GpuNv2a_FrameBegin(void)
                  DP_WSTATUS_RESET_CMD_COUNTER  | DP_WSTATUS_RESET_CLOCK_COUNTER;
     s_cnTriMax = s_cnUpMax = 0;
     s_cnTriCalls = s_cnTriSlow = s_cnUpSlow = 0;
+    s_cnClipped = s_cnRejected = 0;
+    s_clipX0 = 0.0f;           s_clipY0 = 0.0f;
+    s_clipX1 = (float)SCR_W;   s_clipY1 = (float)SCR_H;
     s_batchUsed  = 0;
     s_runStart   = 0;
     s_cnTris     = 0;
@@ -904,7 +1017,7 @@ void GpuNv2a_FrameEnd(void)
              * submit = tile uploads + triangle issue; vram dec/drain = page
              * decodes and full GPU drains the texture cache had to do. What is
              * left of `frame` after these is the game update + OT walk ([OTT]). */
-            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d",
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d | clip=%d rej=%d",
                    (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
                    (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
                    (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
@@ -920,7 +1033,8 @@ void GpuNv2a_FrameEnd(void)
                    g_ProfAudioMs,
                    RdpBusyUs(*DP_CLOCK), RdpBusyUs(*DP_PIPE_BUSY), RdpBusyUs(*DP_TMEM_BUSY), RdpBusyUs(*DP_BUSY),
                    s_cnTriCalls, (unsigned)TICKS_TO_US((unsigned)s_cnTriMax), s_cnTriSlow,
-                   (unsigned)TICKS_TO_US((unsigned)s_cnUpMax), s_cnUpSlow);
+                   (unsigned)TICKS_TO_US((unsigned)s_cnUpMax), s_cnUpSlow,
+                   s_cnClipped, s_cnRejected);
         }
     }
 }
@@ -1033,6 +1147,10 @@ void GpuNv2a_SetScissor(int x, int y, int w, int h)
         return;
     GpuNv2a_FlushBatch();
     rdpq_set_scissor(x, y, x + w, y + h);
+    s_clipX0 = (float)x;
+    s_clipY0 = (float)y;
+    s_clipX1 = (float)(x + w);
+    s_clipY1 = (float)(y + h);
 }
 
 /* Decoded-page and palette storage for psx_vram.c's cache. 8-byte aligned: the

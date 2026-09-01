@@ -82,6 +82,7 @@ s_PcConfig g_PcConfig = {
     .xboxPalettedTex     = 2,    /* Xbox: paletted cache, palette DMA bit CLEAR (log 054 proved the palette samples on this variant) */
     .n64TexCi4           = 1,    /* N64: native CI4 pages (escape hatch: texture_ci4=0) */
     .n64AudioPumpBudgetMs = 16,  /* N64: cap one pump's mixing so a slow frame does not refill the whole ring */
+    .n64ClipScreen       = 1,    /* N64: CPU screen clipping before the RDP (escape hatch: clip_screen=0) */
     .xboxVideo720p       = 0,    /* Xbox: 480p by default (720p costs texture-cache RAM) */
     .logDiag             = 0,    /* Xbox: quiet log by default (per-frame diag probes gated; log_diag=1 restores) */
     .cutsceneLineGapMs   = 300,  /* min ms between cutscene voice lines (PSX inter-line pause); tune down if it re-desyncs */
@@ -774,6 +775,10 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "texture_ci4") == 0)
         {
             g_PcConfig.n64TexCi4 = (atoi(value) != 0);
+        }
+        else if (strcmp(key, "clip_screen") == 0)
+        {
+            g_PcConfig.n64ClipScreen = (atoi(value) != 0);
         }
         else if (strcmp(key, "audio_pump_budget_ms") == 0)
         {
