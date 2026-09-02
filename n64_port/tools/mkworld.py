@@ -420,8 +420,8 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances):
       0x14 bufferCount * { u16 vertCount; u16 opaWords; u16 semiWords; u16 pad;
                            u32 vertOff; u32 opaOff; u32 semiOff; }   (20 B)
       tileRefs:  u16 final tile indices this cell uses (for load/refcount)
-      instances: { s16 rot[9]; s16 pad; s32 t[3]; }  (28 B, IPD verbatim,
-                  t[0]/t[2] cell-relative Q8, t[1] absolute Q8)
+      instances: { s16 rot[9]; s16 pad; s32 t[3]; }  (32 B: 18+2+12, IPD
+                  verbatim, t[0]/t[2] cell-relative Q8, t[1] absolute Q8)
       verts:     { s16 x,y,z; u8 r,g,b,a; s16 s,t; u16 pad; } (16 B)
                  s,t are 10.5 fixed-point tile-local texels, T3D's own unit.
       cmds:      u16 words

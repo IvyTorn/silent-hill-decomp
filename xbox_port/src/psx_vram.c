@@ -97,8 +97,12 @@ typedef struct {
  * between each other's art frame to frame. The extra 256KB comes out of the
  * ~560KB free when this cache is built, and any slot whose allocation fails
  * is skipped by every scan in this file. */
-#define PAGE_N      8                         /* 8 * 64KB = 512KB of index pages */
-#define PAL_N       32                        /* 32 * 1KB  = 32KB of palettes */
+/* 8 -> 5 with the native world renderer: world tpages leave this cache's
+ * working set (tiles live in t3d_world.c's own store), so the slots only
+ * serve characters, HUD and the PSX fallback path. Frees ~192KB of heap the
+ * chunk blocks need. Revisit if [VRAM] thrash returns on unconverted maps. */
+#define PAGE_N      3                         /* 3 * 64KB = 192KB of index pages */
+#define PAL_N       16                        /* 16 * 1KB  = 16KB of palettes */
 #else
 #define PAGE_N      64                        /* 64 * 64KB = 4MB of index pages */
 #define PAL_N       128                       /* 128 * 1KB  = 128KB of palettes */

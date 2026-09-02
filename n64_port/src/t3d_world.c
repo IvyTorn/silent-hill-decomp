@@ -47,8 +47,16 @@
 #define OP_TRIS   0x4
 #define OP_END    0xF
 
-#define MAX_WCHUNKS   8
-#define MAX_TILE_RAM  (352 * 1024)  /* resident tile pixel budget */
+/* Four cells around the player go native, the rest stay on the PSX fallback;
+ * grows once the strip-IPD funding lands. */
+#define MAX_WCHUNKS   4
+
+/* Every SHT tile is at most 2048 bytes BY CONSTRUCTION (the TMEM budget:
+ * 4096 CI4 texels or 2048 CI8 texels, both 2KB), so tile pixels live in a
+ * static fixed-slot pool -- 83 small heap mallocs per chunk fragmented the
+ * heap until the 48KB vertex block could not be placed at 136KB free. */
+#define TILE_SLOT_BYTES 2048
+#define TILE_SLOTS      96
 
 typedef struct
 {
@@ -58,7 +66,7 @@ typedef struct
     uint8_t  pad;
     uint16_t w, h;
     uint32_t pixLen;
-    void*    pix;       /* cached malloc, written back for RDP DMA */
+    void*    pix;       /* slot in s_tilePool, written back for RDP DMA */
 } WTile;
 
 typedef struct
@@ -80,7 +88,8 @@ typedef struct
 } WChunk;
 
 static WChunk  s_chunks[MAX_WCHUNKS];
-static WTile   s_tiles[192];
+static WTile   s_tiles[TILE_SLOTS];
+static uint8_t s_tilePool[TILE_SLOTS][TILE_SLOT_BYTES] __attribute__((aligned(16)));
 static int     s_tileRam;
 
 static FILE*   s_sht;             /* area tile store, kept open */
@@ -99,6 +108,16 @@ static int     s_worldStarted;    /* per-frame world state applied */
 /* one-shot + census diagnostics */
 static int     s_logOnce;
 static int     s_cnBlocks, s_cnFallback;
+
+/* Chunk loads that fail RETRY every frame (the FixOffsets maintenance loop
+ * calls the hook per loaded chunk per frame); log the first few and then a
+ * heartbeat, or the ring drowns. */
+static int WFailLog(void)
+{
+    static int n;
+    n++;
+    return n <= 12 || (n & 511) == 0;
+}
 
 int ShT3d_Ready(void);            /* from t3d_n64.c */
 
@@ -176,32 +195,27 @@ static int TileAcquire(int sthIdx)
     if (fread(meta, 1, 16, s_sht) != 16)
         return -1;
 
+    /* SHT tile meta: fmt@0, w@2, h@4, pixOff@8, pixLen@12 (all BE). */
     t = &s_tiles[slot];
     t->fmt    = meta[0];
     t->w      = rd16(meta + 2);
     t->h      = rd16(meta + 4);
-    t->pixLen = rd32(meta + 8);
-    if (s_tileRam + (int)t->pixLen > MAX_TILE_RAM)
-    {
-        SH_DBG("[T3DW] tile RAM budget hit (%d + %u)", s_tileRam, (unsigned)t->pixLen);
-        return -1;
-    }
-    t->pix = malloc(t->pixLen);
-    if (t->pix == NULL)
-        return -1;
-    fseek(s_sht, rd32(meta + 8), SEEK_SET);
-    /* pixOff is meta+8; re-read: offset field first, then data */
     {
         uint32_t pixOff = rd32(meta + 8);
         uint32_t pixLen = rd32(meta + 12);
-        t->pixLen = pixLen;
+        if (pixLen > TILE_SLOT_BYTES)
+        {
+            SH_DBG("[T3DW] tile %d oversize %u -- converter bug", sthIdx, (unsigned)pixLen);
+            return -1;
+        }
+        t->pix = s_tilePool[slot];
         fseek(s_sht, pixOff, SEEK_SET);
         if (fread(t->pix, 1, pixLen, s_sht) != pixLen)
         {
-            free(t->pix);
             t->pix = NULL;
             return -1;
         }
+        t->pixLen = pixLen;
     }
     data_cache_hit_writeback(t->pix, t->pixLen);
     t->sthIdx = sthIdx;
@@ -218,7 +232,6 @@ static void TileRelease(int sthIdx)
     if (--s_tiles[slot].refs <= 0)
     {
         s_tileRam -= s_tiles[slot].pixLen;
-        free(s_tiles[slot].pix);
         s_tiles[slot].pix    = NULL;
         s_tiles[slot].sthIdx = -1;
     }
@@ -309,11 +322,10 @@ static void ChunkFree(WChunk* c)
 
 /* Record one pass's command stream into an rspq block.
  * verts/mats belong to the chunk; tiles are resident (acquired). */
-static rspq_block_t* RecordPass(const uint8_t* data, uint32_t cmdOff, int cmdWords,
+static rspq_block_t* RecordPass(const uint8_t* p, int cmdWords,
                                 const T3DVertPacked* verts, const T3DMat4FP* mats,
                                 int semi)
 {
-    const uint8_t* p = data + cmdOff;
     int i = 0, pushed = 0, needSync = 0;
 
     rspq_block_begin();
@@ -402,7 +414,6 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     char base[16], prefix[8], name[20];
     FILE* f;
     uint8_t hdr[0x14];
-    uint8_t* data = NULL;
     long size;
     int i, n, bufCount, instCount, refCount;
     uint32_t instOff, refsOff;
@@ -436,12 +447,18 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     snprintf(name, sizeof name, "%s.SHW", base);
     f = WOpen(name);
     if (f == NULL)
+    {
+        if (WFailLog())
+            SH_DBG("[T3DW] %s: not found (sd:+rom:)", name);
         return;
+    }
     fseek(f, 0, SEEK_END);
     size = ftell(f);
+    (void)size;
     fseek(f, 0, SEEK_SET);
     if (fread(hdr, 1, sizeof hdr, f) != sizeof hdr || rd32(hdr) != SHW_MAGIC)
     {
+        SH_DBG("[T3DW] %s: bad header/magic", name);
         fclose(f);
         return;
     }
@@ -462,22 +479,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         return;
     }
 
-    data = malloc(size);
-    if (data == NULL)
-    {
-        fclose(f);
-        return;
-    }
-    fseek(f, 0, SEEK_SET);
-    if (fread(data, 1, size, f) != (size_t)size)
-    {
-        free(data);
-        fclose(f);
-        return;
-    }
-    fclose(f);
-
-    /* find (or free) a slot */
+    /* find a free slot */
     c = NULL;
     for (i = 0; i < MAX_WCHUNKS; i++)
         if (!s_chunks[i].inUse)
@@ -487,122 +489,204 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         }
     if (c == NULL)
     {
-        SH_DBG("[T3DW] chunk slots full for %s", base);
-        free(data);
+        if (WFailLog())
+            SH_DBG("[T3DW] %s: chunk slots full", base);
+        fclose(f);
         return;
     }
-
     memset(c, 0, sizeof *c);
     c->cellX = cellX;
     c->cellZ = cellZ;
 
-    /* Tiles first (blocks reference their pixels). */
-    c->tileRefs = malloc(refCount * 2);
-    c->tileRefCount = 0;
-    for (i = 0; i < refCount; i++)
+    /* STREAM-PARSE: the file is ~87% vertex payload; never hold it whole.
+     * Small tables first, then the big vertex block into the cleanest free
+     * space, then verts through a staging window and commands through a
+     * small transient. Peak heap = verts + ~4KB instead of file + verts
+     * (the whole-file version fragmented until 48KB had no home at 136KB
+     * free). Everything below cleans up through fail:. */
     {
-        uint16_t idx = rd16(data + refsOff + i * 2);
-        if (TileAcquire(idx) >= 0)
-            c->tileRefs[c->tileRefCount++] = idx;
-    }
+        uint8_t* table = NULL;
+        uint8_t* tmp   = NULL;
+        int      total = 0;
+        int      maxWords = 0;
 
-    /* Instance matrices -> fixed point. rot Q12/4096 with the 1/8 world
-     * scale folded in; translation Q8/8 with the cell corner added. */
-    c->mats = malloc_uncached(sizeof(T3DMat4FP) * (instCount ? instCount : 1));
-    for (i = 0; i < instCount; i++)
-    {
-        const uint8_t* ip = data + instOff + i * 28;
-        T3DMat4 m;
-        int r, cc;
-        int32_t tx = (int32_t)rd32(ip + 16);
-        int32_t ty = (int32_t)rd32(ip + 20);
-        int32_t tz = (int32_t)rd32(ip + 24);
-        tx += cellX * 10240;
-        tz += cellZ * 10240;
-        for (cc = 0; cc < 4; cc++)
-            for (r = 0; r < 4; r++)
-                m.m[cc][r] = (cc == r) ? 1.0f : 0.0f;
-        for (r = 0; r < 3; r++)
-            for (cc = 0; cc < 3; cc++)
-                m.m[cc][r] = (float)(int16_t)rd16(ip + (r * 3 + cc) * 2) / 32768.0f;
-        m.m[3][0] = (float)tx / 8.0f;
-        m.m[3][1] = (float)ty / 8.0f;
-        m.m[3][2] = (float)tz / 8.0f;
-        m.m[0][3] = m.m[1][3] = m.m[2][3] = 0.0f;
-        m.m[3][3] = 1.0f;
-        t3d_mat4_to_fixed(&c->mats[i], &m);
-    }
+        table = malloc(bufCount * 20);
+        if (table == NULL)
+            goto fail;
+        fseek(f, 0x14, SEEK_SET);
+        if (fread(table, 1, bufCount * 20, f) != (size_t)(bufCount * 20))
+            goto fail;
 
-    /* Vertices: count total (pair-aligned per buffer), convert to packed. */
-    {
-        int total = 0;
         for (i = 0; i < bufCount; i++)
-            total += (rd16(data + 0x14 + i * 20) + 1) & ~1;
+        {
+            int ow = rd16(table + i * 20 + 2);
+            int sw = rd16(table + i * 20 + 4);
+            total += (rd16(table + i * 20) + 1) & ~1;
+            if (ow > maxWords) maxWords = ow;
+            if (sw > maxWords) maxWords = sw;
+        }
+
+        /* Vert-bytes gate: the lobby-class cells wait for the residency
+         * budget work; everything typical is ~10-25KB. */
+        if (total * 16 > 80 * 1024)
+        {
+            if (WFailLog())
+                SH_DBG("[T3DW] %s: %dKB of verts over the 80KB gate -- PSX fallback",
+                       base, total * 16 / 1024);
+            goto fail;
+        }
+
         c->verts = malloc_uncached(sizeof(T3DVertPacked) * (total / 2 + 1));
+        c->mats  = malloc_uncached(sizeof(T3DMat4FP) * (instCount ? instCount : 1));
+        if (c->verts == NULL || c->mats == NULL)
+        {
+            if (WFailLog())
+                SH_DBG("[T3DW] %s: verts/mats alloc FAILED (v=%d i=%d)",
+                       base, total, instCount);
+            goto fail;
+        }
+
+        /* Instances -> fixed-point matrices. rot Q12/4096 with the 1/8 world
+         * scale folded in; translation Q8/8 with the cell corner added. */
+        tmp = malloc(instCount * 32 > 4096 ? (size_t)instCount * 32 : 4096);
+        if (tmp == NULL)
+            goto fail;
+        fseek(f, instOff, SEEK_SET);
+        if (fread(tmp, 1, instCount * 32, f) != (size_t)(instCount * 32))
+            goto fail;
+        for (i = 0; i < instCount; i++)
+        {
+            const uint8_t* ip = tmp + i * 32;
+            T3DMat4 m;
+            int r, cc;
+            int32_t tx = (int32_t)rd32(ip + 20) + cellX * 10240;
+            int32_t ty = (int32_t)rd32(ip + 24);
+            int32_t tz = (int32_t)rd32(ip + 28) + cellZ * 10240;
+            memset(&m, 0, sizeof m);
+            for (r = 0; r < 3; r++)
+                for (cc = 0; cc < 3; cc++)
+                    m.m[cc][r] = (float)(int16_t)rd16(ip + (r * 3 + cc) * 2) / 32768.0f;
+            m.m[3][0] = (float)tx / 8.0f;
+            m.m[3][1] = (float)ty / 8.0f;
+            m.m[3][2] = (float)tz / 8.0f;
+            m.m[3][3] = 1.0f;
+            t3d_mat4_to_fixed(&c->mats[i], &m);
+        }
+
+        /* Tile refs. */
+        c->tileRefs = malloc(refCount ? refCount * 2 : 2);
+        c->tileRefCount = 0;
+        if (c->tileRefs == NULL)
+            goto fail;
+        fseek(f, refsOff, SEEK_SET);
+        if (fread(tmp, 1, refCount * 2, f) != (size_t)(refCount * 2))
+            goto fail;
+        for (i = 0; i < refCount; i++)
+        {
+            uint16_t idx = rd16(tmp + i * 2);
+            if (TileAcquire(idx) >= 0)
+                c->tileRefs[c->tileRefCount++] = idx;
+        }
+
+        /* Verts: stream 64 file-verts (1KB) at a time through tmp. */
         {
             T3DVertPacked* vp = c->verts;
             int vi = 0;
             for (i = 0; i < bufCount; i++)
             {
-                const uint8_t* bt = data + 0x14 + i * 20;
+                const uint8_t* bt = table + i * 20;
                 int vcount = rd16(bt);
                 uint32_t voff = rd32(bt + 8);
-                int k;
+                int k = 0;
                 vi = (vi + 1) & ~1;   /* each buffer starts on a pair */
-                for (k = 0; k < vcount; k++, vi++)
+                fseek(f, voff, SEEK_SET);
+                while (k < vcount)
                 {
-                    const uint8_t* v = data + voff + k * 16;
-                    int16_t* pos  = (vi & 1) ? vp[vi / 2].posB : vp[vi / 2].posA;
-                    uint32_t rgba;
-                    int16_t* st   = (vi & 1) ? vp[vi / 2].stB : vp[vi / 2].stA;
-                    int cr = v[6] * 2, cg = v[7] * 2, cb = v[8] * 2, ca = v[9];
-                    if (cr > 255) cr = 255;
-                    if (cg > 255) cg = 255;
-                    if (cb > 255) cb = 255;
-                    pos[0] = (int16_t)rd16(v + 0);
-                    pos[1] = (int16_t)rd16(v + 2);
-                    pos[2] = (int16_t)rd16(v + 4);
-                    rgba = ((uint32_t)cr << 24) | ((uint32_t)cg << 16) |
-                           ((uint32_t)cb << 8) | (uint32_t)ca;
-                    if (vi & 1) { vp[vi / 2].rgbaB = rgba; vp[vi / 2].normB = 0; }
-                    else        { vp[vi / 2].rgbaA = rgba; vp[vi / 2].normA = 0; }
-                    st[0] = (int16_t)rd16(v + 10);
-                    st[1] = (int16_t)rd16(v + 12);
+                    int batch = vcount - k > 64 ? 64 : vcount - k;
+                    int b;
+                    if (fread(tmp, 1, batch * 16, f) != (size_t)(batch * 16))
+                        goto fail;
+                    for (b = 0; b < batch; b++, k++, vi++)
+                    {
+                        const uint8_t* v = tmp + b * 16;
+                        int16_t* pos = (vi & 1) ? vp[vi / 2].posB : vp[vi / 2].posA;
+                        int16_t* st  = (vi & 1) ? vp[vi / 2].stB : vp[vi / 2].stA;
+                        uint32_t rgba;
+                        int cr = v[6] * 2, cg = v[7] * 2, cb = v[8] * 2;
+                        if (cr > 255) cr = 255;
+                        if (cg > 255) cg = 255;
+                        if (cb > 255) cb = 255;
+                        pos[0] = (int16_t)rd16(v + 0);
+                        pos[1] = (int16_t)rd16(v + 2);
+                        pos[2] = (int16_t)rd16(v + 4);
+                        rgba = ((uint32_t)cr << 24) | ((uint32_t)cg << 16) |
+                               ((uint32_t)cb << 8) | (uint32_t)v[9];
+                        if (vi & 1) { vp[vi / 2].rgbaB = rgba; vp[vi / 2].normB = 0; }
+                        else        { vp[vi / 2].rgbaA = rgba; vp[vi / 2].normA = 0; }
+                        st[0] = (int16_t)rd16(v + 10);
+                        st[1] = (int16_t)rd16(v + 12);
+                    }
                 }
             }
         }
-    }
 
-    /* Record the blocks. OP_VERTS indices are BUFFER-local (each buffer's
-     * verts encode from 0), so rebase into the chunk's concatenated array.
-     * mkworld pads every buffer's vert count even, keeping vbase pair-aligned. */
-    c->bufs = calloc(bufCount, sizeof(WBuf));
-    {
-        int vbase = 0;
-        for (i = 0; i < bufCount; i++)
+        /* Commands: one transient sized to the largest pass, reused. */
+        free(tmp);
+        tmp = malloc(maxWords ? (size_t)maxWords * 2 : 2);
+        if (tmp == NULL)
+            goto fail;
+        c->bufs = calloc(bufCount, sizeof(WBuf));
+        if (c->bufs == NULL)
+            goto fail;
         {
-            const uint8_t* bt = data + 0x14 + i * 20;
-            int vcount    = rd16(bt);
-            int opaWords  = rd16(bt + 2);
-            int semiWords = rd16(bt + 4);
-            uint32_t opaOff  = rd32(bt + 0x0C);
-            uint32_t semiOff = rd32(bt + 0x10);
-            const T3DVertPacked* bverts = c->verts + vbase / 2;
-            if (opaWords > 1)
-                c->bufs[i].opa = RecordPass(data, opaOff, opaWords,
-                                            bverts, c->mats, 0);
-            if (semiWords > 1)
-                c->bufs[i].semi = RecordPass(data, semiOff, semiWords,
-                                             bverts, c->mats, 1);
-            vbase += (vcount + 1) & ~1;
+            int vbase = 0;
+            for (i = 0; i < bufCount; i++)
+            {
+                const uint8_t* bt = table + i * 20;
+                int vcount    = rd16(bt);
+                int opaWords  = rd16(bt + 2);
+                int semiWords = rd16(bt + 4);
+                uint32_t opaOff  = rd32(bt + 0x0C);
+                uint32_t semiOff = rd32(bt + 0x10);
+                const T3DVertPacked* bverts = c->verts + vbase / 2;
+                if (opaWords > 1)
+                {
+                    fseek(f, opaOff, SEEK_SET);
+                    if (fread(tmp, 1, opaWords * 2, f) != (size_t)(opaWords * 2))
+                        goto fail;
+                    c->bufs[i].opa = RecordPass(tmp, opaWords, bverts, c->mats, 0);
+                }
+                if (semiWords > 1)
+                {
+                    fseek(f, semiOff, SEEK_SET);
+                    if (fread(tmp, 1, semiWords * 2, f) != (size_t)(semiWords * 2))
+                        goto fail;
+                    c->bufs[i].semi = RecordPass(tmp, semiWords, bverts, c->mats, 1);
+                }
+                vbase += (vcount + 1) & ~1;
+            }
         }
-    }
 
-    c->bufCount = bufCount;
-    c->inUse = 1;
-    free(data);
-    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d tiles=%d tileRam=%dK",
-           base, bufCount, instCount, c->tileRefCount, s_tileRam / 1024);
+        free(tmp);
+        free(table);
+        fclose(f);
+        c->bufCount = bufCount;
+        c->inUse = 1;
+        SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d tiles=%d tileRam=%dK",
+               base, bufCount, instCount, c->tileRefCount, s_tileRam / 1024);
+        return;
+
+fail:
+        if (WFailLog())
+            SH_DBG("[T3DW] %s: load failed (see prior line or alloc)", base);
+        free(tmp);
+        free(table);
+        fclose(f);
+        c->inUse = 1;          /* let ChunkFree see a live chunk to unwind */
+        c->bufCount = 0;
+        ChunkFree(c);
+        return;
+    }
 }
 
 void ShT3d_WorldChunkEvict(int cellX, int cellZ)
@@ -625,7 +709,6 @@ void ShT3d_WorldReset(void)
     for (i = 0; i < (int)(sizeof s_tiles / sizeof s_tiles[0]); i++)
         if (s_tiles[i].sthIdx >= 0)
         {
-            free(s_tiles[i].pix);
             s_tiles[i].pix = NULL;
             s_tiles[i].sthIdx = -1;
             s_tiles[i].refs = 0;

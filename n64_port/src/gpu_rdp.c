@@ -91,7 +91,10 @@ static unsigned long long s_frameStart;
 /* 1024 vertices is 64 KB at ShVertex's 64-byte stride. It does NOT have to hold
  * a whole frame -- BatchAlloc flushes when it fills -- so this is a staging
  * buffer, not a frame buffer. The Xbox's 4096 would be 256 KB for no benefit. */
-#define MAX_BATCH_VERTS 1024
+/* 1024 -> 512 with the native world renderer: the batch now carries only
+ * characters, effects and 2D (the world bypasses it), and 32KB of .bss goes
+ * back to the heap. A fuller batch just flushes more often. */
+#define MAX_BATCH_VERTS 512
 
 static ShVertex s_batch[MAX_BATCH_VERTS];
 static int      s_batchUsed;

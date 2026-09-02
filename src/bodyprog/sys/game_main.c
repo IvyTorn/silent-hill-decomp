@@ -122,8 +122,12 @@ static s32 g_PrevVBlanks = 0;
  * Against the Xbox's measured ~29KB/frame it is still a 4x margin, and the
  * 256KB it frees is what lets the memory card exist at all — without a card
  * the KCET-logo check never completes and the game cannot reach its title
- * screen. */
-#define PC_PKTBUF_SIZE (128 * 1024)
+ * screen.
+ * 128 -> 96KB with the native world renderer: world prims no longer build
+ * packets at all (they draw as RSP blocks), so the arena carries only
+ * characters, HUD and effects; the canary at the end still screams on
+ * overflow. Funds the renderer's chunk residency. */
+#define PC_PKTBUF_SIZE (96 * 1024)
 #elif defined(SH_XBOX_PORT)
 /* Xbox: 2MB. TWO arenas are calloc'd (double-buffered), so PC's 16MB costs 32MB
  * of a 64MB console — it took free RAM at boot from ~33MB to 4.4MB, which left

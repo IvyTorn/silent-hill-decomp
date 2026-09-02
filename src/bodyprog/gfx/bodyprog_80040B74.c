@@ -31,6 +31,7 @@
  * RSP display lists instead of the per-prim software-GTE path. The subcell
  * PVS above still decides WHAT draws; only the how changes. */
 #include "sh_t3d.h"
+static void ShT3d_N64ChunkLoadedHook(s_Chunk* chunk); /* defined near Ipd_ChunkDraw */
 #else
 #define SH_N64_STOCK_PVS 0
 #endif
