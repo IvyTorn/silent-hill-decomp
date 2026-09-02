@@ -154,6 +154,12 @@ if [ -f "$SCRIPT_DIR/build/diag_disc.shpak" ] && [ -d "$SCRIPT_DIR/filesystem/ma
     mkdir -p "$SCRIPT_DIR/build/diagfs"
     cp "$SCRIPT_DIR/build/diag_disc.shpak" "$SCRIPT_DIR/build/diagfs/disc.shpak"
     cp -r "$SCRIPT_DIR/filesystem/maps" "$SCRIPT_DIR/build/diagfs/maps"
+    # Native world assets (mkworld.py output), when staged: the emulator has
+    # no SD card, so rom:/N64W is the only way t3d_world.c finds them there.
+    if [ -d "$SCRIPT_DIR/build/n64w" ]; then
+        cp -r "$SCRIPT_DIR/build/n64w" "$SCRIPT_DIR/build/diagfs/N64W"
+        echo "    [DIAG] N64W: $(du -sh "$SCRIPT_DIR/build/n64w" | cut -f1)"
+    fi
     "$I/bin/mkdfs" "$SCRIPT_DIR/build/sh_diag.dfs" "$SCRIPT_DIR/build/diagfs" >/dev/null
     rm -f "$OUT/sh_diag.z64"
     "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh_diag.z64"         --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"         ${MSYM:+"$MSYM"}         --align 4096 "$SCRIPT_DIR/build/sh_diag.dfs"

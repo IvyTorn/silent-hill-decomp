@@ -418,7 +418,7 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances):
       0x08 u16 instanceCount, u16 tileRefCount
       0x0C u32 instancesOff, u32 tileRefsOff
       0x14 bufferCount * { u16 vertCount; u16 opaWords; u16 semiWords; u16 pad;
-                           u32 vertOff; u32 opaOff; u32 semiOff; }   (16 B)
+                           u32 vertOff; u32 opaOff; u32 semiOff; }   (20 B)
       tileRefs:  u16 final tile indices this cell uses (for load/refcount)
       instances: { s16 rot[9]; s16 pad; s32 t[3]; }  (28 B, IPD verbatim,
                   t[0]/t[2] cell-relative Q8, t[1] absolute Q8)
@@ -445,10 +445,14 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances):
         verts = []
         c_opa = encode_buffer_cmds(opa, verts)
         c_semi = encode_buffer_cmds(semi, verts)
+        # The runtime concatenates buffers into one T3DVertPacked array and
+        # rebases per buffer, so every buffer must hold an EVEN vert count.
+        if len(verts) & 1:
+            verts.append(verts[-1] if verts else (0, 0, 0, 0, 0, 0, 0, 0, 0))
         buffers.append((c_opa, c_semi, verts))
 
     refs = sorted(tile_refs)
-    base = 0x14 + 16 * len(buffers)
+    base = 0x14 + 20 * len(buffers)   # entries are ">4H3I" = 20 bytes
     blobs = bytearray()
 
     def blob(data):

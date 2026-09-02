@@ -37,6 +37,23 @@ static float         s_rotAngle;
 /* COP0 ticks -> us on this console (46.875 ticks/us). */
 #define T3D_TICKS_TO_US(t) ((unsigned)((t) * 8ull / 375ull))
 
+/* 0 now that the spike proved itself (title screenshot 20260902_030517 +
+ * 1600 stable frames): the quad only obscures the world work. Flip to 1 for
+ * a quick "is t3d alive" check. */
+#define SH_T3D_SPIKE 0
+
+int ShT3d_Ready(void)
+{
+    if (!s_up && !s_initTried)
+    {
+        static int s_warm;
+        /* Same deferral as the spike: never init during the boot window. */
+        if (s_warm++ >= 120)
+            ShT3d_Init();
+    }
+    return s_up;
+}
+
 void ShT3d_Init(void)
 {
     uint16_t norm;
@@ -86,6 +103,9 @@ void ShT3d_SpikeDraw(void)
     static int s_census;
     static int s_skip;
     int trace;
+
+    if (!SH_T3D_SPIKE)
+        return;
 
     /* LAZY init, ~2 s after frames start: with init at GpuNv2a_Init the boot
      * wedged at a DIFFERENT [BOOT] step per build with the spike never

@@ -1942,6 +1942,19 @@ void GpuXbox_UiDiagFrame(int gameState, int hiResGlyphs)
     s_diagFt4N  = 0;
 }
 
+/* The live draw-env screen transform, for a native renderer that must land
+ * its pixels exactly where PutVert would: px = (x + ofsX)*sclX + contentX.
+ * The N64's Tiny3D world path folds these into its projection matrix so
+ * RSP-projected geometry and PSX-path prims agree to the pixel. */
+void GpuXbox_GetViewTransform(float* ofsX, float* ofsY, float* sclX, float* sclY, int* contentX)
+{
+    *ofsX = s_ofsX;
+    *ofsY = s_ofsY;
+    *sclX = s_scaleX;
+    *sclY = s_scaleY;
+    *contentX = g_Nv2aContentX;
+}
+
 /* Frame clear colour for GpuNv2a_FrameBegin: the PSX draw-env isbg background
  * (GsSortClear routes background2dColor = fog.color through PutDrawEnv), else
  * opaque black. This is what turns the beyond-fog void into a fog wall. */

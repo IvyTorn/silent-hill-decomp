@@ -31,6 +31,11 @@ void ShT3d_WorldReset(void);
  * frame. */
 int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx);
 
+/* Camera handoff, once per frame before the buffer draws: wsMatrix is
+ * &GsWSMATRIX (s16 m[3][3] Q12 + s32 t[3] Q8), h/ofx/ofy the live GTE
+ * projection distance and geometry offset. */
+void ShT3d_WorldViewSet(const void* wsMatrix, int h, int ofx, int ofy);
+
 /* Frame boundary notifications from gpu_rdp.c. */
 void ShT3d_NotifyFrameBegin(void);
 void ShT3d_NotifyFrameEnd(void);

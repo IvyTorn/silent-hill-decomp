@@ -1048,6 +1048,8 @@ void GpuNv2a_FrameBegin(void)
     clear = GpuXbox_GetClearColor();
     rdpq_set_mode_fill(RGBA32((clear >> 16) & 0xFF, (clear >> 8) & 0xFF, clear & 0xFF, 0xFF));
     rdpq_fill_rectangle(0, 0, SCR_W, SCR_H);
+
+    ShT3d_NotifyFrameBegin();
 }
 
 void GpuNv2a_FrameEnd(void)
@@ -1060,6 +1062,7 @@ void GpuNv2a_FrameEnd(void)
     /* Stage-0 spike: RSP-transformed geometry into the same frame, after all
      * PSX content. See t3d_n64.c for the state-discipline note. */
     ShT3d_SpikeDraw();
+    ShT3d_NotifyFrameEnd();
 
     /* The on-screen log exists for when nothing is drawing. The moment the
      * renderer produces a triangle it has done its job and is only in the way,

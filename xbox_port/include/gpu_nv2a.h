@@ -56,6 +56,7 @@ void  GpuNv2a_SetScissor(int x, int y, int w, int h);
 /* Frame clear colour (0xAARRGGBB) — gpu_xbox.c supplies the PSX draw-env
  * isbg background (fog colour in-game) via GpuXbox_GetClearColor(). */
 unsigned int GpuXbox_GetClearColor(void);
+void GpuXbox_GetViewTransform(float* ofsX, float* ofsY, float* sclX, float* sclY, int* contentX);
 
 /* Framebuffer -> PSX-VRAM readback (screen-grab effects: pause/save backgrounds,
  * air-screamer window-crash distortion, StoreImage grabs of the display pages).

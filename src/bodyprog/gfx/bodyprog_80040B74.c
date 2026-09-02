@@ -27,6 +27,10 @@
 /* 1 = use the game's ORIGINAL subcell PVS for interiors (see Ipd_ChunkDraw). */
 #ifdef SH_N64_PORT
 #define SH_N64_STOCK_PVS 1
+/* Native world renderer (Tiny3D): visible model buffers draw as pre-recorded
+ * RSP display lists instead of the per-prim software-GTE path. The subcell
+ * PVS above still decides WHAT draws; only the how changes. */
+#include "sh_t3d.h"
 #else
 #define SH_N64_STOCK_PVS 0
 #endif
@@ -1477,6 +1481,9 @@ void Ipd_ChunkInit(q19_12 posX0, q19_12 posZ0, q19_12 posX1, q19_12 posZ1) // 0x
                                             &g_Map.chunkTextures.halfPage,
                                             g_Map.textureFileIdx);
                         func_80044044(pChunk->ipdHdr, pChunk->cellX, pChunk->cellZ);
+#ifdef SH_N64_PORT
+                        ShT3d_N64ChunkLoadedHook(pChunk);
+#endif
                     }
 
                     nextSlot++;
@@ -1533,6 +1540,9 @@ void Ipd_ChunkInit(q19_12 posX0, q19_12 posZ0, q19_12 posX1, q19_12 posZ1) // 0x
         {
             IpdHeader_FixOffsets(curChunk->ipdHdr, &g_Map.globalLm.lmHdr, 1, &g_Map.chunkTextures.fullPage, &g_Map.chunkTextures.halfPage, g_Map.textureFileIdx);
             func_80044044(curChunk->ipdHdr, curChunk->cellX, curChunk->cellZ);
+#ifdef SH_N64_PORT
+            ShT3d_N64ChunkLoadedHook(curChunk);
+#endif
         }
     }
 }
@@ -2421,6 +2431,12 @@ s32 Ipd_LoadStart(s_Chunk* chunk, e_FsFile fileIdx, s32 cellX, s32 cellZ, q19_12
         return fileIdx;
     }
 
+#ifdef SH_N64_PORT
+    /* This slot is being retargeted; drop any native-renderer residency for
+     * the cell it used to hold (no-op when there is none). */
+    ShT3d_WorldChunkEvict(chunk->cellX, chunk->cellZ);
+#endif
+
     chunk->cellX    = cellX;
     chunk->cellZ    = cellZ;
     chunk->queueIdx = Fs_QueueStartRead(fileIdx, chunk->ipdHdr);
@@ -3101,9 +3117,38 @@ void func_80044044(s_IpdHeader* ipd, s32 cellX, s32 cellZ) // 0x80044044
     ipd->collisionData.positionZ += (cellZ - prevCellZ) * Q12_TO_Q8(CHUNK_CELL_SIZE);
 }
 
+#ifdef SH_N64_PORT
+/* A chunk finished loading and fixing up: resolve its file-table name from
+ * the (still-fresh) queue entry and hand it to the native renderer, which
+ * loads the matching N64W/<name>.SHW. The SHW carries its own cell coords,
+ * so a stale queue entry (wrapped ring) self-rejects on mismatch. */
+static void ShT3d_N64ChunkLoadedHook(s_Chunk* chunk)
+{
+    const s_FsQueueEntry* e = &g_FsQueue.entries[chunk->queueIdx & (FS_QUEUE_LENGTH - 1)];
+    char name[16];
+
+    if (e->info == NULL)
+        return;
+    Fs_GetFileInfoName(name, e->info);
+    ShT3d_WorldChunkLoaded(name, chunk->cellX, chunk->cellZ);
+}
+#endif
+
 void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool arg4) // 0x80044090
 {
     #define CHUNK_SUBCELL_SIZE Q8(8.0f)
+
+#ifdef SH_N64_PORT
+    /* Hand the live camera to the native renderer: GsWSMATRIX is the frame's
+     * world->view matrix, h/ofx/ofy the GTE projection state the mesh path
+     * would use. Read here, at draw time, because the lighting helpers in
+     * bodyprog_80055028.c flip them mid-emit and always restore. */
+    {
+        s32 gofx, gofy;
+        ReadGeomOffset(&gofx, &gofy);
+        ShT3d_WorldViewSet(&GsWSMATRIX, ReadGeomScreen(), gofx, gofy);
+    }
+#endif
 
     s_ModelInfo         modelInfo;
     GsCOORDINATE2       modelCoord;
@@ -3298,6 +3343,12 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
         {
 #ifdef SH_N64_PORT
             s_wdVis++;
+            /* Native path first: a resident chunk's buffer draws as a
+             * pre-recorded RSP block. Falls back per-buffer when no native
+             * data exists (chunk streaming in, area unconverted, tile budget
+             * miss) -- both renderers coexist within one frame. */
+            if (!ShT3d_WorldDrawBuffer(ipdHdr->cellX, ipdHdr->cellZ,
+                                       ipdHdr->modelOrderList[i]))
 #endif
             for (curBufC = ipdModelBuf->modelInstances; curBufC < &ipdModelBuf->modelInstances[ipdModelBuf->modelInstanceCount]; curBufC++)
             {

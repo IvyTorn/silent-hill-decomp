@@ -92,15 +92,14 @@ static uint32_t* s_palOffsets;    /* file offset + word count per palette */
 static uint16_t* s_palWords;
 
 static T3DViewport s_wvp;
+static int     s_wvpInited;
 static int     s_frameActive;     /* between NotifyFrameBegin/End */
 static int     s_worldStarted;    /* per-frame world state applied */
-static int     s_up;              /* t3d initialised (shared with spike) */
 
 /* one-shot + census diagnostics */
 static int     s_logOnce;
 static int     s_cnBlocks, s_cnFallback;
 
-extern void ShT3d_Init(void);
 int ShT3d_Ready(void);            /* from t3d_n64.c */
 
 /* Camera handed over by the game side each frame (Ipd_ChunkDraw). */
@@ -452,6 +451,17 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     instOff   = rd32(hdr + 0xC);
     refsOff   = rd32(hdr + 0x10);
 
+    /* The caller's name came from a ring-buffer queue entry that can have
+     * been reused; the SHW carries its own cell coords, so a stale name
+     * self-rejects here instead of drawing the wrong cell. */
+    if ((int8_t)hdr[4] != cellX || (int8_t)hdr[5] != cellZ)
+    {
+        SH_DBG("[T3DW] %s cell mismatch (%d,%d vs %d,%d) -- skipped",
+               name, (int)(int8_t)hdr[4], (int)(int8_t)hdr[5], cellX, cellZ);
+        fclose(f);
+        return;
+    }
+
     data = malloc(size);
     if (data == NULL)
     {
@@ -523,21 +533,22 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         t3d_mat4_to_fixed(&c->mats[i], &m);
     }
 
-    /* Vertices: count total, convert to packed pairs. */
+    /* Vertices: count total (pair-aligned per buffer), convert to packed. */
     {
         int total = 0;
         for (i = 0; i < bufCount; i++)
-            total += rd16(data + 0x14 + i * 16);
-        c->verts = malloc_uncached(sizeof(T3DVertPacked) * ((total + 1) / 2 + 1));
+            total += (rd16(data + 0x14 + i * 20) + 1) & ~1;
+        c->verts = malloc_uncached(sizeof(T3DVertPacked) * (total / 2 + 1));
         {
             T3DVertPacked* vp = c->verts;
             int vi = 0;
             for (i = 0; i < bufCount; i++)
             {
-                const uint8_t* bt = data + 0x14 + i * 16;
+                const uint8_t* bt = data + 0x14 + i * 20;
                 int vcount = rd16(bt);
                 uint32_t voff = rd32(bt + 8);
                 int k;
+                vi = (vi + 1) & ~1;   /* each buffer starts on a pair */
                 for (k = 0; k < vcount; k++, vi++)
                 {
                     const uint8_t* v = data + voff + k * 16;
@@ -562,29 +573,28 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         }
     }
 
-    /* Record the blocks. Vert indices in OP_VERTS are chunk-global; each
-     * buffer's stream indexes from its own base, so pass a rebased pointer. */
+    /* Record the blocks. OP_VERTS indices are BUFFER-local (each buffer's
+     * verts encode from 0), so rebase into the chunk's concatenated array.
+     * mkworld pads every buffer's vert count even, keeping vbase pair-aligned. */
     c->bufs = calloc(bufCount, sizeof(WBuf));
     {
         int vbase = 0;
         for (i = 0; i < bufCount; i++)
         {
-            const uint8_t* bt = data + 0x14 + i * 16;
-            int vcount   = rd16(bt);
-            int opaWords = rd16(bt + 2);
+            const uint8_t* bt = data + 0x14 + i * 20;
+            int vcount    = rd16(bt);
+            int opaWords  = rd16(bt + 2);
             int semiWords = rd16(bt + 4);
-            uint32_t opaOff  = rd32(bt + 12 - 4 + 4); /* +0x0C */
-            uint32_t semiOff = rd32(bt + 12 + 4 - 4 + 4); /* +0x10 */
-            opaOff  = rd32(bt + 0x0C);
-            semiOff = rd32(bt + 0x10);
-            (void)vcount;
+            uint32_t opaOff  = rd32(bt + 0x0C);
+            uint32_t semiOff = rd32(bt + 0x10);
+            const T3DVertPacked* bverts = c->verts + vbase / 2;
             if (opaWords > 1)
                 c->bufs[i].opa = RecordPass(data, opaOff, opaWords,
-                                            c->verts, c->mats, 0);
+                                            bverts, c->mats, 0);
             if (semiWords > 1)
                 c->bufs[i].semi = RecordPass(data, semiOff, semiWords,
-                                             c->verts, c->mats, 1);
-            vbase += vcount;
+                                             bverts, c->mats, 1);
+            vbase += (vcount + 1) & ~1;
         }
     }
 
@@ -652,6 +662,7 @@ static void WorldFrameStart(void)
     rdpq_mode_filter(FILTER_POINT);          /* PSX look, and TMEM tiles have
                                                 no border texels for bilinear */
     rdpq_mode_alphacompare(1);
+    rdpq_mode_tlut(TLUT_RGBA16);             /* every tile is CI4/CI8 */
     rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
     t3d_light_set_count(0);
     t3d_state_set_drawflags(T3D_FLAG_SHADED | T3D_FLAG_TEXTURED);
@@ -689,6 +700,11 @@ static void WorldFrameStart(void)
         proj.m[2][3] = 1.0f;
     }
 
+    if (!s_wvpInited)
+    {
+        s_wvp = t3d_viewport_create();
+        s_wvpInited = 1;
+    }
     t3d_viewport_set_projection_matrix(&s_wvp, &proj);
     t3d_viewport_set_view_matrix(&s_wvp, &view);
     t3d_viewport_attach(&s_wvp);
@@ -710,7 +726,11 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
         return 0;
     }
     if (c->bufs[bufIdx].opa == NULL && c->bufs[bufIdx].semi == NULL)
-        return 1;   /* empty buffer: nothing to draw, but nothing to fall back to */
+    {
+        /* No native data: either genuinely empty (PSX loop no-ops cheaply)
+         * or global-PLM instances the converter skips -- both want fallback. */
+        return 0;
+    }
 
     if (!s_worldStarted)
         WorldFrameStart();

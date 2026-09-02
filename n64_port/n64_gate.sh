@@ -225,9 +225,9 @@ while IFS= read -r f; do
             HOT="${SH_HOT_OPT:--O2}" ;;
     esac
     # Tiny3D's headers use C23 [[deprecated]] attributes, a syntax error under
-    # gnu17. Only the bridge TU sees them; a later -std wins over TARGETFLAGS'.
+    # gnu17. Only the bridge TUs see them; a later -std wins over TARGETFLAGS'.
     case "$f" in
-        */n64_port/src/t3d_n64.c) HOT="$HOT -std=gnu2x -O2" ;;
+        */n64_port/src/t3d_*.c) HOT="$HOT -std=gnu2x -O2" ;;
     esac
     if err=$("$TOOL" $FLAGS $INLINEFLAG $DEFS $LANGDEFS $USE_INCS $WARN $EXTRA $HOT -c "$f" -o "$obj" 2>&1); then
         pass=$((pass+1))

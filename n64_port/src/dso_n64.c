@@ -77,6 +77,14 @@ void* MapDso_Open(const char* mapName)
         PsxVram_N64ReleaseCache();
     }
 
+    /* Same reasoning for the native world renderer: a map switch invalidates
+     * every resident chunk block and the area tile store, and their heap is
+     * needed for the incoming overlay. */
+    {
+        extern void ShT3d_WorldReset(void);
+        ShT3d_WorldReset();
+    }
+
     for (i = 0; i < sizeof(s_dirs) / sizeof(s_dirs[0]); i++)
     {
         snprintf(path, sizeof(path), "%s/%s.dso", s_dirs[i], mapName);
