@@ -50,6 +50,15 @@ static FILE* s_bin;
 static int   s_curSector;
 static int   s_inited;
 static int   s_warned;
+static int   s_sdMounted;
+
+/* Real hardware always has the flashcart SD; the emulator never does. The
+ * autostart robot keys off this so a test build can never mash a real
+ * controller session again. */
+int Cd_N64SdPresent(void)
+{
+    return s_sdMounted;
+}
 
 /* ---------------------------------------------------------------- pack */
 
@@ -207,7 +216,10 @@ void Cd_N64Init(void)
     /* Mount both before probing. Either can legitimately be absent: a cartridge
      * with no SD slot in use, or a ROM with no filesystem attached. */
     if (debug_init_sdfs("sd:/", -1))
+    {
+        s_sdMounted = 1;
         SH_DBG("[CD] sd: mounted");
+    }
     else
         SH_DBG("[CD] sd: not available");
 

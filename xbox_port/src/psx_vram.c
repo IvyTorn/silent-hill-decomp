@@ -101,8 +101,11 @@ typedef struct {
  * working set (tiles live in t3d_world.c's own store), so the slots only
  * serve characters, HUD and the PSX fallback path. Frees ~192KB of heap the
  * chunk blocks need. Revisit if [VRAM] thrash returns on unconverted maps. */
-#define PAGE_N      3                         /* 3 * 64KB = 192KB of index pages */
-#define PAL_N       16                        /* 16 * 1KB  = 16KB of palettes */
+/* 4 is the floor: the TITLE screen's working set (title art + font + menu)
+ * needs 4 pages -- at 3 it re-decoded 6 pages EVERY frame (105ms, menus at
+ * 6fps). In-game the native world keeps world tpages out of here. */
+#define PAGE_N      4                         /* 4 * 64KB = 256KB of index pages */
+#define PAL_N       20                        /* 20 * 1KB  = 20KB of palettes */
 #else
 #define PAGE_N      64                        /* 64 * 64KB = 4MB of index pages */
 #define PAL_N       128                       /* 128 * 1KB  = 128KB of palettes */

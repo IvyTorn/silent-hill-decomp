@@ -26,6 +26,7 @@
  */
 #include <libdragon.h>
 
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,7 +50,14 @@
 
 /* Four cells around the player go native, the rest stay on the PSX fallback;
  * grows once the strip-IPD funding lands. */
-#define MAX_WCHUNKS   4
+#define MAX_WCHUNKS   3
+
+/* Chunk data (verts + matrices + tile refs) lives in a FIXED per-slot arena,
+ * not the heap: at map time the game runs the heap down to double digits and
+ * fragments the rest, which first starved these allocations and then crashed
+ * libdragon mid-block-recording (rspq_next_buffer memsets an unchecked
+ * malloc). The arena caps what a cell may need; bigger cells stay PSX. */
+#define WCHUNK_ARENA_BYTES (56 * 1024)
 
 /* Every SHT tile is at most 2048 bytes BY CONSTRUCTION (the TMEM budget:
  * 4096 CI4 texels or 2048 CI8 texels, both 2KB), so tile pixels live in a
@@ -80,14 +88,15 @@ typedef struct
     int            cellX, cellZ;
     int            inUse;
     int            bufCount;
-    WBuf*          bufs;
-    T3DVertPacked* verts;      /* all buffers concatenated, uncached */
-    T3DMat4FP*     mats;       /* instance matrices, uncached */
-    uint16_t*      tileRefs;   /* SHT indices held resident */
+    WBuf*          bufs;       /* heap (small); blocks are heap too */
+    T3DVertPacked* verts;      /* -> own arena slot, cache-written-back */
+    T3DMat4FP*     mats;       /* -> own arena slot, after verts */
+    uint16_t*      tileRefs;   /* -> own arena slot, after mats */
     int            tileRefCount;
 } WChunk;
 
 static WChunk  s_chunks[MAX_WCHUNKS];
+static uint8_t s_chunkArena[MAX_WCHUNKS][WCHUNK_ARENA_BYTES] __attribute__((aligned(16)));
 static WTile   s_tiles[TILE_SLOTS];
 static uint8_t s_tilePool[TILE_SLOTS][TILE_SLOT_BYTES] __attribute__((aligned(16)));
 static int     s_tileRam;
@@ -312,13 +321,13 @@ static void ChunkFree(WChunk* c)
         if (c->bufs[i].semi) rspq_block_free(c->bufs[i].semi);
     }
     free(c->bufs);
-    if (c->verts) free_uncached(c->verts);
-    if (c->mats)  free_uncached(c->mats);
+    /* verts/mats/tileRefs live in the slot's arena; nothing to free. */
     for (i = 0; i < c->tileRefCount; i++)
         TileRelease(c->tileRefs[i]);
-    free(c->tileRefs);
     memset(c, 0, sizeof *c);
 }
+
+static int s_cnTileMiss;   /* groups whose geometry was dropped at record time */
 
 /* Record one pass's command stream into an rspq block.
  * verts/mats belong to the chunk; tiles are resident (acquired). */
@@ -326,7 +335,7 @@ static rspq_block_t* RecordPass(const uint8_t* p, int cmdWords,
                                 const T3DVertPacked* verts, const T3DMat4FP* mats,
                                 int semi)
 {
-    int i = 0, pushed = 0, needSync = 0;
+    int i = 0, pushed = 0, needSync = 0, skip = 0;
 
     rspq_block_begin();
 
@@ -348,7 +357,14 @@ static rspq_block_t* RecordPass(const uint8_t* p, int cmdWords,
             uint16_t tref = rd16(p + i * 2);
             i++;
             if (needSync) { t3d_tri_sync(); needSync = 0; }
-            if (tref > 0)
+            skip = 0;
+            if (tref == 0)
+            {
+                /* untextured group: shade-only, or it would sample whatever
+                 * tile the previous group left in TMEM */
+                rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+            }
+            else
             {
                 int slot = TileSlotFind(tref - 1);
                 if (slot >= 0)
@@ -356,12 +372,20 @@ static rspq_block_t* RecordPass(const uint8_t* p, int cmdWords,
                     WTile* t = &s_tiles[slot];
                     surface_t surf = surface_make_linear(t->pix,
                         t->fmt == 0 ? FMT_CI4 : FMT_CI8, t->w, t->h);
+                    rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
                     rdpq_tex_upload_tlut(s_pals + s_palOffsets[arg], 0,
                                          s_palWords[arg]);
                     rdpq_tex_upload(TILE0, &surf, NULL);
                 }
-                /* missing tile: keep drawing; stale TMEM shows, but geometry
-                 * stays visible and the census names the miss */
+                else
+                {
+                    /* Missing tile: DROP the group's geometry. Drawing it
+                     * with stale TMEM painted other rooms' art (a wanted
+                     * poster) onto this one's furniture. A hole is honest
+                     * and the census counts it. */
+                    skip = 1;
+                    s_cnTileMiss++;
+                }
             }
         }
         else if (opc == OP_MATRIX)
@@ -376,20 +400,25 @@ static rspq_block_t* RecordPass(const uint8_t* p, int cmdWords,
         {
             uint16_t first = rd16(p + i * 2);
             i++;
+            if (skip)
+                continue;
             if (needSync) { t3d_tri_sync(); needSync = 0; }
             t3d_vert_load(verts + first / 2, 0, arg);
         }
         else if (opc == OP_TRIS)
         {
             int n = arg, k;
-            for (k = 0; k < n; k++)
+            if (!skip)
             {
-                /* packed u8 triples across u16 words */
-                int base = i * 2 + k * 3;
-                t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
+                for (k = 0; k < n; k++)
+                {
+                    /* packed u8 triples across u16 words */
+                    int base = i * 2 + k * 3;
+                    t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
+                }
+                needSync = 1;
             }
             i += (n * 3 + 1) / 2;
-            needSync = 1;
         }
         else if (opc == OP_END)
         {
@@ -526,24 +555,26 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             if (sw > maxWords) maxWords = sw;
         }
 
-        /* Vert-bytes gate: the lobby-class cells wait for the residency
-         * budget work; everything typical is ~10-25KB. */
-        if (total * 16 > 80 * 1024)
+        /* Carve verts + mats + refs from this slot's fixed arena. */
         {
-            if (WFailLog())
-                SH_DBG("[T3DW] %s: %dKB of verts over the 80KB gate -- PSX fallback",
-                       base, total * 16 / 1024);
-            goto fail;
-        }
-
-        c->verts = malloc_uncached(sizeof(T3DVertPacked) * (total / 2 + 1));
-        c->mats  = malloc_uncached(sizeof(T3DMat4FP) * (instCount ? instCount : 1));
-        if (c->verts == NULL || c->mats == NULL)
-        {
-            if (WFailLog())
-                SH_DBG("[T3DW] %s: verts/mats alloc FAILED (v=%d i=%d)",
-                       base, total, instCount);
-            goto fail;
+            int vertBytes = (int)sizeof(T3DVertPacked) * (total / 2 + 1);
+            int matBytes  = (int)sizeof(T3DMat4FP) * (instCount ? instCount : 1);
+            int refBytes  = refCount ? refCount * 2 : 2;
+            int need = ((vertBytes + 15) & ~15) + ((matBytes + 15) & ~15)
+                     + ((refBytes + 15) & ~15);
+            uint8_t* a = s_chunkArena[(int)(c - s_chunks)];
+            if (need > WCHUNK_ARENA_BYTES)
+            {
+                if (WFailLog())
+                    SH_DBG("[T3DW] %s: %dKB over the %dKB arena -- PSX fallback",
+                           base, need / 1024, WCHUNK_ARENA_BYTES / 1024);
+                goto fail;
+            }
+            c->verts = (T3DVertPacked*)a;
+            a += (vertBytes + 15) & ~15;
+            c->mats = (T3DMat4FP*)a;
+            a += (matBytes + 15) & ~15;
+            c->tileRefs = (uint16_t*)a;
         }
 
         /* Instances -> fixed-point matrices. rot Q12/4096 with the 1/8 world
@@ -572,12 +603,11 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             m.m[3][3] = 1.0f;
             t3d_mat4_to_fixed(&c->mats[i], &m);
         }
+        data_cache_hit_writeback(c->mats,
+            sizeof(T3DMat4FP) * (instCount ? instCount : 1));
 
-        /* Tile refs. */
-        c->tileRefs = malloc(refCount ? refCount * 2 : 2);
+        /* Tile refs (arena-resident, carved above). */
         c->tileRefCount = 0;
-        if (c->tileRefs == NULL)
-            goto fail;
         fseek(f, refsOff, SEEK_SET);
         if (fread(tmp, 1, refCount * 2, f) != (size_t)(refCount * 2))
             goto fail;
@@ -630,7 +660,26 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             }
         }
 
-        /* Commands: one transient sized to the largest pass, reused. */
+        data_cache_hit_writeback(c->verts,
+            sizeof(T3DVertPacked) * (total / 2 + 1));
+
+        /* Commands: one transient sized to the largest pass, reused.
+         * GUARD: rspq block recording grows its buffers with UNCHECKED
+         * mallocs (rspq_next_buffer memsets the result); recording into a
+         * starved heap is a crash, not a failure. Defer until it can fit. */
+        {
+            struct mallinfo mi = mallinfo();
+            /* Blocks for a typical cell record into ~15-25KB of buffers; the
+             * map-load window has ~60KB free, so a fat guard deferred
+             * FOREVER (missed by 2KB) and the fallback thrash spiral began. */
+            if (mi.fordblks < 40 * 1024)
+            {
+                if (WFailLog())
+                    SH_DBG("[T3DW] %s: only %dKB heap free -- defer recording",
+                           base, (int)mi.fordblks / 1024);
+                goto fail;
+            }
+        }
         free(tmp);
         tmp = malloc(maxWords ? (size_t)maxWords * 2 : 2);
         if (tmp == NULL)
@@ -672,8 +721,9 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         fclose(f);
         c->bufCount = bufCount;
         c->inUse = 1;
-        SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d tiles=%d tileRam=%dK",
-               base, bufCount, instCount, c->tileRefCount, s_tileRam / 1024);
+        SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d tiles=%d/%d miss=%d tileRam=%dK",
+               base, bufCount, instCount, c->tileRefCount, refCount,
+               s_cnTileMiss, s_tileRam / 1024);
         return;
 
 fail:

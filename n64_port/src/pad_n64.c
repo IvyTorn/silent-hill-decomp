@@ -101,7 +101,15 @@ void Pad_Poll(void)
      * ~7 game-frames a second, so from ~100 s in, mash START then CROSS on a
      * cycle -- that walks PUSH-START -> menu (cursor sits on START with no
      * saves) -> confirm -> difficulty confirm. Removes the hardware round-trip
-     * from reproducing the map-load hang. */
+     * from reproducing the map-load hang.
+     * SD present = real console = humans only, regardless of the define: a
+     * test build reaching hardware used to mean the robot mashed a live
+     * controller session until someone remembered to flip the flag. */
+    {
+        extern int Cd_N64SdPresent(void);
+        if (Cd_N64SdPresent())
+            goto real_input;
+    }
     {
         static unsigned s_poll = 0;
         unsigned        phase;
