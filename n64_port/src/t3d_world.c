@@ -79,8 +79,11 @@ typedef struct
 
 typedef struct
 {
-    rspq_block_t* opa;
-    rspq_block_t* semi;
+    /* Byte offsets into the chunk's arena cmd region; 0 words = empty. */
+    uint32_t opaOff, semiOff;
+    uint16_t opaWords, semiWords;
+    uint16_t vbase;      /* first vert (pair-aligned) of this buffer */
+    uint16_t pad;
 } WBuf;
 
 typedef struct
@@ -88,10 +91,11 @@ typedef struct
     int            cellX, cellZ;
     int            inUse;
     int            bufCount;
-    WBuf*          bufs;       /* heap (small); blocks are heap too */
+    WBuf*          bufs;       /* -> own arena slot */
     T3DVertPacked* verts;      /* -> own arena slot, cache-written-back */
     T3DMat4FP*     mats;       /* -> own arena slot, after verts */
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
+    uint8_t*       cmds;       /* -> own arena slot: all passes' streams */
     int            tileRefCount;
 } WChunk;
 
@@ -315,29 +319,25 @@ static void ChunkFree(WChunk* c)
     int i;
     if (!c->inUse)
         return;
-    for (i = 0; i < c->bufCount; i++)
-    {
-        if (c->bufs[i].opa)  rspq_block_free(c->bufs[i].opa);
-        if (c->bufs[i].semi) rspq_block_free(c->bufs[i].semi);
-    }
-    free(c->bufs);
-    /* verts/mats/tileRefs live in the slot's arena; nothing to free. */
+    /* Everything lives in the slot's arena; only tile refs need releasing. */
     for (i = 0; i < c->tileRefCount; i++)
         TileRelease(c->tileRefs[i]);
     memset(c, 0, sizeof *c);
 }
 
-static int s_cnTileMiss;   /* groups whose geometry was dropped at record time */
+static int s_cnTileMiss;   /* groups whose geometry was skipped this frame */
 
-/* Record one pass's command stream into an rspq block.
- * verts/mats belong to the chunk; tiles are resident (acquired). */
-static rspq_block_t* RecordPass(const uint8_t* p, int cmdWords,
-                                const T3DVertPacked* verts, const T3DMat4FP* mats,
-                                int semi)
+/* Replay one pass's command stream LIVE. Pre-recorded rspq blocks were the
+ * design, but recording needs heap exactly when the game has none (libdragon
+ * grows block buffers with UNCHECKED mallocs -- a starved heap is a crash,
+ * a guarded one deferred forever). Replay costs ~1-3ms of t3d calls for a
+ * visible room against the ~100ms the RSP path replaces, needs zero heap,
+ * and tile misses self-heal frame to frame instead of baking into a block. */
+static void RunPass(const uint8_t* p, int cmdWords,
+                    const T3DVertPacked* verts, const T3DMat4FP* mats,
+                    int semi)
 {
     int i = 0, pushed = 0, needSync = 0, skip = 0;
-
-    rspq_block_begin();
 
     /* Pass-wide state the OTHER pass may have changed. */
     if (semi)
@@ -434,8 +434,6 @@ static rspq_block_t* RecordPass(const uint8_t* p, int cmdWords,
         t3d_tri_sync();
     if (pushed)
         t3d_matrix_pop(1);
-
-    return rspq_block_end();
 }
 
 void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
@@ -555,14 +553,26 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             if (sw > maxWords) maxWords = sw;
         }
 
-        /* Carve verts + mats + refs from this slot's fixed arena. */
+        /* Carve verts + mats + refs + buf table + command streams from this
+         * slot's fixed arena. cmdBytes counts every pass's words. */
         {
             int vertBytes = (int)sizeof(T3DVertPacked) * (total / 2 + 1);
             int matBytes  = (int)sizeof(T3DMat4FP) * (instCount ? instCount : 1);
             int refBytes  = refCount ? refCount * 2 : 2;
-            int need = ((vertBytes + 15) & ~15) + ((matBytes + 15) & ~15)
-                     + ((refBytes + 15) & ~15);
+            int bufBytes  = (int)sizeof(WBuf) * bufCount;
+            int cmdBytes  = 0;
+            int need;
             uint8_t* a = s_chunkArena[(int)(c - s_chunks)];
+            for (i = 0; i < bufCount; i++)
+            {
+                int ow = rd16(table + i * 20 + 2);
+                int sw = rd16(table + i * 20 + 4);
+                if (ow > 1) cmdBytes += (ow * 2 + 3) & ~3;
+                if (sw > 1) cmdBytes += (sw * 2 + 3) & ~3;
+            }
+            need = ((vertBytes + 15) & ~15) + ((matBytes + 15) & ~15)
+                 + ((refBytes + 15) & ~15) + ((bufBytes + 15) & ~15)
+                 + ((cmdBytes + 15) & ~15);
             if (need > WCHUNK_ARENA_BYTES)
             {
                 if (WFailLog())
@@ -575,6 +585,11 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             c->mats = (T3DMat4FP*)a;
             a += (matBytes + 15) & ~15;
             c->tileRefs = (uint16_t*)a;
+            a += (refBytes + 15) & ~15;
+            c->bufs = (WBuf*)a;
+            a += (bufBytes + 15) & ~15;
+            c->cmds = a;
+            memset(c->bufs, 0, bufBytes);
         }
 
         /* Instances -> fixed-point matrices. rot Q12/4096 with the 1/8 world
@@ -663,32 +678,12 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         data_cache_hit_writeback(c->verts,
             sizeof(T3DVertPacked) * (total / 2 + 1));
 
-        /* Commands: one transient sized to the largest pass, reused.
-         * GUARD: rspq block recording grows its buffers with UNCHECKED
-         * mallocs (rspq_next_buffer memsets the result); recording into a
-         * starved heap is a crash, not a failure. Defer until it can fit. */
+        /* Command streams: copy every pass into the arena; drawn by LIVE
+         * replay (RunPass), so no rspq blocks and no heap at all. */
         {
-            struct mallinfo mi = mallinfo();
-            /* Blocks for a typical cell record into ~15-25KB of buffers; the
-             * map-load window has ~60KB free, so a fat guard deferred
-             * FOREVER (missed by 2KB) and the fallback thrash spiral began. */
-            if (mi.fordblks < 40 * 1024)
-            {
-                if (WFailLog())
-                    SH_DBG("[T3DW] %s: only %dKB heap free -- defer recording",
-                           base, (int)mi.fordblks / 1024);
-                goto fail;
-            }
-        }
-        free(tmp);
-        tmp = malloc(maxWords ? (size_t)maxWords * 2 : 2);
-        if (tmp == NULL)
-            goto fail;
-        c->bufs = calloc(bufCount, sizeof(WBuf));
-        if (c->bufs == NULL)
-            goto fail;
-        {
+            uint32_t cmdCur = 0;
             int vbase = 0;
+            (void)maxWords;
             for (i = 0; i < bufCount; i++)
             {
                 const uint8_t* bt = table + i * 20;
@@ -697,20 +692,24 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                 int semiWords = rd16(bt + 4);
                 uint32_t opaOff  = rd32(bt + 0x0C);
                 uint32_t semiOff = rd32(bt + 0x10);
-                const T3DVertPacked* bverts = c->verts + vbase / 2;
+                c->bufs[i].vbase = (uint16_t)vbase;
                 if (opaWords > 1)
                 {
                     fseek(f, opaOff, SEEK_SET);
-                    if (fread(tmp, 1, opaWords * 2, f) != (size_t)(opaWords * 2))
+                    if (fread(c->cmds + cmdCur, 1, opaWords * 2, f) != (size_t)(opaWords * 2))
                         goto fail;
-                    c->bufs[i].opa = RecordPass(tmp, opaWords, bverts, c->mats, 0);
+                    c->bufs[i].opaOff   = cmdCur;
+                    c->bufs[i].opaWords = (uint16_t)opaWords;
+                    cmdCur += (opaWords * 2 + 3) & ~3;
                 }
                 if (semiWords > 1)
                 {
                     fseek(f, semiOff, SEEK_SET);
-                    if (fread(tmp, 1, semiWords * 2, f) != (size_t)(semiWords * 2))
+                    if (fread(c->cmds + cmdCur, 1, semiWords * 2, f) != (size_t)(semiWords * 2))
                         goto fail;
-                    c->bufs[i].semi = RecordPass(tmp, semiWords, bverts, c->mats, 1);
+                    c->bufs[i].semiOff   = cmdCur;
+                    c->bufs[i].semiWords = (uint16_t)semiWords;
+                    cmdCur += (semiWords * 2 + 3) & ~3;
                 }
                 vbase += (vcount + 1) & ~1;
             }
@@ -858,7 +857,7 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
         s_cnFallback++;
         return 0;
     }
-    if (c->bufs[bufIdx].opa == NULL && c->bufs[bufIdx].semi == NULL)
+    if (c->bufs[bufIdx].opaWords == 0 && c->bufs[bufIdx].semiWords == 0)
     {
         /* No native data: either genuinely empty (PSX loop no-ops cheaply)
          * or global-PLM instances the converter skips -- both want fallback. */
@@ -868,15 +867,20 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
     if (!s_worldStarted)
         WorldFrameStart();
 
-    if (c->bufs[bufIdx].opa)
     {
-        rspq_block_run(c->bufs[bufIdx].opa);
-        s_cnBlocks++;
-    }
-    if (c->bufs[bufIdx].semi)
-    {
-        rspq_block_run(c->bufs[bufIdx].semi);
-        s_cnBlocks++;
+        const T3DVertPacked* bverts = c->verts + c->bufs[bufIdx].vbase / 2;
+        if (c->bufs[bufIdx].opaWords > 1)
+        {
+            RunPass(c->cmds + c->bufs[bufIdx].opaOff, c->bufs[bufIdx].opaWords,
+                    bverts, c->mats, 0);
+            s_cnBlocks++;
+        }
+        if (c->bufs[bufIdx].semiWords > 1)
+        {
+            RunPass(c->cmds + c->bufs[bufIdx].semiOff, c->bufs[bufIdx].semiWords,
+                    bverts, c->mats, 1);
+            s_cnBlocks++;
+        }
     }
     return 1;
 }
