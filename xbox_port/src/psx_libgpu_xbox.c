@@ -178,6 +178,18 @@ static void (*s_vsyncCb)(void) = 0;   /* the game's per-vblank callback */
  * hold it for N vblanks, then open the next frame (FrameBegin). The registered
  * VSyncCallback (Screen_VSyncCallback: boot-logo timers counters_1C[] + MIDI pump)
  * is fired once per real vblank — we have no vblank IRQ, so this is its tick. */
+#if defined(SH_N64_PORT)
+/* Real elapsed vblanks, from the clock. GpuNv2a_Ms is the HAL's millisecond
+ * counter (game-side code on this console cannot call libdragon directly). */
+extern int GpuNv2a_Ms(void);
+static int N64_VblanksNow(void)
+{
+    return (int)(((long long)GpuNv2a_Ms() * 60LL) / 1000LL);
+}
+static int s_n64LogFlushVbl;   /* s_vblanks at the last log commit  */
+static int s_n64ReportVbl;     /* s_vblanks at the last mem report  */
+#endif
+
 int VSync(int mode)
 {
     int n, i;
@@ -236,6 +248,62 @@ int VSync(int mode)
     }
 
     n = (mode == 0) ? 1 : mode;
+#if defined(SH_N64_PORT)
+    /* THE TIMESTEP, and it was wrong. This console has no vblank IRQ, so
+     * s_vblanks only ever advanced for the vblanks THIS FUNCTION waited
+     * through -- one or two per call, however long the frame actually took.
+     * The game reads the delta as g_VBlanks and uses it for two things, and
+     * both were being fed a fiction:
+     *
+     *   the timestep   a 220 ms frame reported as 1 vblank advances 1/60 s of
+     *                  animation, movement, script and timers for 220 ms of
+     *                  wall clock. Measured over a real session: 1650 frames
+     *                  against 1800 counted vblanks, i.e. the game believed it
+     *                  was running at 55 fps while the log says 5. Everything
+     *                  moved at about a seventh of its proper speed -- the
+     *                  "slow motion" that no rendering setting changed.
+     *
+     *   the pacing     game_main.c waits when g_VBlanks < effectiveMin. Told it
+     *                  was one vblank into a two-vblank budget, it slept one
+     *                  more vi_wait_vblank (up to 16.7 ms) on a frame that had
+     *                  already overrun its budget eleven times over.
+     *
+     * So: count real vblanks, and hold the presented frame only while genuinely
+     * ahead of the target. A late frame now waits not at all and reports the
+     * truth, which is what the game's own dropped-frame handling expects. */
+    {
+        int guard = 0;
+        int target = s_vblanks + n;
+        while (N64_VblanksNow() < target && ++guard <= 4)
+        {
+            GpuNv2a_WaitVbl();
+            if (s_vsyncCb)
+                s_vsyncCb();
+        }
+        {
+            int real  = N64_VblanksNow();
+            int ticks = real - s_vblanks;
+            s_vblanks = (real > target) ? real : target;
+            /* The callback drives the boot-logo timers and the MIDI pump: it
+             * wants one tick per elapsed vblank, but a long load must not fire
+             * a hundred at once. Four matches the clamp the game applies to
+             * its own vblank delta. */
+            if (ticks > 4) ticks = 4;
+            for (i = guard; i < ticks; i++)
+                if (s_vsyncCb)
+                    s_vsyncCb();
+        }
+        /* Commit the RAM-buffered log ~once a second. Edge-triggered, not
+         * modular: the counter now moves in jumps and would step over any
+         * fixed multiple. */
+        if (s_vblanks - s_n64LogFlushVbl >= 60)
+        {
+            extern void SH_DebugLogFlush(void);
+            s_n64LogFlushVbl = s_vblanks;
+            SH_DebugLogFlush();
+        }
+    }
+#else
     for (i = 0; i < n; i++) {
         GpuNv2a_WaitVbl();          /* hold the presented frame for one vblank */
         ++s_vblanks;
@@ -245,6 +313,7 @@ int VSync(int mode)
         if (s_vsyncCb)
             s_vsyncCb();
     }
+#endif
 
     GpuNv2a_FrameBegin();           /* clear + target the next frame's back buffer */
 
@@ -258,7 +327,11 @@ int VSync(int mode)
         if (g_PsxPresentLastFrame)
             GpuNv2a_FreezeBlit();
     }
+#if defined(SH_N64_PORT)
+    if (s_vblanks - s_n64ReportVbl >= 600) { s_n64ReportVbl = s_vblanks;
+#else
     if ((s_vblanks % 600) == 0) {
+#endif
         extern void Xbox_MemReport(const char*);
         extern void Pgxp_CovDump(void);
         SH_DBG("[SH-XBOX] vblank %d", s_vblanks);
