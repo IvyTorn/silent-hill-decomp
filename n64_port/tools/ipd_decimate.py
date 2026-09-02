@@ -128,7 +128,18 @@ class Poly:
         self.vi = [prim.vi[c] for c in cs]
         self.li = [prim.li[c] for c in cs]
         self.uv = [prim.uv[c] for c in cs]
-        self.pos = [verts[v] for v in self.vi]
+        # A vertex index that does not resolve to this mesh's own pool means the
+        # primitive reads a NEIGHBOUR's already-transformed vertex -- that is how
+        # character parts weld their seams, and its world position does not exist
+        # until the skeleton runs. Such a primitive cannot be evaluated here, so
+        # it is left with no geometry and every caller passes it through intact.
+        self.pos = []
+        for v in self.vi:
+            q = verts[v] if 0 <= v < len(verts) else None
+            if q is None:
+                self.pos = []
+                break
+            self.pos.append(q)
         self.key = (prim.material_idx, prim.clut, prim.is_transparent, prim.tpage)
         self.src = src
         self.n = None

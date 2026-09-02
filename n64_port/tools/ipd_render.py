@@ -21,6 +21,7 @@ from sh1fmt.ipd import Ipd, CELL_Q8   # noqa: E402
 from PIL import Image, ImageDraw       # noqa: E402
 
 PERIM = (0, 1, 3, 2)
+CULL = 0
 
 
 def cell_polys(ipd):
@@ -90,12 +91,21 @@ def render(polys, size, view, bounds):
         return (W / 2 + s / d * W * 0.55, H / 2 + vy / d * H * 0.55, f)
 
     items = []
+    culled = 0
     for pts, mat, transp in polys:
         pp = [proj(p) for p in pts]
         depth = sum(p[2] for p in pp) / len(pp)
         if view == "corner" and any(p[2] < 1.0 for p in pp):
             continue
+        if CULL:
+            ar = ((pp[1][0] - pp[0][0]) * (pp[2][1] - pp[0][1])
+                  - (pp[2][0] - pp[0][0]) * (pp[1][1] - pp[0][1]))
+            if ar * CULL > 0.0:
+                culled += 1
+                continue
         items.append((depth, pp, colour(mat, transp)))
+    if CULL:
+        print(f"    cull={CULL}: dropped {culled} of {len(polys)} ({100.0*culled/max(len(polys),1):.0f}%)")
     items.sort(key=lambda it: -it[0])          # far first
     zmax = max((it[0] for it in items), default=1.0) or 1.0
     for depth, pp, col in items:
@@ -120,7 +130,10 @@ def main():
     ap.add_argument("--cell", help="cell name for --compare, e.g. ERFCFC")
     ap.add_argument("--view", default="iso", choices=("top", "iso", "corner"))
     ap.add_argument("--size", default="640x480")
+    ap.add_argument("--cull", type=int, default=0, help="1 or -1: reject one winding")
     a = ap.parse_args()
+    global CULL
+    CULL = a.cull
     W, H = (int(v) for v in a.size.lower().split("x"))
 
     if a.compare:

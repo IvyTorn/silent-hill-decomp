@@ -84,6 +84,7 @@ s_PcConfig g_PcConfig = {
     .n64AudioPumpBudgetMs = 16,  /* N64: cap one pump's mixing so a slow frame does not refill the whole ring */
     .n64ClipScreen       = 1,    /* N64: CPU screen clipping before the RDP (escape hatch: clip_screen=0) */
     .n64RdpProbe         = 0,    /* N64: RDP measurement mode off */
+    .n64CullBackfaces    = 0,    /* N64: PSX parity (no culling); cull_backfaces=1/-1 to try */
     .xboxVideo720p       = 0,    /* Xbox: 480p by default (720p costs texture-cache RAM) */
     .logDiag             = 0,    /* Xbox: quiet log by default (per-frame diag probes gated; log_diag=1 restores) */
     .cutsceneLineGapMs   = 300,  /* min ms between cutscene voice lines (PSX inter-line pause); tune down if it re-desyncs */
@@ -776,6 +777,12 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "texture_ci4") == 0)
         {
             g_PcConfig.n64TexCi4 = (atoi(value) != 0);
+        }
+        else if (strcmp(key, "cull_backfaces") == 0)
+        {
+            g_PcConfig.n64CullBackfaces = atoi(value);
+            if (g_PcConfig.n64CullBackfaces > 0)      g_PcConfig.n64CullBackfaces = 1;
+            else if (g_PcConfig.n64CullBackfaces < 0) g_PcConfig.n64CullBackfaces = -1;
         }
         else if (strcmp(key, "rdp_probe") == 0)
         {

@@ -200,14 +200,37 @@ static const rdpq_trifmt_t TRIFMT_SH_SHADE = {
     .z_offset     = -1,
 };
 
+/* The render mode the RDP is actually in, so a bind that changes nothing the
+ * RDP cares about does not re-issue it. `s_modeDirty` is set by every page
+ * bind, but the mode depends only on WHETHER we are texturing and on the PSX
+ * blend -- not on which page. That made ~100 full mode resets per frame, and a
+ * mode reset is not a cheap register write: rdpq_set_mode_standard rewrites
+ * the whole SOM/combiner state, which the RDP can only adopt by draining its
+ * pipeline. With the RDP's pipe-busy counter sitting at 205 ms of a 233 ms
+ * frame for only ~940 triangles, per-command drains are the cost, and these
+ * are the ones we can simply not issue. Reset in FrameBegin, because
+ * rdpq_attach re-establishes the mode itself. */
+static int s_appliedTex   = -1;
+static int s_appliedBlend = -2;
+static int s_cnModeSets;
+
 static void ApplyMode(void)
 {
+    int texOn;
+
     if (!s_modeDirty)
         return;
     s_modeDirty = 0;
 
+    texOn = (s_texEnabled && s_texPage != NULL) ? 1 : 0;
+    if (texOn == s_appliedTex && s_curBlend == s_appliedBlend)
+        return;                     /* same mode the RDP already holds */
+    s_appliedTex   = texOn;
+    s_appliedBlend = s_curBlend;
+    s_cnModeSets++;
+
     rdpq_set_mode_standard();
-    if (s_texEnabled && s_texPage != NULL)
+    if (texOn)
     {
         rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
         rdpq_mode_tlut(TLUT_RGBA16);
@@ -394,6 +417,7 @@ static int   s_cnClipped, s_cnRejected;
 static int s_probeMode;
 static unsigned long long s_cnAreaPx;
 static int s_cnBigTris;      /* > 4096 px after clipping */
+static int s_cnCulled;       /* backfacing triangles rejected */
 static void CountArea(const float* a, const float* b, const float* c)
 {
     float ar = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]);
@@ -530,6 +554,25 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
     if (s1 <= s0 || t1 <= t0)
         return;
 
+    /* Backface rejection. The PSX GPU drew both faces because it had no
+     * culling at all, so the game hands over every polygon of a closed room
+     * including the ~half pointing away from the camera; each costs a full
+     * transform, a TMEM window and an RDP command to end up hidden behind the
+     * ones facing us. The screen-space signed area is the test, and it is two
+     * subtractions and a cross product on coordinates already in hand.
+     *
+     * OFF by default: nothing guarantees SH's world geometry is consistently
+     * wound, and a wrong guess turns walls invisible rather than merely ugly.
+     * cull_backfaces=1 to try it, -1 to cull the other winding. */
+    if (g_PcConfig.n64CullBackfaces)
+    {
+        float ar = (vb[0] - va[0]) * (vc[1] - va[1]) - (vc[0] - va[0]) * (vb[1] - va[1]);
+        if (ar * (float)g_PcConfig.n64CullBackfaces > 0.0f)
+        {
+            s_cnCulled++;
+            return;
+        }
+    }
     CountArea(va, vb, vc);
     if (s_probeMode == 1)
     {
@@ -597,6 +640,8 @@ static void DrawStagedTri(const float* va, const float* vb, const float* vc, int
          * of a flush. */
 flat_fallback:
         s_cnTexTooBig++;
+        /* Changes the combiner directly and restores it below, so the memo
+         * still describes the RDP correctly on the way out. */
         rdpq_mode_tlut(TLUT_NONE);
         rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
         {
@@ -867,7 +912,8 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
 
     s_cnTris += 2;
     s_cnTexTris += 2;
-    s_modeDirty = 1;   /* combiner was changed; next flush re-applies */
+    s_modeDirty    = 1;   /* combiner was changed; next flush re-applies */
+    s_appliedBlend = -2;  /* ...and it really must re-apply: invalidate the memo */
     return 1;
 }
 
@@ -951,8 +997,12 @@ void GpuNv2a_FrameBegin(void)
     s_cnTriMax = s_cnUpMax = 0;
     s_cnTriCalls = s_cnTriSlow = s_cnUpSlow = 0;
     s_cnClipped = s_cnRejected = 0;
+    s_cnModeSets = 0;
+    /* rdpq_attach re-establishes the render mode for the new frame. */
+    s_appliedTex = -1; s_appliedBlend = -2;
     s_cnAreaPx = 0;
     s_cnBigTris = 0;
+    s_cnCulled = 0;
     s_probeMode = g_PcConfig.n64RdpProbe ? (int)((g_Nv2aFrameCount / 64) % 3) : 0;
     s_clipX0 = 0.0f;           s_clipY0 = 0.0f;
     s_clipX1 = (float)SCR_W;   s_clipY1 = (float)SCR_H;
@@ -1095,7 +1145,7 @@ void GpuNv2a_FrameEnd(void)
              * submit = tile uploads + triangle issue; vram dec/drain = page
              * decodes and full GPU drains the texture cache had to do. What is
              * left of `frame` after these is the game update + OT walk ([OTT]). */
-            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d | clip=%d rej=%d | px=%uK big=%d probe=%d | vbl=%d dt=%d vc=%d",
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d | clip=%d rej=%d cull=%d modes=%d | px=%uK big=%d probe=%d | vbl=%d dt=%d vc=%d",
                    (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
                    (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
                    (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
@@ -1112,7 +1162,7 @@ void GpuNv2a_FrameEnd(void)
                    RdpBusyUs(*DP_CLOCK), RdpBusyUs(*DP_PIPE_BUSY), RdpBusyUs(*DP_TMEM_BUSY), RdpBusyUs(*DP_BUSY),
                    s_cnTriCalls, (unsigned)TICKS_TO_US((unsigned)s_cnTriMax), s_cnTriSlow,
                    (unsigned)TICKS_TO_US((unsigned)s_cnUpMax), s_cnUpSlow,
-                   s_cnClipped, s_cnRejected,
+                   s_cnClipped, s_cnRejected, s_cnCulled, s_cnModeSets,
                    (unsigned)(s_cnAreaPx / 1000ULL), s_cnBigTris, s_probeMode,
                    VSync(-1), g_VBlanks, GsGetVcount());
         }

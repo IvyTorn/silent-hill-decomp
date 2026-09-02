@@ -160,6 +160,7 @@ typedef struct {
     int   n64AudioPumpBudgetMs; /* N64 only: max ms one audio pump may spend refilling the ring; 0 = unbounded. Config key: audio_pump_budget_ms; default 16. */
     int   n64ClipScreen;    /* N64 only: 1 = clip triangles to the screen on the CPU before the RDP (default; the RDP walks off-screen scanlines the PSX GPU never rasterised), 0 = hand them over unclipped. Config key: clip_screen. */
     int   n64RdpProbe;      /* N64 only: 1 = measurement mode, cycles normal / no-fill / no-texture rendering every 64 frames so one [PROF] log splits the RDP's time. Flickers by design. Config key: rdp_probe; default 0. */
+    int   n64CullBackfaces; /* N64 only: 0 = draw both faces as the PSX GPU did (default), 1 = reject backfacing triangles by screen-space winding, -1 = reject the opposite winding. Config key: cull_backfaces. */
     int   xboxVideo720p;    /* Xbox only: 0 = 480p (default), 1 = 1280x720 pillarboxed 4:3 (config key: video_720p; applied at boot, reboot to change) */
     int   logDiag;          /* Xbox only: 0 = quiet log (default; per-frame diag probes gated), 1 = full diagnostic stream (config key: log_diag) */
     int   cutsceneLineGapMs; /* minimum silence (ms) between cutscene voice lines so they don't run together; 0 = off, 300 = default (config key: cutscene_line_gap_ms) */
