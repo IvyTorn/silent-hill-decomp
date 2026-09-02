@@ -218,6 +218,18 @@ static int s_appliedTex   = -1;
 static int s_appliedBlend = -2;
 static int s_cnModeSets;
 
+/* Force the next ApplyMode to re-issue the PSX render mode. Called after the
+ * native world path (ShT3d_WorldFlush) reprograms rdpq for 3D, so the PSX OT
+ * walk that follows does not inherit t3d's combiner/blender/scissor. */
+void GpuNv2a_PsxModeInvalidate(void)
+{
+    s_modeDirty    = 1;
+    s_appliedTex   = -1;
+    s_appliedBlend = -2;
+    /* rdpq scissor was narrowed to the t3d viewport; restore full screen. */
+    rdpq_set_scissor(0, 0, SCR_W, SCR_H);
+}
+
 static void ApplyMode(void)
 {
     int texOn;
@@ -1060,10 +1072,17 @@ void GpuNv2a_FrameEnd(void)
     if (!s_inited || s_fb == NULL)
         return;
 
+    /* Native world FIRST, on the live about-to-present surface (the only point
+     * whose t3d output survives -- a mid-frame VSync discards earlier draws).
+     * Then FlushBatch draws the frame's remaining PSX prims (characters, items,
+     * HUD) on top. Most PSX prims already rasterised incrementally during the
+     * OT walk, so a close character can be occluded by world here until the Z
+     * buffer lands -- acceptable to get the world visible. */
+    ShT3d_WorldFlush();
+
     GpuNv2a_FlushBatch();
 
-    /* Stage-0 spike: RSP-transformed geometry into the same frame, after all
-     * PSX content. See t3d_n64.c for the state-discipline note. */
+    /* Stage-0 spike (disabled): see t3d_n64.c for the state-discipline note. */
     ShT3d_SpikeDraw();
     ShT3d_NotifyFrameEnd();
 

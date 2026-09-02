@@ -40,4 +40,15 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int h, int ofx, int ofy);
 void ShT3d_NotifyFrameBegin(void);
 void ShT3d_NotifyFrameEnd(void);
 
+/* Draw the recorded world buffers. Called from GpuNv2a_FrameEnd before the
+ * PSX batch flush -- the only point whose t3d output reaches the shown frame. */
+void ShT3d_WorldFlush(void);
+
+/* 1 if a native chunk drew geometry this frame. The full-screen fog/
+ * brightness tint quads in Gfx_2dEffectsDraw are meant to blend INTO the PSX
+ * OT world; the native world is already on the framebuffer, so on this port
+ * those quads darken it to black instead. Skip them where native drew (its
+ * own fog/brightness pass replaces them); unconverted areas keep theirs. */
+int ShT3d_WorldDrewThisFrame(void);
+
 #endif

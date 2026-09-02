@@ -3381,6 +3381,11 @@ void MainLoop(void) // 0x80032EE0
             }
         }
 #endif
+        /* Native (Tiny3D) world is drawn in GpuNv2a_FrameEnd, right before the
+         * present: that is the only point whose output survives to the shown
+         * frame (a mid-frame VSync detaches/reattaches the render target, so a
+         * draw here at GsDrawOt is discarded). The draw list + camera were
+         * recorded during OT build. */
         GsDrawOt(&g_OrderingTable0[g_ActiveBufferIdx]);
 #ifdef SH_PC_PORT
         {

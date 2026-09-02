@@ -27,6 +27,7 @@
 #include <libdragon.h>
 
 #include <malloc.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -134,16 +135,45 @@ static int WFailLog(void)
 
 int ShT3d_Ready(void);            /* from t3d_n64.c */
 
-/* Camera handed over by the game side each frame (Ipd_ChunkDraw). */
-static const void* s_wsMatrix;    /* MATRIX*: s16 m[3][3] Q12 + s32 t[3] Q8 */
+/* Camera, COPIED (not aliased) at Ipd_ChunkDraw time. GsWSMATRIX is mutated
+ * by every later object draw (characters), so by the deferred FrameEnd flush
+ * the pointer would read a character's matrix. MATRIX = 9 s16 + pad + 3 s32. */
+static int16_t s_wm[9];
+static int32_t s_wt[3];
+static int s_haveView;
 static int s_geomH, s_geomOfx, s_geomOfy;
+
+/* Deferred draw list: (cell, buf) recorded during OT build, drawn at the
+ * GsDrawOt point. The accumulation window is bounded by FLUSH, not by
+ * FrameBegin: the game calls VSync (-> FrameBegin) BETWEEN the OT build and
+ * GsDrawOt, so resetting the list on FrameBegin wiped the records before the
+ * flush ever saw them. Instead the first WorldViewSet after a flush clears
+ * the list. */
+#define WORLD_DRAWLIST_MAX 64
+static struct { int16_t cx, cz, buf; } s_drawList[WORLD_DRAWLIST_MAX];
+static int s_drawCount;
+static int s_flushed = 1;   /* 1 => next WorldViewSet starts a fresh list */
 
 void ShT3d_WorldViewSet(const void* wsMatrix, int h, int ofx, int ofy)
 {
-    s_wsMatrix = wsMatrix;
-    s_geomH    = h;
-    s_geomOfx  = ofx;
-    s_geomOfy  = ofy;
+    const int16_t* m = (const int16_t*)wsMatrix;
+    const int32_t* t = (const int32_t*)((const uint8_t*)wsMatrix + 20);
+    int i;
+    /* First camera handoff after a flush = start of a new frame's world;
+     * clear the draw list here rather than on FrameBegin (which the game's
+     * mid-frame VSync fires between the OT build and the GsDrawOt flush). */
+    if (s_flushed)
+    {
+        s_drawCount = 0;
+        s_flushed = 0;
+    }
+    for (i = 0; i < 9; i++)
+        s_wm[i] = m[i];
+    s_wt[0] = t[0]; s_wt[1] = t[1]; s_wt[2] = t[2];
+    s_geomH   = h;
+    s_geomOfx = ofx;
+    s_geomOfy = ofy;
+    s_haveView = 1;
 }
 
 /* ------------------------------------------------------------- helpers */
@@ -778,77 +808,84 @@ void ShT3d_WorldReset(void)
 
 static void WorldFrameStart(void)
 {
-    const int16_t* wm;
-    const int32_t* wt;
-    T3DMat4 view, proj;
-    float ofsX, ofsY, sclX, sclY;
-    int r, cc;
-
-    extern void GpuXbox_GetViewTransform(float* ofsX, float* ofsY,
-                                         float* sclX, float* sclY, int* contentX);
-    int contentX;
+    /* R = view rotation (world->view), Q12 row-major in s_wm; t = view
+     * translation, Q8 in s_wt. The geometry lives in t3d units = world/8
+     * (Q8 world >> 3), so the camera is derived in the same units. */
+    float R[3][3];
+    float eye[3], fwd[3], up[3];
+    int i;
 
     t3d_frame_start();
-    /* No Z buffer attached: Z modes would make the RDP scribble RDRAM. */
-    rdpq_mode_zbuf(false, false);
-    rdpq_mode_filter(FILTER_POINT);          /* PSX look, and TMEM tiles have
-                                                no border texels for bilinear */
+    rdpq_mode_zbuf(false, false);            /* no Z buffer attached yet */
+    rdpq_mode_filter(FILTER_POINT);
     rdpq_mode_alphacompare(1);
-    rdpq_mode_tlut(TLUT_RGBA16);             /* every tile is CI4/CI8 */
+    rdpq_mode_tlut(TLUT_RGBA16);
     rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
     t3d_light_set_count(0);
     t3d_state_set_drawflags(T3D_FLAG_SHADED | T3D_FLAG_TEXTURED);
 
-    /* View: GsWSMATRIX rows are Q12, t is Q8. Column-major out. */
-    wm = (const int16_t*)s_wsMatrix;
-    wt = (const int32_t*)((const uint8_t*)s_wsMatrix + 20); /* MATRIX: 9*s16 + pad + 3*s32 */
-    for (cc = 0; cc < 4; cc++)
-        for (r = 0; r < 4; r++)
-            view.m[cc][r] = 0.0f;
-    for (r = 0; r < 3; r++)
-        for (cc = 0; cc < 3; cc++)
-            view.m[cc][r] = (float)wm[r * 3 + cc] / 4096.0f;
-    view.m[3][0] = (float)wt[0] / 8.0f;
-    view.m[3][1] = (float)wt[1] / 8.0f;
-    view.m[3][2] = (float)wt[2] / 8.0f;
-    view.m[3][3] = 1.0f;
+    for (i = 0; i < 9; i++)
+        R[i / 3][i % 3] = (float)s_wm[i] / 4096.0f;
 
-    /* Projection: PSX +Z-forward with the draw-env transform folded in.
-     * px = ((ofx + h*xv/zv) + OFS_X)*SCL_X + CX  ->  ndcX = (px-160)/160
-     * py = ((ofy + h*yv/zv) + OFS_Y)*SCL_Y       ->  ndcY = (120-py)/120 */
-    GpuXbox_GetViewTransform(&ofsX, &ofsY, &sclX, &sclY, &contentX);
+    /* Camera position in world = -R^T * t (R orthonormal). t is Q8 world;
+     * eye in t3d units = that >> 3 (== / 8). */
+    for (i = 0; i < 3; i++)
     {
+        float cw = -(R[0][i] * (float)s_wt[0] + R[1][i] * (float)s_wt[1]
+                   + R[2][i] * (float)s_wt[2]) / 4096.0f;   /* Q8 world */
+        eye[i] = cw / 8.0f;                                 /* t3d units */
+    }
+    /* Camera basis in world: forward = R^T * +Z (PSX looks down +Z);
+     * up = -R^T * +Y (PSX +Y is DOWN, t3d +Y is up). */
+    for (i = 0; i < 3; i++)
+    {
+        fwd[i] =  R[2][i];
+        up[i]  = -R[1][i];
+    }
+
+    {
+        /* fovy from the GTE projection distance h: a point at screen half-
+         * height projects at y/z = 120/h, so tan(fovy/2) = 120/h. */
         float h = (float)s_geomH;
-        float cx = (((float)s_geomOfx + ofsX) * sclX + (float)contentX - 160.0f) / 160.0f;
-        float cy = (120.0f - ((float)s_geomOfy + ofsY) * sclY) / 120.0f;
-        float zn = 2.0f, zf = 1600.0f;   /* t3d units (Q8/8) */
-        memset(&proj, 0, sizeof proj);
-        proj.m[0][0] = h * sclX / 160.0f;
-        proj.m[1][1] = -h * sclY / 120.0f;
-        proj.m[2][0] = cx;
-        proj.m[2][1] = cy;
-        proj.m[2][2] = (zf + zn) / (zf - zn);
-        proj.m[3][2] = -2.0f * zf * zn / (zf - zn);
-        proj.m[2][3] = 1.0f;
-    }
+        float fovy = (h > 1.0f) ? 2.0f * atanf(120.0f / h) : 1.2f;
+        T3DVec3 e  = {{ eye[0], eye[1], eye[2] }};
+        T3DVec3 tg = {{ eye[0] + fwd[0] * 256.0f,
+                        eye[1] + fwd[1] * 256.0f,
+                        eye[2] + fwd[2] * 256.0f }};
+        T3DVec3 u  = {{ up[0], up[1], up[2] }};
 
-    if (!s_wvpInited)
-    {
-        s_wvp = t3d_viewport_create();
-        s_wvpInited = 1;
+        if (!s_wvpInited)
+        {
+            s_wvp = t3d_viewport_create();
+            s_wvpInited = 1;
+        }
+        t3d_viewport_set_projection(&s_wvp, fovy, 8.0f, 400000.0f);
+        t3d_viewport_look_at(&s_wvp, &e, &tg, &u);
+        t3d_viewport_attach(&s_wvp);
+
+        {
+            static int s_cs;
+            if ((s_cs++ & 127) == 0)
+                SH_DBG("[T3DCAM] eye=%d,%d,%d fwd=%d,%d,%d h=%d fovyx100=%d",
+                       (int)eye[0], (int)eye[1], (int)eye[2],
+                       (int)(fwd[0]*100), (int)(fwd[1]*100), (int)(fwd[2]*100),
+                       s_geomH, (int)(fovy*100));
+        }
     }
-    t3d_viewport_set_projection_matrix(&s_wvp, &proj);
-    t3d_viewport_set_view_matrix(&s_wvp, &view);
-    t3d_viewport_attach(&s_wvp);
 
     s_worldStarted = 1;
 }
 
+/* RECORD-ONLY: the actual t3d draw is deferred to ShT3d_WorldFlush in
+ * FrameEnd. Drawing here (during OT build) put t3d output on the framebuffer
+ * before the PSX batch flushed and presented, and it never survived to the
+ * screen -- the spike proved t3d output only reaches the frame when drawn in
+ * FrameEnd. Returning 1 still tells the game to skip its PSX per-prim path. */
 int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
 {
     WChunk* c;
 
-    if (!s_frameActive || !ShT3d_Ready() || s_wsMatrix == NULL)
+    if (!s_frameActive || !ShT3d_Ready() || !s_haveView)
         return 0;
 
     c = ChunkFind(cellX, cellZ);
@@ -864,31 +901,83 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
         return 0;
     }
 
-    if (!s_worldStarted)
-        WorldFrameStart();
+    if (s_drawCount < WORLD_DRAWLIST_MAX)
+    {
+        s_drawList[s_drawCount].cx  = (int16_t)cellX;
+        s_drawList[s_drawCount].cz  = (int16_t)cellZ;
+        s_drawList[s_drawCount].buf = (int16_t)bufIdx;
+        s_drawCount++;
+    }
+    return 1;
+}
+
+/* Draw all recorded buffers. Called from GpuNv2a_FrameEnd BEFORE the PSX
+ * batch flush, so the world lands under characters/items (correct order for
+ * a fixed camera with no Z buffer) on the live, about-to-present surface. */
+void ShT3d_WorldFlush(void)
+{
+    int i;
 
     {
-        const T3DVertPacked* bverts = c->verts + c->bufs[bufIdx].vbase / 2;
-        if (c->bufs[bufIdx].opaWords > 1)
+        static int s_fl;
+        if ((s_fl++ & 127) == 0)
+            SH_DBG("[T3DWF] flush call: drawCount=%d ready=%d haveView=%d",
+                   s_drawCount, ShT3d_Ready(), s_haveView);
+    }
+
+    if (s_drawCount == 0 || !ShT3d_Ready() || !s_haveView)
+    {
+        s_flushed = 1;
+        return;
+    }
+
+    WorldFrameStart();
+
+    for (i = 0; i < s_drawCount; i++)
+    {
+        WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
+        int b = s_drawList[i].buf;
+        const T3DVertPacked* bverts;
+        if (c == NULL || b >= c->bufCount)
+            continue;
+        bverts = c->verts + c->bufs[b].vbase / 2;
+        if (c->bufs[b].opaWords > 1)
         {
-            RunPass(c->cmds + c->bufs[bufIdx].opaOff, c->bufs[bufIdx].opaWords,
-                    bverts, c->mats, 0);
+            RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts, c->mats, 0);
             s_cnBlocks++;
         }
-        if (c->bufs[bufIdx].semiWords > 1)
+        if (c->bufs[b].semiWords > 1)
         {
-            RunPass(c->cmds + c->bufs[bufIdx].semiOff, c->bufs[bufIdx].semiWords,
-                    bverts, c->mats, 1);
+            RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts, c->mats, 1);
             s_cnBlocks++;
         }
     }
-    return 1;
+    s_flushed = 1;
+
+    /* t3d_frame_start reprogrammed rdpq modes; the PSX OT walk that follows
+     * memoises its mode application, so tell it the mode is dirty or the
+     * first PSX prim inherits t3d's combiner/blender. */
+    {
+        extern void GpuNv2a_PsxModeInvalidate(void);
+        GpuNv2a_PsxModeInvalidate();
+    }
 }
 
 void ShT3d_NotifyFrameBegin(void)
 {
     s_frameActive  = 1;
     s_worldStarted = 0;
+    /* NOT s_drawCount = 0 here: FrameBegin fires on a mid-frame VSync between
+     * the OT build and the GsDrawOt flush. The list is bounded by s_flushed. */
+}
+
+/* "Will native draw this frame": the draw is deferred to FrameEnd, but the
+ * draw LIST is filled during OT build (WorldDrawBuffer), which runs before
+ * Gfx_2dEffectsDraw -- so s_drawCount is the correct suppression signal for
+ * the fog/brightness quads. (s_cnBlocks isn't incremented until the flush.) */
+int ShT3d_WorldDrewThisFrame(void)
+{
+    return s_drawCount > 0;
 }
 
 void ShT3d_NotifyFrameEnd(void)

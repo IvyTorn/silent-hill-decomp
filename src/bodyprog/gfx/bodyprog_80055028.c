@@ -1,5 +1,8 @@
 #include "game.h"
 #include "inline_no_dmpsx.h"
+#ifdef SH_N64_PORT
+#include "sh_t3d.h"
+#endif
 #ifdef SH_PC_PORT
 #include "pc_config.h"
 /* PsyCross runtime horizontal PAR. main_pc.c bakes this to 15/14 (320x224 -> 4:3)
@@ -324,7 +327,11 @@ void Gfx_2dEffectsDraw(void) // 0x800550D0
         func_8008D470(g_WorldEnvWork.field_50, &g_WorldEnvWork.field_58, &g_WorldEnvWork.field_60, g_WorldEnvWork.waterZones);
     }
 
-    if (g_WorldEnvWork.screenBrightness > 0)
+    if (g_WorldEnvWork.screenBrightness > 0
+#ifdef SH_N64_PORT
+        && !ShT3d_WorldDrewThisFrame()   /* would darken the native world to black */
+#endif
+        )
     {
         poly            = (POLY_G4*)GsOUT_PACKET_P;
         mode            = (DR_MODE*)(GsOUT_PACKET_P + sizeof(POLY_G4));
@@ -361,6 +368,16 @@ void Gfx_2dEffectsDraw(void) // 0x800550D0
         AddPrim(ot->org, mode);
     }
 
+#ifdef SH_N64_PORT
+    /* The full-screen fog quad blends into the PSX OT world; the native world
+     * is already composited on the framebuffer, so this quad only darkens it.
+     * Skip where native drew -- its own fog pass will replace this. */
+    if (ShT3d_WorldDrewThisFrame())
+    {
+        /* nothing: native world path suppresses the PSX fog overlay */
+    }
+    else
+#endif
 #ifdef SH_PC_PORT
     /* PC port: simplified fog color quad. SetPriority is a no-op on PC,
      * and DR_MODE gets stripped by the OT0 sanitizer, so just draw the
