@@ -71,7 +71,11 @@ extern unsigned g_PsxVramPalGen;
 extern unsigned long long g_XbChunkDrawCycles, g_XbCharaCycles;
 extern int PsxVram_PageIs4bpp(const void* page);   /* psx_vram.c */
 extern int VSync(int mode);                        /* psx_libgpu_xbox.c: -1 = read the counter */
-extern int g_VBlanks;                              /* the game's own timestep, in vblanks */
+extern int g_VBlanks;                              /* the game's own vblank delta */
+/* The REAL timestep: game_main.c feeds MIN(GsGetVcount(), H_BLANKS_PER_FRAME_MIN)
+ * into g_DeltaTime, so this -- not g_VBlanks -- is what decides how much game
+ * time a frame advances, and the MIN is why a slow frame plays in slow motion. */
+extern int GsGetVcount(void);
 extern unsigned           g_XbCharaCount;
 /* sh_log_n64.c: what logging cost this frame. */
 extern unsigned long long g_ProfLogStderrTicks, g_ProfLogSdTicks;
@@ -1091,7 +1095,7 @@ void GpuNv2a_FrameEnd(void)
              * submit = tile uploads + triangle issue; vram dec/drain = page
              * decodes and full GPU drains the texture cache had to do. What is
              * left of `frame` after these is the game update + OT walk ([OTT]). */
-            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d | clip=%d rej=%d | px=%uK big=%d probe=%d | vbl=%d dt=%d",
+            SH_DBG("[PROF] frame=%uus waitFb=%uus submit=%uus uploads=%d win=%d binds=%d/ci4=%d tlutWrap=%d tlutReuse=%d | dec=%d/%uus drain=%d/%uus pal=%d | chunk=%uus chara=%uus/%u | log=%d %uus+%uus | audio=%dms | rdp clk=%uus pipe=%uus tmem=%uus cmd=%uus | tri=%d max=%uus slow=%d | up max=%uus slow=%d | clip=%d rej=%d | px=%uK big=%d probe=%d | vbl=%d dt=%d vc=%d",
                    (unsigned)TICKS_TO_US((unsigned)g_Nv2aDrawCycles),
                    (unsigned)TICKS_TO_US((unsigned)s_cnWaitFbTicks),
                    (unsigned)TICKS_TO_US((unsigned)s_cnSubmitTicks),
@@ -1110,7 +1114,7 @@ void GpuNv2a_FrameEnd(void)
                    (unsigned)TICKS_TO_US((unsigned)s_cnUpMax), s_cnUpSlow,
                    s_cnClipped, s_cnRejected,
                    (unsigned)(s_cnAreaPx / 1000ULL), s_cnBigTris, s_probeMode,
-                   VSync(-1), g_VBlanks);
+                   VSync(-1), g_VBlanks, GsGetVcount());
         }
     }
 }
