@@ -344,7 +344,12 @@ def encode_buffer_cmds(pieces, verts_out):
 
     def flush():
         if tris:
-            cmds.append(op(OP_VERTS, len(window)))
+            # T3DVertPacked interleaves vertex PAIRS: the runtime hands
+            # t3d_vert_load a pointer at win_base/2 packed structs and an even
+            # count, so both must be even. Pad with a dup of the last vert.
+            if len(window) & 1:
+                verts_out.append(verts_out[-1])
+            cmds.append(op(OP_VERTS, (len(window) + 1) & ~1))
             cmds.append(win_base[0])
             cmds.append(op(OP_TRIS, len(tris)))
             packed = []
@@ -355,8 +360,16 @@ def encode_buffer_cmds(pieces, verts_out):
             for i in range(0, len(packed), 2):
                 cmds.append((packed[i] << 8) | packed[i + 1])
         window.clear()
+        if len(verts_out) & 1:
+            verts_out.append(verts_out[-1] if verts_out else
+                             (0, 0, 0, 0, 0, 0, 0, 0, 0))
         win_base[0] = len(verts_out)
         del tris[:]
+
+    if len(verts_out) & 1:
+        verts_out.append(verts_out[-1] if verts_out else
+                         (0, 0, 0, 0, 0, 0, 0, 0, 0))
+    win_base[0] = len(verts_out)
 
     def vkey(p):
         return (round(p[0] * 2), round(p[1] * 2), round(p[2] * 2),

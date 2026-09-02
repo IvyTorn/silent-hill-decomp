@@ -121,6 +121,12 @@ void ShT3d_SpikeDraw(void)
 
     T3D_STEP("frame_start");
     t3d_frame_start();
+    /* t3d_frame_start enables Z compare+write unconditionally, but this frame
+     * has NO Z buffer (rdpq_attach(fb, NULL)) -- the RDP would read/write
+     * depth at a stale Z-image address, i.e. scribble over random RDRAM.
+     * That was the boot-garbage/delayed-crash class of the first spike runs.
+     * Off until the world stage attaches a real Z buffer. */
+    rdpq_mode_zbuf(false, false);
 
     T3D_STEP("viewport");
     t3d_viewport_set_projection(&s_viewport, T3D_DEG_TO_RAD(85.0f), 2.0f, 100.0f);
