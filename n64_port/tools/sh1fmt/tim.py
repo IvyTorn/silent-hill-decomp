@@ -49,6 +49,47 @@ class Tim:
     def clut_entry(self, row, idx):
         return struct.unpack_from("<H", self.clut, (row * self.clut_w + idx) * 2)[0]
 
+    @property
+    def bpp(self):
+        return (4, 8, 16, 24)[self.pmode]
+
+    def palette(self, row):
+        """CLUT row as a list of u16 PSX-1555 entries, or None if out of range."""
+        if row < 0 or row >= self.clut_h:
+            return None
+        n = self.clut_w
+        return list(struct.unpack_from("<%dH" % n, self.clut, row * n * 2))
+
+    def pixels_rect(self, u0, v0, w, h):
+        """Indexed pixels of a texel rect, row-major, PSX packing (4bpp: low
+        nibble = left texel, w texels -> w/2 bytes; 8bpp: 1 byte per texel).
+        Out-of-range texels read as 0. u0 and w must be even for 4bpp."""
+        out = bytearray()
+        if self.pmode == 0:
+            assert (u0 & 1) == 0 and (w & 1) == 0, (u0, w)
+            row_bytes = self.stored_w * 2
+            for y in range(v0, v0 + h):
+                if 0 <= y < self.height:
+                    base = y * row_bytes
+                    row = self.pixels[base + (u0 >> 1) : base + ((u0 + w) >> 1)]
+                    row = row + b"\x00" * ((w >> 1) - len(row))
+                else:
+                    row = b"\x00" * (w >> 1)
+                out += row
+        elif self.pmode == 1:
+            row_bytes = self.stored_w * 2
+            for y in range(v0, v0 + h):
+                if 0 <= y < self.height:
+                    base = y * row_bytes
+                    row = self.pixels[base + u0 : base + u0 + w]
+                    row = row + b"\x00" * (w - len(row))
+                else:
+                    row = b"\x00" * w
+                out += row
+        else:
+            raise ValueError("pixels_rect: only 4/8bpp")
+        return bytes(out)
+
     def rgba_for_clut_row(self, row):
         """Full image as flat RGBA bytes using CLUT row `row` (4/8bpp) or raw (16bpp).
 

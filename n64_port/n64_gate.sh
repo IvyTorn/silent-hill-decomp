@@ -224,6 +224,11 @@ while IFS= read -r f; do
         */n64_port/src/gpu_rdp.c)
             HOT="${SH_HOT_OPT:--O2}" ;;
     esac
+    # Tiny3D's headers use C23 [[deprecated]] attributes, a syntax error under
+    # gnu17. Only the bridge TU sees them; a later -std wins over TARGETFLAGS'.
+    case "$f" in
+        */n64_port/src/t3d_n64.c) HOT="$HOT -std=gnu2x -O2" ;;
+    esac
     if err=$("$TOOL" $FLAGS $INLINEFLAG $DEFS $LANGDEFS $USE_INCS $WARN $EXTRA $HOT -c "$f" -o "$obj" 2>&1); then
         pass=$((pass+1))
         # Warnings from a SUCCESSFUL compile are kept: a green gate that threw

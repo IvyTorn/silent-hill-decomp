@@ -66,7 +66,7 @@ echo "=== link ($(ls "$GATE"/*.o | wc -l) objects) ==="
 # does the same, because ld is inconsistent about global ctors/dtors and the
 # --wrap __do_global_ctors below is written against g++'s arrangement.
 if ! mips64-elf-g++ -o "$OUT/sh.elf" "$GATE"/*.o -lc -mabi=o64 \
-        -Wl,-L"$I/mips64-elf/lib" -Wl,-ldragon -Wl,-lm -Wl,-ldragonsys \
+        -Wl,-L"$I/mips64-elf/lib" -Wl,-lt3d -Wl,-ldragon -Wl,-lm -Wl,-ldragonsys \
         -Wl,-T"$I/mips64-elf/lib/n64.ld" \
         ${EXTERNS:+-Wl,-T"$EXTERNS"} \
         -Wl,--gc-sections -Wl,--wrap,__do_global_ctors -Wl,--wrap,malloc -Wl,--wrap,calloc \

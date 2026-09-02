@@ -39,6 +39,7 @@
 #include "pc_config.h"    /* g_PcConfig.n64ClipScreen */
 #include "sh_log.h"
 #include "sh_log_n64.h"
+#include "sh_t3d.h"
 
 /* 0 while the port has nothing worth looking at. The on-screen log is the only
  * diagnostic channel a TV or a headless emulator run has, and geometry starts
@@ -970,6 +971,8 @@ void GpuNv2a_Init(void)
 
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE);
     rdpq_init();
+    /* Tiny3D init is LAZY (first ShT3d_SpikeDraw) -- calling it here, before
+     * the [BOOT] psx-ram/arena setup, wedged boot at varying steps. */
     s_inited = 1;
 
     SH_DBG("[GPU] rdp up: %dx%d 16bpp x2, no z (painter's order from the OT)", SCR_W, SCR_H);
@@ -1053,6 +1056,10 @@ void GpuNv2a_FrameEnd(void)
         return;
 
     GpuNv2a_FlushBatch();
+
+    /* Stage-0 spike: RSP-transformed geometry into the same frame, after all
+     * PSX content. See t3d_n64.c for the state-discipline note. */
+    ShT3d_SpikeDraw();
 
     /* The on-screen log exists for when nothing is drawing. The moment the
      * renderer produces a triangle it has done its job and is only in the way,
