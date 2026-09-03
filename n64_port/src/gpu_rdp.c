@@ -1072,22 +1072,14 @@ void GpuNv2a_FrameEnd(void)
     if (!s_inited || s_fb == NULL)
         return;
 
-    GpuNv2a_FlushBatch();
-
-    /* DIAGNOSTIC: plain rdpq rectangles at the FrameEnd draw point. If these
-     * do NOT appear in gameplay, nothing drawn in FrameEnd reaches the screen
-     * (a mid-frame detach / buffer swap), and the whole "draw the world in
-     * FrameEnd" approach is wrong here -- independent of t3d. Green top-left,
-     * cyan top-right. */
-    rdpq_set_mode_fill(RGBA32(0, 255, 0, 255));
-    rdpq_fill_rectangle(4, 4, 44, 44);
-    rdpq_set_mode_fill(RGBA32(0, 255, 255, 255));
-    rdpq_fill_rectangle(SCR_W - 44, 4, SCR_W - 4, 44);
-
-    /* Native world at the EXACT point the spike proved works: after the PSX
-     * batch flush, right before present. (Drawn on top of characters/items
-     * until the Z buffer lands -- getting it VISIBLE comes first.) */
+    /* Native world in FrameEnd (the only point whose t3d output reaches the
+     * shown frame -- a mid-frame VSync discards earlier draws), BEFORE the
+     * final PSX batch flush so characters/items land on top of the walls.
+     * Characters that flushed incrementally earlier in the frame still sit
+     * under the world (no Z buffer yet) -- the depth pass is the next task. */
     ShT3d_WorldFlush();
+
+    GpuNv2a_FlushBatch();
 
     /* Stage-0 spike (disabled): see t3d_n64.c for the state-discipline note. */
     ShT3d_SpikeDraw();
