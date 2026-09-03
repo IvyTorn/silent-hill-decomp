@@ -3381,11 +3381,15 @@ void MainLoop(void) // 0x80032EE0
             }
         }
 #endif
-        /* Native (Tiny3D) world is drawn in GpuNv2a_FrameEnd, right before the
-         * present: that is the only point whose output survives to the shown
-         * frame (a mid-frame VSync detaches/reattaches the render target, so a
-         * draw here at GsDrawOt is discarded). The draw list + camera were
-         * recorded during OT build. */
+#ifdef SH_N64_PORT
+        /* Native (Tiny3D) world drawn HERE, before the PSX ordering-table walk:
+         * clear -> world -> PSX prims (characters/items) on top, the right
+         * order for a fixed camera with no Z buffer. The draw list + camera
+         * were recorded during OT build. (Earlier this point rendered nothing,
+         * but that was the broken camera/geometry -- retested once the world
+         * rendered from FrameEnd.) */
+        { extern void ShT3d_WorldFlush(void); ShT3d_WorldFlush(); }
+#endif
         GsDrawOt(&g_OrderingTable0[g_ActiveBufferIdx]);
 #ifdef SH_PC_PORT
         {

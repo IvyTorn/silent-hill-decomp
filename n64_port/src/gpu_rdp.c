@@ -1072,13 +1072,9 @@ void GpuNv2a_FrameEnd(void)
     if (!s_inited || s_fb == NULL)
         return;
 
-    /* Native world in FrameEnd (the only point whose t3d output reaches the
-     * shown frame -- a mid-frame VSync discards earlier draws), BEFORE the
-     * final PSX batch flush so characters/items land on top of the walls.
-     * Characters that flushed incrementally earlier in the frame still sit
-     * under the world (no Z buffer yet) -- the depth pass is the next task. */
-    ShT3d_WorldFlush();
-
+    /* Native world is drawn in game_main BEFORE GsDrawOt (world under the PSX
+     * characters/items -- correct fixed-camera order). This point stays as a
+     * safety flush of anything still queued. */
     GpuNv2a_FlushBatch();
 
     /* Stage-0 spike (disabled): see t3d_n64.c for the state-discipline note. */
