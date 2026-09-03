@@ -49,6 +49,10 @@
 #define OP_TRIS   0x4
 #define OP_END    0xF
 
+/* Diagnostic: draw the whole world as flat shaded (vertex colour), no texture,
+ * to isolate geometry-projects from texture problems. 0 = real textured path. */
+#define SH_T3DW_FLAT 0
+
 /* Four cells around the player go native, the rest stay on the PSX fallback;
  * grows once the strip-IPD funding lands. */
 #define MAX_WCHUNKS   3
@@ -137,9 +141,11 @@ int ShT3d_Ready(void);            /* from t3d_n64.c */
 
 /* Camera, COPIED (not aliased) at Ipd_ChunkDraw time. GsWSMATRIX is mutated
  * by every later object draw (characters), so by the deferred FrameEnd flush
- * the pointer would read a character's matrix. MATRIX = 9 s16 + pad + 3 s32. */
+ * the pointer would read a character's matrix. s_wm = view ROTATION; the
+ * camera POSITION comes separately from D_800C3868.t (GsWSMATRIX.t is zero on
+ * this port -- deriving eye from it put the camera at the origin). Q8 world. */
 static int16_t s_wm[9];
-static int32_t s_wt[3];
+static int32_t s_camPos[3];
 static int s_haveView;
 static int s_geomH, s_geomOfx, s_geomOfy;
 
@@ -154,10 +160,10 @@ static struct { int16_t cx, cz, buf; } s_drawList[WORLD_DRAWLIST_MAX];
 static int s_drawCount;
 static int s_flushed = 1;   /* 1 => next WorldViewSet starts a fresh list */
 
-void ShT3d_WorldViewSet(const void* wsMatrix, int h, int ofx, int ofy)
+void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
+                        int h, int ofx, int ofy)
 {
     const int16_t* m = (const int16_t*)wsMatrix;
-    const int32_t* t = (const int32_t*)((const uint8_t*)wsMatrix + 20);
     int i;
     /* First camera handoff after a flush = start of a new frame's world;
      * clear the draw list here rather than on FrameBegin (which the game's
@@ -169,7 +175,7 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int h, int ofx, int ofy)
     }
     for (i = 0; i < 9; i++)
         s_wm[i] = m[i];
-    s_wt[0] = t[0]; s_wt[1] = t[1]; s_wt[2] = t[2];
+    s_camPos[0] = camX; s_camPos[1] = camY; s_camPos[2] = camZ;
     s_geomH   = h;
     s_geomOfx = ofx;
     s_geomOfy = ofy;
@@ -386,6 +392,10 @@ static void RunPass(const uint8_t* p, int cmdWords,
         {
             uint16_t tref = rd16(p + i * 2);
             i++;
+#if SH_T3DW_FLAT
+            (void)tref; skip = 0;   /* flat debug: draw every group solid */
+            continue;
+#endif
             if (needSync) { t3d_tri_sync(); needSync = 0; }
             skip = 0;
             if (tref == 0)
@@ -402,6 +412,11 @@ static void RunPass(const uint8_t* p, int cmdWords,
                     WTile* t = &s_tiles[slot];
                     surface_t surf = surface_make_linear(t->pix,
                         t->fmt == 0 ? FMT_CI4 : FMT_CI8, t->w, t->h);
+                    /* rdpq_sync_tile before overwriting TMEM: t3d_tri_draw is
+                     * async on the RSP/RDP, so without the sync the load races
+                     * the previous group's rasterisation (t3dmodel.c does this
+                     * before every upload). */
+                    rdpq_sync_tile();
                     rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
                     rdpq_tex_upload_tlut(s_pals + s_palOffsets[arg], 0,
                                          s_palWords[arg]);
@@ -638,10 +653,17 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             int32_t tx = (int32_t)rd32(ip + 20) + cellX * 10240;
             int32_t ty = (int32_t)rd32(ip + 24);
             int32_t tz = (int32_t)rd32(ip + 28) + cellZ * 10240;
+            /* TRUE rotation: instance rot is Q12 (4096 = 1.0). Vertices are
+             * scaled to world/8 at load (see below) so they share the matrix
+             * translation's scale -- both in world/8 t3d units, small enough
+             * for t3d's fixed-point pipeline. (The old /32768 folded a 1/8
+             * scale in to compensate for raw Q8 vertices, but that left the
+             * vertices themselves world*256 -- 8x past t3d's usable range, so
+             * the RSP overflowed them off-screen.) */
             memset(&m, 0, sizeof m);
             for (r = 0; r < 3; r++)
                 for (cc = 0; cc < 3; cc++)
-                    m.m[cc][r] = (float)(int16_t)rd16(ip + (r * 3 + cc) * 2) / 32768.0f;
+                    m.m[cc][r] = (float)(int16_t)rd16(ip + (r * 3 + cc) * 2) / 4096.0f;
             m.m[3][0] = (float)tx / 8.0f;
             m.m[3][1] = (float)ty / 8.0f;
             m.m[3][2] = (float)tz / 8.0f;
@@ -691,9 +713,13 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                         if (cr > 255) cr = 255;
                         if (cg > 255) cg = 255;
                         if (cb > 255) cb = 255;
-                        pos[0] = (int16_t)rd16(v + 0);
-                        pos[1] = (int16_t)rd16(v + 2);
-                        pos[2] = (int16_t)rd16(v + 4);
+                        /* Q8 world (D*256) -> world/8 t3d units (D*32): >>3.
+                         * Matches the instance translation (tx/8) and the eye
+                         * (camPos/8); keeps every coordinate small enough that
+                         * t3d's fixed-point transform does not overflow. */
+                        pos[0] = (int16_t)((int16_t)rd16(v + 0) / 8);
+                        pos[1] = (int16_t)((int16_t)rd16(v + 2) / 8);
+                        pos[2] = (int16_t)((int16_t)rd16(v + 4) / 8);
                         rgba = ((uint32_t)cr << 24) | ((uint32_t)cg << 16) |
                                ((uint32_t)cb << 8) | (uint32_t)v[9];
                         if (vi & 1) { vp[vi / 2].rgbaB = rgba; vp[vi / 2].normB = 0; }
@@ -815,28 +841,20 @@ static void WorldFrameStart(void)
     float eye[3], fwd[3], up[3];
     int i;
 
+    /* Mirror the spike's ORDER exactly (the spike renders in gameplay, this
+     * path did not): frame_start -> zbuf off -> viewport (proj/look/attach)
+     * FIRST, then combiner/lights/drawflags, then draw. Setting lights or the
+     * combiner before the viewport attach left them stale. */
     t3d_frame_start();
     rdpq_mode_zbuf(false, false);            /* no Z buffer attached yet */
-    rdpq_mode_filter(FILTER_POINT);
-    rdpq_mode_alphacompare(1);
-    rdpq_mode_tlut(TLUT_RGBA16);
-    rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
-    t3d_light_set_count(0);
-    t3d_state_set_drawflags(T3D_FLAG_SHADED | T3D_FLAG_TEXTURED);
 
     for (i = 0; i < 9; i++)
         R[i / 3][i % 3] = (float)s_wm[i] / 4096.0f;
-
-    /* Camera position in world = -R^T * t (R orthonormal). t is Q8 world;
-     * eye in t3d units = that >> 3 (== / 8). */
+    /* Eye = camera world position (Q8) / 8 = world/8 t3d units (matches the
+     * instance translation tx/8 and the >>3 vertices). */
     for (i = 0; i < 3; i++)
-    {
-        float cw = -(R[0][i] * (float)s_wt[0] + R[1][i] * (float)s_wt[1]
-                   + R[2][i] * (float)s_wt[2]) / 4096.0f;   /* Q8 world */
-        eye[i] = cw / 8.0f;                                 /* t3d units */
-    }
-    /* Camera basis in world: forward = R^T * +Z (PSX looks down +Z);
-     * up = -R^T * +Y (PSX +Y is DOWN, t3d +Y is up). */
+        eye[i] = (float)s_camPos[i] / 8.0f;
+    /* forward = R^T*+Z (PSX looks down +Z); up = -R^T*+Y (PSX +Y is down). */
     for (i = 0; i < 3; i++)
     {
         fwd[i] =  R[2][i];
@@ -844,32 +862,49 @@ static void WorldFrameStart(void)
     }
 
     {
-        /* fovy from the GTE projection distance h: a point at screen half-
-         * height projects at y/z = 120/h, so tan(fovy/2) = 120/h. */
+        static const uint8_t ambWhite[4] = {255, 255, 255, 255};
+        static const uint8_t dirWhite[4] = {255, 255, 255, 255};
         float h = (float)s_geomH;
-        float fovy = (h > 1.0f) ? 2.0f * atanf(120.0f / h) : 1.2f;
-        T3DVec3 e  = {{ eye[0], eye[1], eye[2] }};
-        T3DVec3 tg = {{ eye[0] + fwd[0] * 256.0f,
-                        eye[1] + fwd[1] * 256.0f,
-                        eye[2] + fwd[2] * 256.0f }};
-        T3DVec3 u  = {{ up[0], up[1], up[2] }};
+        float fovy = (h > 1.0f) ? 2.0f * atanf(120.0f / h) : 1.0f;
+        T3DVec3 e   = {{ eye[0], eye[1], eye[2] }};
+        T3DVec3 tg  = {{ eye[0] + fwd[0]*256.0f, eye[1] + fwd[1]*256.0f, eye[2] + fwd[2]*256.0f }};
+        T3DVec3 u   = {{ up[0], up[1], up[2] }};
+        T3DVec3 ld  = {{ 0.0f, 0.0f, 1.0f }};
 
-        if (!s_wvpInited)
-        {
-            s_wvp = t3d_viewport_create();
-            s_wvpInited = 1;
-        }
-        t3d_viewport_set_projection(&s_wvp, fovy, 8.0f, 400000.0f);
+        if (!s_wvpInited) { s_wvp = t3d_viewport_create(); s_wvpInited = 1; }
+        t3d_viewport_set_projection(&s_wvp, fovy, 4.0f, 50000.0f);
         t3d_viewport_look_at(&s_wvp, &e, &tg, &u);
         t3d_viewport_attach(&s_wvp);
 
+        rdpq_mode_filter(FILTER_POINT);
+#if SH_T3DW_FLAT
+        rdpq_mode_alphacompare(0);
+        rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+#else
+        rdpq_mode_alphacompare(1);
+        rdpq_mode_tlut(TLUT_RGBA16);
+        rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+#endif
+        t3d_light_set_ambient(ambWhite);
+        fm_vec3_norm(&ld, &ld);
+        t3d_light_set_directional(0, dirWhite, &ld);
+        t3d_light_set_count(1);
+#if SH_T3DW_FLAT
+        t3d_state_set_drawflags(T3D_FLAG_SHADED);
+#else
+        t3d_state_set_drawflags(T3D_FLAG_SHADED | T3D_FLAG_TEXTURED);
+#endif
+
         {
             static int s_cs;
-            if ((s_cs++ & 127) == 0)
-                SH_DBG("[T3DCAM] eye=%d,%d,%d fwd=%d,%d,%d h=%d fovyx100=%d",
+            if ((s_cs++ & 63) == 0)
+                SH_DBG("[T3DCAM] camPos=%d,%d,%d eye=%d,%d,%d fwd=%d,%d,%d h=%d cell0=%d,%d",
+                       (int)s_camPos[0], (int)s_camPos[1], (int)s_camPos[2],
                        (int)eye[0], (int)eye[1], (int)eye[2],
                        (int)(fwd[0]*100), (int)(fwd[1]*100), (int)(fwd[2]*100),
-                       s_geomH, (int)(fovy*100));
+                       s_geomH,
+                       s_drawCount > 0 ? s_drawList[0].cx : 99,
+                       s_drawCount > 0 ? s_drawList[0].cz : 99);
         }
     }
 

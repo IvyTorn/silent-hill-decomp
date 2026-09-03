@@ -40,7 +40,7 @@ static float         s_rotAngle;
 /* 0 now that the spike proved itself (title screenshot 20260902_030517 +
  * 1600 stable frames): the quad only obscures the world work. Flip to 1 for
  * a quick "is t3d alive" check. */
-#define SH_T3D_SPIKE 0
+#define SH_T3D_SPIKE 0   /* proven: t3d renders in gameplay (gradient quad shown) */
 
 int ShT3d_Ready(void)
 {

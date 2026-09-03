@@ -3145,9 +3145,12 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
      * would use. Read here, at draw time, because the lighting helpers in
      * bodyprog_80055028.c flip them mid-emit and always restore. */
     {
+        extern MATRIX D_800C3868;   /* camera transform; .t = camera world pos (Q8) */
         s32 gofx, gofy;
         ReadGeomOffset(&gofx, &gofy);
-        ShT3d_WorldViewSet(&GsWSMATRIX, ReadGeomScreen(), gofx, gofy);
+        ShT3d_WorldViewSet(&GsWSMATRIX,
+                           D_800C3868.t[0], D_800C3868.t[1], D_800C3868.t[2],
+                           ReadGeomScreen(), gofx, gofy);
     }
 #endif
 

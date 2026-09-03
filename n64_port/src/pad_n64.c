@@ -147,9 +147,9 @@ void Pad_Poll(void)
                 s_padBuf[6] = 0x80; s_padBuf[7] = 0x00;               /* stick full up */
                 return;
             }
-            if (g_N64GameState == 7 && s_menuParked < 2700)
+            if (g_N64GameState == 7 && s_menuParked < 60)
             {
-                s_menuParked++;                                       /* ~45s at 60Hz */
+                s_menuParked++;   /* brief park (~1s@60Hz / ~6s@10VPS ares) */
                 goto real_input;
             }
         }
