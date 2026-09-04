@@ -286,6 +286,21 @@ void ShLogN64_EnableSdMirror(void)
         SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log");
 }
 
+/* Crash-path commit. fflush alone pushes bytes to the FAT layer but leaves
+ * the directory entry's SIZE stale, so everything since the last 1-second
+ * fclose cycle -- always the [CRASH] lines themselves -- reads back as
+ * missing. fclose commits data AND size; no reopen, the next stop is the
+ * red screen. */
+void ShLogN64_CrashCommit(void)
+{
+    if (s_sdMirror != NULL)
+    {
+        FILE* f = s_sdMirror;
+        s_sdMirror = NULL;   /* no further mirror writes mid-death */
+        fclose(f);
+    }
+}
+
 void SH_DebugLogInit(void)
 {
     if (g_ShDebugLog != NULL)

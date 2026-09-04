@@ -88,6 +88,9 @@ typedef struct
     uint32_t opaOff, semiOff;
     uint16_t opaWords, semiWords;
     uint16_t vbase;      /* first vert (pair-aligned) of this buffer */
+    /* First OP_VERTS-group index of each stream in the chunk's groupPos
+     * array; RunPass counts groups upward from here as it replays. */
+    uint16_t opaGroupBase, semiGroupBase;
     uint16_t pad;
 } WBuf;
 
@@ -100,7 +103,9 @@ typedef struct
     WBuf*          bufs;       /* -> own arena slot */
     T3DVertPacked* verts;      /* -> own arena slot, cache-written-back */
     T3DMat4FP*     mats;       /* -> own arena slot, after verts */
-    float*         instPos;    /* -> own arena slot: 3 floats/inst, world/8 */
+    float*         groupPos;   /* per-OP_VERTS-group world/8 centroids, after
+                                * the cmd streams in the arena; NULL = none
+                                * fitted (every group classifies background) */
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
     uint8_t*       cmds;       /* -> own arena slot: all passes' streams */
     int            tileRefCount;
@@ -379,18 +384,27 @@ static int s_cnTileMiss;   /* groups whose geometry was skipped this frame */
  * a guarded one deferred forever). Replay costs ~1-3ms of t3d calls for a
  * visible room against the ~100ms the RSP path replaces, needs zero heap,
  * and tile misses self-heal frame to frame instead of baking into a block. */
-/* wantFg: 0 = draw only background instances (farther than the player), 1 =
+/* A group (one OP_VERTS load) is foreground only when its centroid is nearer
+ * the camera than the player by more than this margin (world/8: 16 = half a
+ * world unit). Without it the floor patch at the player's own feet sits right
+ * on the split plane and flickers over him frame to frame. */
+#define WORLD_FG_BIAS 16.0f
+
+/* wantFg: 0 = draw only background groups (farther than the player), 1 =
  * only foreground (nearer). Splitting the same stream twice around the PSX
- * character OT reproduces the OT's back-to-front order with no Z buffer. */
+ * character OT reproduces the OT's back-to-front order with no Z buffer.
+ * groupBase = this stream's first index into groupPos (see WBuf); groupPos
+ * NULL = no centroid data, everything is background. */
 static void RunPass(const uint8_t* p, int cmdWords,
                     const T3DVertPacked* verts, const T3DMat4FP* mats,
-                    const float* instPos, int instCount, int wantFg,
+                    const float* groupPos, int groupBase, int wantFg,
                     int semi)
 {
-    /* depthSkip defaults to wantFg so any geometry before the first OP_MATRIX
-     * (no instance to classify) draws in the background pass only -- never in
-     * both, which would double-draw it. */
+    /* depthSkip defaults to wantFg so any geometry before the first OP_VERTS
+     * classification draws in the background pass only -- never in both,
+     * which would double-draw it. */
     int i = 0, pushed = 0, needSync = 0, tileSkip = 0, depthSkip = wantFg;
+    int gIdx = groupBase;
 
     /* Pass-wide state the OTHER pass may have changed. */
     if (semi)
@@ -457,24 +471,25 @@ static void RunPass(const uint8_t* p, int cmdWords,
                 t3d_matrix_pop(1);
             t3d_matrix_push(&mats[arg]);
             pushed = 1;
-            /* Classify this instance: view-space depth = forward . (pos - eye)
-             * in world/8 units. Nearer than the player (< s_playerViewZ) draws
-             * in the foreground pass, otherwise the background pass. */
-            if ((int)arg < instCount)
-            {
-                const float* P = instPos + (int)arg * 3;
-                float vz = s_fwdF[0] * (P[0] - s_eyeF[0])
-                         + s_fwdF[1] * (P[1] - s_eyeF[1])
-                         + s_fwdF[2] * (P[2] - s_eyeF[2]);
-                depthSkip = (((vz < s_playerViewZ) ? 1 : 0) != wantFg);
-            }
-            else
-                depthSkip = 0;
         }
         else if (opc == OP_VERTS)
         {
             uint16_t first = rd16(p + i * 2);
+            int g = gIdx++;
             i++;
+            /* Classify this <=32-vert patch: view-space depth = forward .
+             * (centroid - eye), world/8. Clearly nearer than the player =
+             * foreground (drawn after the character OT), else background. */
+            if (groupPos != NULL)
+            {
+                const float* P = groupPos + g * 3;
+                float vz = s_fwdF[0] * (P[0] - s_eyeF[0])
+                         + s_fwdF[1] * (P[1] - s_eyeF[1])
+                         + s_fwdF[2] * (P[2] - s_eyeF[2]);
+                depthSkip = (((vz < s_playerViewZ - WORLD_FG_BIAS) ? 1 : 0) != wantFg);
+            }
+            else
+                depthSkip = wantFg;
             if (tileSkip || depthSkip)
                 continue;
             if (needSync) { t3d_tri_sync(); needSync = 0; }
@@ -633,7 +648,6 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         {
             int vertBytes = (int)sizeof(T3DVertPacked) * (total / 2 + 1);
             int matBytes  = (int)sizeof(T3DMat4FP) * (instCount ? instCount : 1);
-            int posBytes  = (int)sizeof(float) * 3 * (instCount ? instCount : 1);
             int refBytes  = refCount ? refCount * 2 : 2;
             int bufBytes  = (int)sizeof(WBuf) * bufCount;
             int cmdBytes  = 0;
@@ -647,7 +661,6 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                 if (sw > 1) cmdBytes += (sw * 2 + 3) & ~3;
             }
             need = ((vertBytes + 15) & ~15) + ((matBytes + 15) & ~15)
-                 + ((posBytes + 15) & ~15)
                  + ((refBytes + 15) & ~15) + ((bufBytes + 15) & ~15)
                  + ((cmdBytes + 15) & ~15);
             if (need > WCHUNK_ARENA_BYTES)
@@ -661,8 +674,6 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             a += (vertBytes + 15) & ~15;
             c->mats = (T3DMat4FP*)a;
             a += (matBytes + 15) & ~15;
-            c->instPos = (float*)a;
-            a += (posBytes + 15) & ~15;
             c->tileRefs = (uint16_t*)a;
             a += (refBytes + 15) & ~15;
             c->bufs = (WBuf*)a;
@@ -703,12 +714,6 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             m.m[3][1] = (float)ty / 8.0f;
             m.m[3][2] = (float)tz / 8.0f;
             m.m[3][3] = 1.0f;
-            /* Instance origin in world/8 (same space as the eye) -- RunPass
-             * projects it onto the camera forward axis to split foreground
-             * from background per frame. */
-            c->instPos[i * 3 + 0] = m.m[3][0];
-            c->instPos[i * 3 + 1] = m.m[3][1];
-            c->instPos[i * 3 + 2] = m.m[3][2];
             t3d_mat4_to_fixed(&c->mats[i], &m);
         }
         data_cache_hit_writeback(c->mats,
@@ -809,6 +814,126 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                     cmdCur += (semiWords * 2 + 3) & ~3;
                 }
                 vbase += (vcount + 1) & ~1;
+            }
+
+            /* Per-GROUP centroids for the painter's split. An OP_VERTS group
+             * is a <=32-vert patch of wall/floor, so classifying groups --
+             * instead of whole instances: this cell has FIVE instances, each
+             * a room-sized blob whose single origin flipped the entire shell
+             * over the characters -- approaches the PSX ordering table's
+             * per-primitive granularity. Each centroid is the group's local
+             * vert average pushed through its instance matrix into world/8,
+             * appended after the command streams in the arena. If they don't
+             * fit, groupPos stays NULL and every group draws in the
+             * background pass -- the pre-split behaviour, never worse. */
+            {
+                uint8_t* arena  = s_chunkArena[(int)(c - s_chunks)];
+                uint32_t gcount = 0;
+                int      bi, pass;
+
+                for (bi = 0; bi < bufCount; bi++)
+                    for (pass = 0; pass < 2; pass++)
+                    {
+                        int words = pass ? c->bufs[bi].semiWords : c->bufs[bi].opaWords;
+                        const uint8_t* p = c->cmds + (pass ? c->bufs[bi].semiOff : c->bufs[bi].opaOff);
+                        int k = 0;
+                        if (pass) c->bufs[bi].semiGroupBase = (uint16_t)gcount;
+                        else      c->bufs[bi].opaGroupBase  = (uint16_t)gcount;
+                        if (words <= 1)
+                            continue;
+                        while (k < words)
+                        {
+                            uint16_t w   = rd16(p + k * 2);
+                            uint16_t opc = w >> 12;
+                            uint16_t arg = w & 0xFFF;
+                            k++;
+                            if (opc == OP_TILE)       k++;
+                            else if (opc == OP_VERTS) { k++; gcount++; }
+                            else if (opc == OP_TRIS)  k += (arg * 3 + 1) / 2;
+                            else if (opc == OP_END)   break;
+                            /* OP_MATRIX: 1 word, nothing to skip */
+                        }
+                    }
+
+                {
+                    uint32_t gbytes = gcount * 3 * (uint32_t)sizeof(float);
+                    uint8_t* gp     = c->cmds + ((cmdCur + 15u) & ~15u);
+                    if (gcount == 0 || gp + gbytes > arena + WCHUNK_ARENA_BYTES)
+                    {
+                        c->groupPos = NULL;
+                        if (gcount != 0)
+                            SH_DBG("[T3DW] %s: %u group centroids over the arena -- background-only",
+                                   base, (unsigned)gcount);
+                    }
+                    else
+                    {
+                        float*   gpos = (float*)gp;
+                        uint32_t g    = 0;
+                        c->groupPos = gpos;
+                        for (bi = 0; bi < bufCount; bi++)
+                            for (pass = 0; pass < 2; pass++)
+                            {
+                                int words = pass ? c->bufs[bi].semiWords : c->bufs[bi].opaWords;
+                                const uint8_t* p = c->cmds + (pass ? c->bufs[bi].semiOff : c->bufs[bi].opaOff);
+                                int bvbase  = c->bufs[bi].vbase;
+                                int curInst = -1;
+                                int k = 0;
+                                if (words <= 1)
+                                    continue;
+                                while (k < words)
+                                {
+                                    uint16_t w   = rd16(p + k * 2);
+                                    uint16_t opc = w >> 12;
+                                    uint16_t arg = w & 0xFFF;
+                                    k++;
+                                    if (opc == OP_TILE)
+                                        k++;
+                                    else if (opc == OP_MATRIX)
+                                        curInst = (int)arg;
+                                    else if (opc == OP_VERTS)
+                                    {
+                                        int     first = rd16(p + k * 2);
+                                        int     n     = arg;
+                                        int32_t sx = 0, sy = 0, sz = 0;
+                                        float   lx, ly, lz, wx, wy, wz;
+                                        int     v;
+                                        k++;
+                                        for (v = 0; v < n; v++)
+                                        {
+                                            int vi = bvbase + first + v;
+                                            const int16_t* q = (vi & 1) ? c->verts[vi / 2].posB
+                                                                        : c->verts[vi / 2].posA;
+                                            sx += q[0]; sy += q[1]; sz += q[2];
+                                        }
+                                        if (n > 0) { lx = (float)sx / n; ly = (float)sy / n; lz = (float)sz / n; }
+                                        else       { lx = ly = lz = 0.0f; }
+                                        if (curInst >= 0 && curInst < instCount)
+                                        {
+                                            /* T3DMat4FP is the float matrix verbatim in
+                                             * 16.16 (m[col].i/f[row]); world[r] =
+                                             * sum_c M(c,r)*local[c] + M(3,r), the same
+                                             * multiply the RSP applies to the verts. */
+                                            const T3DMat4FP* fm = &c->mats[curInst];
+#define MFP(cc, r) ((float)fm->m[cc].i[r] + (float)fm->m[cc].f[r] * (1.0f / 65536.0f))
+                                            wx = MFP(0,0)*lx + MFP(1,0)*ly + MFP(2,0)*lz + MFP(3,0);
+                                            wy = MFP(0,1)*lx + MFP(1,1)*ly + MFP(2,1)*lz + MFP(3,1);
+                                            wz = MFP(0,2)*lx + MFP(1,2)*ly + MFP(2,2)*lz + MFP(3,2);
+#undef MFP
+                                        }
+                                        else { wx = lx; wy = ly; wz = lz; }
+                                        gpos[g * 3 + 0] = wx;
+                                        gpos[g * 3 + 1] = wy;
+                                        gpos[g * 3 + 2] = wz;
+                                        g++;
+                                    }
+                                    else if (opc == OP_TRIS)
+                                        k += (arg * 3 + 1) / 2;
+                                    else if (opc == OP_END)
+                                        break;
+                                }
+                            }
+                    }
+                }
             }
         }
 
@@ -929,14 +1054,35 @@ static void WorldFrameStart(void)
         static const uint8_t ambWhite[4] = {255, 255, 255, 255};
         static const uint8_t dirWhite[4] = {255, 255, 255, 255};
         float h = (float)s_geomH;
-        float fovy = (h > 1.0f) ? 2.0f * atanf(120.0f / h) : 1.0f;
         T3DVec3 e   = {{ eye[0], eye[1], eye[2] }};
         T3DVec3 tg  = {{ eye[0] + fwd[0]*256.0f, eye[1] + fwd[1]*256.0f, eye[2] + fwd[2]*256.0f }};
         T3DVec3 u   = {{ up[0], up[1], up[2] }};
         T3DVec3 ld  = {{ 0.0f, 0.0f, 1.0f }};
 
         if (!s_wvpInited) { s_wvp = t3d_viewport_create(); s_wvpInited = 1; }
-        t3d_viewport_set_projection(&s_wvp, fovy, 4.0f, 50000.0f);
+        /* Off-centre PSX projection. tan(vfov/2) = 120/h over the 240-line
+         * target reproduces the GTE's scale exactly (screen px = h * d/z on
+         * both paths, x and y), and the geometry offset (ofx,ofy) -- the
+         * game's projection CENTRE, which the PSX-prim path honours for the
+         * characters -- is applied as an NDC translate. The old symmetric
+         * frustum pinned the native centre at (160,120) while Harry projected
+         * about (ofx,ofy): a constant on-screen offset between him and the
+         * world he stood in. */
+        {
+            float nearP = 4.0f, farP = 50000.0f;
+            float tanH  = (h > 1.0f) ? (120.0f / h) : 1.0f;
+            T3DMat4 proj;
+            memset(&proj, 0, sizeof proj);
+            proj.m[0][0] = 1.0f / ((320.0f / 240.0f) * tanH);
+            proj.m[1][1] = 1.0f / tanH;
+            proj.m[2][2] = farP / (nearP - farP);
+            proj.m[2][3] = -1.0f;
+            proj.m[3][2] = -2.0f * farP * nearP / (farP - nearP);
+            proj.m[2][0] = -((float)s_geomOfx - 160.0f) / 160.0f;
+            proj.m[2][1] =  ((float)s_geomOfy - 120.0f) / 120.0f;
+            t3d_viewport_set_w_normalize(&s_wvp, nearP, farP);
+            t3d_viewport_set_projection_matrix(&s_wvp, &proj);
+        }
         t3d_viewport_look_at(&s_wvp, &e, &tg, &u);
         t3d_viewport_attach(&s_wvp);
 
@@ -962,11 +1108,11 @@ static void WorldFrameStart(void)
         {
             static int s_cs;
             if ((s_cs++ & 63) == 0)
-                SH_DBG("[T3DCAM] camPos=%d,%d,%d eye=%d,%d,%d fwd=%d,%d,%d h=%d cell0=%d,%d",
+                SH_DBG("[T3DCAM] camPos=%d,%d,%d eye=%d,%d,%d fwd=%d,%d,%d h=%d ofs=%d,%d pvz=%d cell0=%d,%d",
                        (int)s_camPos[0], (int)s_camPos[1], (int)s_camPos[2],
                        (int)eye[0], (int)eye[1], (int)eye[2],
                        (int)(fwd[0]*100), (int)(fwd[1]*100), (int)(fwd[2]*100),
-                       s_geomH,
+                       s_geomH, s_geomOfx, s_geomOfy, (int)s_playerViewZ,
                        s_drawCount > 0 ? s_drawList[0].cx : 99,
                        s_drawCount > 0 ? s_drawList[0].cz : 99);
         }
@@ -1048,13 +1194,13 @@ static void WorldFlushPass(int wantFg)
         if (c->bufs[b].opaWords > 1)
         {
             RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
-                    c->mats, c->instPos, c->instCount, wantFg, 0);
+                    c->mats, c->groupPos, c->bufs[b].opaGroupBase, wantFg, 0);
             s_cnBlocks++;
         }
         if (c->bufs[b].semiWords > 1)
         {
             RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
-                    c->mats, c->instPos, c->instCount, wantFg, 1);
+                    c->mats, c->groupPos, c->bufs[b].semiGroupBase, wantFg, 1);
             s_cnBlocks++;
         }
     }

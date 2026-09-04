@@ -109,6 +109,12 @@ static void N64_CrashDump(exception_t* ex)
            (unsigned long)(uint32_t)ex->regs->a0, (unsigned long)(uint32_t)ex->regs->v0,
            (unsigned long)(uint32_t)ex->regs->s0, (unsigned long)(uint32_t)ex->regs->fp);
     SH_DebugLogFlush();
+    {
+        /* fflush is not enough on FAT (stale directory size); commit hard so
+         * the [CRASH] lines above actually survive the power cycle. */
+        extern void ShLogN64_CrashCommit(void);
+        ShLogN64_CrashCommit();
+    }
     exception_default_handler(ex);
 }
 
