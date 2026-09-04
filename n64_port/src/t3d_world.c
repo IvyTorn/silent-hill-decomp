@@ -393,6 +393,46 @@ static int s_cnTileMiss;   /* groups whose geometry was skipped this frame */
  * on the split plane and flickers over him frame to frame. */
 #define WORLD_FG_BIAS 16.0f
 
+/* Program the combiner and upload a tile's texels+palette to TMEM. Returns 0
+ * (caller drops the group's draws) when the tile isn't resident -- drawing
+ * with stale TMEM painted other rooms' art onto this one's furniture. Called
+ * LAZILY from the first drawn OP_TRIS after an OP_TILE, so a tile whose every
+ * group lands in the other pass never uploads at all: the eager version
+ * re-uploaded the full tile set in BOTH passes, and with the RDP pipe already
+ * ~119ms busy of a ~128ms frame that pushed heavy frames past rspq's 200ms
+ * RSP watchdog ("__rsp_crash" mid-OT walk). */
+static int BindWorldTile(uint16_t tref, uint16_t palArg)
+{
+    int slot;
+    if (tref == 0)
+    {
+        /* untextured group: shade-only, or it would sample whatever tile the
+         * previous group left in TMEM */
+        rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+        return 1;
+    }
+    slot = TileSlotFind(tref - 1);
+    if (slot < 0)
+    {
+        s_cnTileMiss++;
+        return 0;
+    }
+    {
+        WTile* t = &s_tiles[slot];
+        surface_t surf = surface_make_linear(t->pix,
+            t->fmt == 0 ? FMT_CI4 : FMT_CI8, t->w, t->h);
+        /* rdpq_sync_tile before overwriting TMEM: t3d_tri_draw is async on
+         * the RSP/RDP, so without the sync the load races the previous
+         * group's rasterisation (t3dmodel.c does this before every upload). */
+        rdpq_sync_tile();
+        rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+        rdpq_tex_upload_tlut(s_pals + s_palOffsets[palArg], 0,
+                             s_palWords[palArg]);
+        rdpq_tex_upload(TILE0, &surf, NULL);
+    }
+    return 1;
+}
+
 /* wantFg: 0 = draw only background groups (farther than the player), 1 =
  * only foreground (nearer). Splitting the same stream twice around the PSX
  * character OT reproduces the OT's back-to-front order with no Z buffer.
@@ -408,6 +448,11 @@ static void RunPass(const uint8_t* p, int cmdWords,
      * which would double-draw it. */
     int i = 0, pushed = 0, needSync = 0, tileSkip = 0, depthSkip = wantFg;
     int gIdx = groupBase;
+    /* Lazy tile state: OP_TILE only records; BindWorldTile runs at the first
+     * OP_TRIS that actually draws under it. A pending tile overwritten by the
+     * next OP_TILE was for a fully-skipped run of groups. */
+    int tilePending = 0;
+    uint16_t pendTref = 0, pendPal = 0;
 
     /* Pass-wide state the OTHER pass may have changed. */
     if (semi)
@@ -430,42 +475,10 @@ static void RunPass(const uint8_t* p, int cmdWords,
             (void)tref; tileSkip = 0;   /* flat debug: draw every group solid */
             continue;
 #endif
-            if (needSync) { t3d_tri_sync(); needSync = 0; }
-            tileSkip = 0;
-            if (tref == 0)
-            {
-                /* untextured group: shade-only, or it would sample whatever
-                 * tile the previous group left in TMEM */
-                rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
-            }
-            else
-            {
-                int slot = TileSlotFind(tref - 1);
-                if (slot >= 0)
-                {
-                    WTile* t = &s_tiles[slot];
-                    surface_t surf = surface_make_linear(t->pix,
-                        t->fmt == 0 ? FMT_CI4 : FMT_CI8, t->w, t->h);
-                    /* rdpq_sync_tile before overwriting TMEM: t3d_tri_draw is
-                     * async on the RSP/RDP, so without the sync the load races
-                     * the previous group's rasterisation (t3dmodel.c does this
-                     * before every upload). */
-                    rdpq_sync_tile();
-                    rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
-                    rdpq_tex_upload_tlut(s_pals + s_palOffsets[arg], 0,
-                                         s_palWords[arg]);
-                    rdpq_tex_upload(TILE0, &surf, NULL);
-                }
-                else
-                {
-                    /* Missing tile: DROP the group's geometry. Drawing it
-                     * with stale TMEM painted other rooms' art (a wanted
-                     * poster) onto this one's furniture. A hole is honest
-                     * and the census counts it. */
-                    tileSkip = 1;
-                    s_cnTileMiss++;
-                }
-            }
+            pendTref    = tref;
+            pendPal     = arg;
+            tilePending = 1;
+            tileSkip    = 0;   /* unknown until bound; the bind decides */
         }
         else if (opc == OP_MATRIX)
         {
@@ -493,7 +506,11 @@ static void RunPass(const uint8_t* p, int cmdWords,
             }
             else
                 depthSkip = wantFg;
-            if (tileSkip || depthSkip)
+            /* tileSkip is NOT checked here: with lazy binding a missing tile
+             * isn't known until the bind at OP_TRIS; the wasted vert load on
+             * that rare path (miss=0 in every log) is cheaper than binding
+             * tiles for groups that never draw. */
+            if (depthSkip)
                 continue;
             if (needSync) { t3d_tri_sync(); needSync = 0; }
             t3d_vert_load(verts + first / 2, 0, arg);
@@ -501,15 +518,24 @@ static void RunPass(const uint8_t* p, int cmdWords,
         else if (opc == OP_TRIS)
         {
             int n = arg, k;
-            if (!tileSkip && !depthSkip)
+            if (!depthSkip)
             {
-                for (k = 0; k < n; k++)
+                if (tilePending)
                 {
-                    /* packed u8 triples across u16 words */
-                    int base = i * 2 + k * 3;
-                    t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
+                    if (needSync) { t3d_tri_sync(); needSync = 0; }
+                    tileSkip = !BindWorldTile(pendTref, pendPal);
+                    tilePending = 0;
                 }
-                needSync = 1;
+                if (!tileSkip)
+                {
+                    for (k = 0; k < n; k++)
+                    {
+                        /* packed u8 triples across u16 words */
+                        int base = i * 2 + k * 3;
+                        t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
+                    }
+                    needSync = 1;
+                }
             }
             i += (n * 3 + 1) / 2;
         }
@@ -1064,31 +1090,37 @@ static void WorldFrameStart(void)
         T3DVec3 ld  = {{ 0.0f, 0.0f, 1.0f }};
 
         if (!s_wvpInited) { s_wvp = t3d_viewport_create(); s_wvpInited = 1; }
-        /* Off-centre PSX projection. tan(vfov/2) = 120/h over the 240-line
-         * target reproduces the GTE's scale exactly (screen px = h * d/z on
-         * both paths, x and y), and the geometry offset (ofx,ofy) -- the
-         * game's projection CENTRE, which the PSX-prim path honours for the
-         * characters -- is applied as an NDC translate. The old symmetric
-         * frustum pinned the native centre at (160,120) while Harry projected
-         * about (ofx,ofy): a constant on-screen offset between him and the
-         * world he stood in. */
+        /* Land RSP pixels exactly where PutVert lands the PSX prims:
+         *   px = ((gofx + h*vx/vz) + ofsX)*sclX + contentX
+         *   py = ((gofy + h*vy/vz) + ofsY)*sclY
+         * folded into the projection as scale (m[0][0]/m[1][1]) and an NDC
+         * translate (m[2][0/1]) on the 320x240 target. The transform comes
+         * LIVE from the prim path (GpuXbox_GetViewTransform) so disp-env
+         * changes track automatically. In-game that is ofs=(160,112),
+         * scl=(1, 240/224), content=0 => h/160 and h/112: the previous h/120
+         * vertical drew the native world 7% squashed against the PSX-path
+         * characters (Harry poking into doorways, items floating off the
+         * native counter -- collision was never wrong, the picture was).
+         * gofx/gofy are the game's geometry offset DELTA (0,0 in-game). */
         {
             float nearP = 4.0f, farP = 50000.0f;
-            float tanH  = (h > 1.0f) ? (120.0f / h) : 1.0f;
+            float oX, oY, sX, sY;
+            int   cX;
             T3DMat4 proj;
+            extern void GpuXbox_GetViewTransform(float* ofsX, float* ofsY,
+                                                 float* sclX, float* sclY,
+                                                 int* contentX);
+            GpuXbox_GetViewTransform(&oX, &oY, &sX, &sY, &cX);
+            if (h < 1.0f)
+                h = 1.0f;
             memset(&proj, 0, sizeof proj);
-            proj.m[0][0] = 1.0f / ((320.0f / 240.0f) * tanH);
-            proj.m[1][1] = 1.0f / tanH;
+            proj.m[0][0] = h * sX / 160.0f;
+            proj.m[1][1] = h * sY / 120.0f;
             proj.m[2][2] = farP / (nearP - farP);
             proj.m[2][3] = -1.0f;
             proj.m[3][2] = -2.0f * farP * nearP / (farP - nearP);
-            /* ReadGeomOffset is a DELTA from screen centre on this codebase:
-             * the hardware log shows ofs=0,0 throughout gameplay while the
-             * PSX prims land centred. Treating it as an absolute centre
-             * sheared the frustum a full half-screen -- the "world elongates
-             * and swims around Harry" build. (0,0) = symmetric. */
-            proj.m[2][0] = -(float)s_geomOfx / 160.0f;
-            proj.m[2][1] =  (float)s_geomOfy / 120.0f;
+            proj.m[2][0] = -((((float)s_geomOfx + oX) * sX + (float)cX) - 160.0f) / 160.0f;
+            proj.m[2][1] =  ((((float)s_geomOfy + oY) * sY) - 120.0f) / 120.0f;
             t3d_viewport_set_w_normalize(&s_wvp, nearP, farP);
             t3d_viewport_set_projection_matrix(&s_wvp, &proj);
         }
