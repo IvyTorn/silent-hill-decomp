@@ -3150,6 +3150,9 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
         ReadGeomOffset(&gofx, &gofy);
         ShT3d_WorldViewSet(&GsWSMATRIX,
                            D_800C3868.t[0], D_800C3868.t[1], D_800C3868.t[2],
+                           Q12_TO_Q8(g_SysWork.playerWork.player.position.vx),
+                           Q12_TO_Q8(g_SysWork.playerWork.player.position.vy),
+                           Q12_TO_Q8(g_SysWork.playerWork.player.position.vz),
                            ReadGeomScreen(), gofx, gofy);
     }
 #endif

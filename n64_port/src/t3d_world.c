@@ -96,9 +96,11 @@ typedef struct
     int            cellX, cellZ;
     int            inUse;
     int            bufCount;
+    int            instCount;
     WBuf*          bufs;       /* -> own arena slot */
     T3DVertPacked* verts;      /* -> own arena slot, cache-written-back */
     T3DMat4FP*     mats;       /* -> own arena slot, after verts */
+    float*         instPos;    /* -> own arena slot: 3 floats/inst, world/8 */
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
     uint8_t*       cmds;       /* -> own arena slot: all passes' streams */
     int            tileRefCount;
@@ -146,8 +148,14 @@ int ShT3d_Ready(void);            /* from t3d_n64.c */
  * this port -- deriving eye from it put the camera at the origin). Q8 world. */
 static int16_t s_wm[9];
 static int32_t s_camPos[3];
+static int32_t s_playerPos[3];   /* Q8 world; the painter's-split reference */
 static int s_haveView;
 static int s_geomH, s_geomOfx, s_geomOfy;
+
+/* Camera basis in world/8 units + the player's view-space depth, recomputed
+ * per flush in WorldFrameStart and read by RunPass to classify each instance
+ * as foreground (nearer than the player) or background. */
+static float s_eyeF[3], s_fwdF[3], s_playerViewZ;
 
 /* Deferred draw list: (cell, buf) recorded during OT build, drawn at the
  * GsDrawOt point. The accumulation window is bounded by FLUSH, not by
@@ -161,6 +169,7 @@ static int s_drawCount;
 static int s_flushed = 1;   /* 1 => next WorldViewSet starts a fresh list */
 
 void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
+                        int plX, int plY, int plZ,
                         int h, int ofx, int ofy)
 {
     const int16_t* m = (const int16_t*)wsMatrix;
@@ -176,6 +185,7 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
     for (i = 0; i < 9; i++)
         s_wm[i] = m[i];
     s_camPos[0] = camX; s_camPos[1] = camY; s_camPos[2] = camZ;
+    s_playerPos[0] = plX; s_playerPos[1] = plY; s_playerPos[2] = plZ;
     s_geomH   = h;
     s_geomOfx = ofx;
     s_geomOfy = ofy;
@@ -369,11 +379,18 @@ static int s_cnTileMiss;   /* groups whose geometry was skipped this frame */
  * a guarded one deferred forever). Replay costs ~1-3ms of t3d calls for a
  * visible room against the ~100ms the RSP path replaces, needs zero heap,
  * and tile misses self-heal frame to frame instead of baking into a block. */
+/* wantFg: 0 = draw only background instances (farther than the player), 1 =
+ * only foreground (nearer). Splitting the same stream twice around the PSX
+ * character OT reproduces the OT's back-to-front order with no Z buffer. */
 static void RunPass(const uint8_t* p, int cmdWords,
                     const T3DVertPacked* verts, const T3DMat4FP* mats,
+                    const float* instPos, int instCount, int wantFg,
                     int semi)
 {
-    int i = 0, pushed = 0, needSync = 0, skip = 0;
+    /* depthSkip defaults to wantFg so any geometry before the first OP_MATRIX
+     * (no instance to classify) draws in the background pass only -- never in
+     * both, which would double-draw it. */
+    int i = 0, pushed = 0, needSync = 0, tileSkip = 0, depthSkip = wantFg;
 
     /* Pass-wide state the OTHER pass may have changed. */
     if (semi)
@@ -393,11 +410,11 @@ static void RunPass(const uint8_t* p, int cmdWords,
             uint16_t tref = rd16(p + i * 2);
             i++;
 #if SH_T3DW_FLAT
-            (void)tref; skip = 0;   /* flat debug: draw every group solid */
+            (void)tref; tileSkip = 0;   /* flat debug: draw every group solid */
             continue;
 #endif
             if (needSync) { t3d_tri_sync(); needSync = 0; }
-            skip = 0;
+            tileSkip = 0;
             if (tref == 0)
             {
                 /* untextured group: shade-only, or it would sample whatever
@@ -428,7 +445,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
                      * with stale TMEM painted other rooms' art (a wanted
                      * poster) onto this one's furniture. A hole is honest
                      * and the census counts it. */
-                    skip = 1;
+                    tileSkip = 1;
                     s_cnTileMiss++;
                 }
             }
@@ -440,12 +457,25 @@ static void RunPass(const uint8_t* p, int cmdWords,
                 t3d_matrix_pop(1);
             t3d_matrix_push(&mats[arg]);
             pushed = 1;
+            /* Classify this instance: view-space depth = forward . (pos - eye)
+             * in world/8 units. Nearer than the player (< s_playerViewZ) draws
+             * in the foreground pass, otherwise the background pass. */
+            if ((int)arg < instCount)
+            {
+                const float* P = instPos + (int)arg * 3;
+                float vz = s_fwdF[0] * (P[0] - s_eyeF[0])
+                         + s_fwdF[1] * (P[1] - s_eyeF[1])
+                         + s_fwdF[2] * (P[2] - s_eyeF[2]);
+                depthSkip = (((vz < s_playerViewZ) ? 1 : 0) != wantFg);
+            }
+            else
+                depthSkip = 0;
         }
         else if (opc == OP_VERTS)
         {
             uint16_t first = rd16(p + i * 2);
             i++;
-            if (skip)
+            if (tileSkip || depthSkip)
                 continue;
             if (needSync) { t3d_tri_sync(); needSync = 0; }
             t3d_vert_load(verts + first / 2, 0, arg);
@@ -453,7 +483,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
         else if (opc == OP_TRIS)
         {
             int n = arg, k;
-            if (!skip)
+            if (!tileSkip && !depthSkip)
             {
                 for (k = 0; k < n; k++)
                 {
@@ -603,6 +633,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         {
             int vertBytes = (int)sizeof(T3DVertPacked) * (total / 2 + 1);
             int matBytes  = (int)sizeof(T3DMat4FP) * (instCount ? instCount : 1);
+            int posBytes  = (int)sizeof(float) * 3 * (instCount ? instCount : 1);
             int refBytes  = refCount ? refCount * 2 : 2;
             int bufBytes  = (int)sizeof(WBuf) * bufCount;
             int cmdBytes  = 0;
@@ -616,6 +647,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                 if (sw > 1) cmdBytes += (sw * 2 + 3) & ~3;
             }
             need = ((vertBytes + 15) & ~15) + ((matBytes + 15) & ~15)
+                 + ((posBytes + 15) & ~15)
                  + ((refBytes + 15) & ~15) + ((bufBytes + 15) & ~15)
                  + ((cmdBytes + 15) & ~15);
             if (need > WCHUNK_ARENA_BYTES)
@@ -629,11 +661,14 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             a += (vertBytes + 15) & ~15;
             c->mats = (T3DMat4FP*)a;
             a += (matBytes + 15) & ~15;
+            c->instPos = (float*)a;
+            a += (posBytes + 15) & ~15;
             c->tileRefs = (uint16_t*)a;
             a += (refBytes + 15) & ~15;
             c->bufs = (WBuf*)a;
             a += (bufBytes + 15) & ~15;
             c->cmds = a;
+            c->instCount = instCount;
             memset(c->bufs, 0, bufBytes);
         }
 
@@ -668,6 +703,12 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             m.m[3][1] = (float)ty / 8.0f;
             m.m[3][2] = (float)tz / 8.0f;
             m.m[3][3] = 1.0f;
+            /* Instance origin in world/8 (same space as the eye) -- RunPass
+             * projects it onto the camera forward axis to split foreground
+             * from background per frame. */
+            c->instPos[i * 3 + 0] = m.m[3][0];
+            c->instPos[i * 3 + 1] = m.m[3][1];
+            c->instPos[i * 3 + 2] = m.m[3][2];
             t3d_mat4_to_fixed(&c->mats[i], &m);
         }
         data_cache_hit_writeback(c->mats,
@@ -861,6 +902,29 @@ static void WorldFrameStart(void)
         up[i]  = -R[1][i];
     }
 
+    /* Cache the basis + the player's view-space depth for RunPass's per-
+     * instance foreground/background split (world/8 units throughout). */
+    for (i = 0; i < 3; i++)
+    {
+        s_eyeF[i] = eye[i];
+        s_fwdF[i] = fwd[i];
+    }
+    if (s_playerPos[0] == 0 && s_playerPos[1] == 0 && s_playerPos[2] == 0)
+    {
+        /* No valid player yet (pre-spawn / transition frame). A sentinel below
+         * every instance depth keeps the split degenerate-safe: nothing is
+         * foreground, so the whole world draws in the background pass -- the
+         * original behaviour, never world-over-characters. */
+        s_playerViewZ = -1.0e30f;
+    }
+    else
+    {
+        s_playerViewZ =
+              fwd[0] * ((float)s_playerPos[0] / 8.0f - eye[0])
+            + fwd[1] * ((float)s_playerPos[1] / 8.0f - eye[1])
+            + fwd[2] * ((float)s_playerPos[2] / 8.0f - eye[2]);
+    }
+
     {
         static const uint8_t ambWhite[4] = {255, 255, 255, 255};
         static const uint8_t dirWhite[4] = {255, 255, 255, 255};
@@ -946,13 +1010,17 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
     return 1;
 }
 
-/* Draw all recorded buffers. Called from GpuNv2a_FrameEnd BEFORE the PSX
- * batch flush, so the world lands under characters/items (correct order for
- * a fixed camera with no Z buffer) on the live, about-to-present surface. */
-void ShT3d_WorldFlush(void)
+/* Replay every recorded buffer, but only the instances on the requested side
+ * of the player (wantFg: 0 = background, 1 = foreground). The background pass
+ * runs before the PSX character OT and the foreground pass after it, so a
+ * character correctly occludes / is occluded by world geometry with no Z
+ * buffer -- the PSX ordering table's back-to-front model, at instance
+ * granularity. The draw list is cleared (s_flushed) only by the LAST pass. */
+static void WorldFlushPass(int wantFg)
 {
     int i;
 
+    if (!wantFg)
     {
         static int s_fl;
         if ((s_fl++ & 127) == 0)
@@ -962,7 +1030,8 @@ void ShT3d_WorldFlush(void)
 
     if (s_drawCount == 0 || !ShT3d_Ready() || !s_haveView)
     {
-        s_flushed = 1;
+        if (wantFg)
+            s_flushed = 1;
         return;
     }
 
@@ -978,16 +1047,19 @@ void ShT3d_WorldFlush(void)
         bverts = c->verts + c->bufs[b].vbase / 2;
         if (c->bufs[b].opaWords > 1)
         {
-            RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts, c->mats, 0);
+            RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
+                    c->mats, c->instPos, c->instCount, wantFg, 0);
             s_cnBlocks++;
         }
         if (c->bufs[b].semiWords > 1)
         {
-            RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts, c->mats, 1);
+            RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
+                    c->mats, c->instPos, c->instCount, wantFg, 1);
             s_cnBlocks++;
         }
     }
-    s_flushed = 1;
+    if (wantFg)
+        s_flushed = 1;
 
     /* t3d_frame_start reprogrammed rdpq modes; the PSX OT walk that follows
      * memoises its mode application, so tell it the mode is dirty or the
@@ -996,6 +1068,20 @@ void ShT3d_WorldFlush(void)
         extern void GpuNv2a_PsxModeInvalidate(void);
         GpuNv2a_PsxModeInvalidate();
     }
+}
+
+/* Background world: drawn from game_main BEFORE GsDrawOt(OT0), so it lands
+ * under the characters/items on the live, about-to-present surface. */
+void ShT3d_WorldFlush(void)
+{
+    WorldFlushPass(0);
+}
+
+/* Foreground world: drawn AFTER GsDrawOt(OT0) (characters) and before OT2
+ * (2D UI), so geometry nearer than the player occludes him. */
+void ShT3d_WorldFlushForeground(void)
+{
+    WorldFlushPass(1);
 }
 
 void ShT3d_NotifyFrameBegin(void)

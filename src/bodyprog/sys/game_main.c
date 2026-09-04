@@ -3391,6 +3391,13 @@ void MainLoop(void) // 0x80032EE0
         { extern void ShT3d_WorldFlush(void); ShT3d_WorldFlush(); }
 #endif
         GsDrawOt(&g_OrderingTable0[g_ActiveBufferIdx]);
+#ifdef SH_N64_PORT
+        /* Foreground native world: instances NEARER the camera than the player,
+         * drawn after the character OT (OT0) and before the 2D UI (OT2). A
+         * pillar or counter the player walks behind now occludes him -- the
+         * PSX ordering table's depth split, reproduced without a Z buffer. */
+        { extern void ShT3d_WorldFlushForeground(void); ShT3d_WorldFlushForeground(); }
+#endif
 #ifdef SH_PC_PORT
         {
             extern int g_PcPickupItemActive;

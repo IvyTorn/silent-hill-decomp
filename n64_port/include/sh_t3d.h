@@ -33,18 +33,23 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx);
 
 /* Camera handoff, once per chunk before the buffer draws: wsMatrix is
  * &GsWSMATRIX for the view ROTATION (s16 m[3][3] Q12; its t is zero on this
- * port). camX/Y/Z are the camera world position, Q8 (D_800C3868.t). h is the
- * GTE projection distance; ofx/ofy the geometry offset. */
+ * port). camX/Y/Z are the camera world position, Q8 (D_800C3868.t). plX/Y/Z
+ * are the player's world position, Q8 (the foreground/background split plane).
+ * h is the GTE projection distance; ofx/ofy the geometry offset. */
 void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
+                        int plX, int plY, int plZ,
                         int h, int ofx, int ofy);
 
 /* Frame boundary notifications from gpu_rdp.c. */
 void ShT3d_NotifyFrameBegin(void);
 void ShT3d_NotifyFrameEnd(void);
 
-/* Draw the recorded world buffers. Called from GpuNv2a_FrameEnd before the
- * PSX batch flush -- the only point whose t3d output reaches the shown frame. */
+/* Draw the recorded world buffers. WorldFlush draws the BACKGROUND (instances
+ * farther than the player) before GsDrawOt(OT0); WorldFlushForeground draws
+ * the FOREGROUND (nearer than the player) after OT0 and before OT2, so world
+ * geometry can occlude the characters. Both run in one frame. */
 void ShT3d_WorldFlush(void);
+void ShT3d_WorldFlushForeground(void);
 
 /* 1 if a native chunk drew geometry this frame. The full-screen fog/
  * brightness tint quads in Gfx_2dEffectsDraw are meant to blend INTO the PSX
