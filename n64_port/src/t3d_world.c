@@ -62,7 +62,9 @@
  * fragments the rest, which first starved these allocations and then crashed
  * libdragon mid-block-recording (rspq_next_buffer memsets an unchecked
  * malloc). The arena caps what a cell may need; bigger cells stay PSX. */
-#define WCHUNK_ARENA_BYTES (56 * 1024)
+#define WCHUNK_ARENA_BYTES (60 * 1024)  /* 56K left no room for the group
+                                         * centroids (ERFF00: 144 groups =
+                                         * 1.7K over); heap had 242K free */
 
 /* Every SHT tile is at most 2048 bytes BY CONSTRUCTION (the TMEM budget:
  * 4096 CI4 texels or 2048 CI8 texels, both 2KB), so tile pixels live in a
@@ -106,6 +108,7 @@ typedef struct
     float*         groupPos;   /* per-OP_VERTS-group world/8 centroids, after
                                 * the cmd streams in the arena; NULL = none
                                 * fitted (every group classifies background) */
+    int            groupCount;
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
     uint8_t*       cmds;       /* -> own arena slot: all passes' streams */
     int            tileRefCount;
@@ -869,7 +872,8 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                     {
                         float*   gpos = (float*)gp;
                         uint32_t g    = 0;
-                        c->groupPos = gpos;
+                        c->groupPos   = gpos;
+                        c->groupCount = (int)gcount;
                         for (bi = 0; bi < bufCount; bi++)
                             for (pass = 0; pass < 2; pass++)
                             {
@@ -942,8 +946,8 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         fclose(f);
         c->bufCount = bufCount;
         c->inUse = 1;
-        SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d tiles=%d/%d miss=%d tileRam=%dK",
-               base, bufCount, instCount, c->tileRefCount, refCount,
+        SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tiles=%d/%d miss=%d tileRam=%dK",
+               base, bufCount, instCount, c->groupCount, c->tileRefCount, refCount,
                s_cnTileMiss, s_tileRam / 1024);
         return;
 
@@ -1078,8 +1082,13 @@ static void WorldFrameStart(void)
             proj.m[2][2] = farP / (nearP - farP);
             proj.m[2][3] = -1.0f;
             proj.m[3][2] = -2.0f * farP * nearP / (farP - nearP);
-            proj.m[2][0] = -((float)s_geomOfx - 160.0f) / 160.0f;
-            proj.m[2][1] =  ((float)s_geomOfy - 120.0f) / 120.0f;
+            /* ReadGeomOffset is a DELTA from screen centre on this codebase:
+             * the hardware log shows ofs=0,0 throughout gameplay while the
+             * PSX prims land centred. Treating it as an absolute centre
+             * sheared the frustum a full half-screen -- the "world elongates
+             * and swims around Harry" build. (0,0) = symmetric. */
+            proj.m[2][0] = -(float)s_geomOfx / 160.0f;
+            proj.m[2][1] =  (float)s_geomOfy / 120.0f;
             t3d_viewport_set_w_normalize(&s_wvp, nearP, farP);
             t3d_viewport_set_projection_matrix(&s_wvp, &proj);
         }
