@@ -488,6 +488,17 @@ static int BindWorldTile(uint16_t tref, uint16_t palArg)
         rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
         return 1;
     }
+    if (palArg >= s_shtPalCount)
+    {
+        /* A garbage palette index would enqueue a TLUT upload with a wild
+         * pointer AND a wild word count -- scribbling the command stream is
+         * exactly the class behind the jump-to-1 crash. Drop the group. */
+        static int s_palOob;
+        if (s_palOob++ == 0)
+            SH_DBG("[T3DW] pal idx %u >= %u -- group dropped (stream fault?)",
+                   (unsigned)palArg, (unsigned)s_shtPalCount);
+        return 0;
+    }
     slot = TileSlotFind(tref - 1);
     if (slot < 0)
     {
@@ -588,11 +599,19 @@ static void RunPass(const uint8_t* p, int cmdWords,
             }
             else
                 depthSkip = wantFg;
-            /* tileSkip is NOT checked here: with lazy binding a missing tile
-             * isn't known until the bind at OP_TRIS; the wasted vert load on
-             * that rare path (miss=0 in every log) is cheaper than binding
-             * tiles for groups that never draw. */
             if (depthSkip)
+                continue;
+            /* Bind the pending tile BEFORE the vert load: for every drawn
+             * group the upload precedes vertex DMA in exactly the order the
+             * proven eager path used, while tiles whose groups never draw
+             * still never upload. */
+            if (tilePending)
+            {
+                if (needSync) { t3d_tri_sync(); needSync = 0; }
+                tileSkip = !BindWorldTile(pendTref, pendPal);
+                tilePending = 0;
+            }
+            if (tileSkip)
                 continue;
             if (needSync) { t3d_tri_sync(); needSync = 0; }
             t3d_vert_load(verts + first / 2, 0, arg);
@@ -600,24 +619,15 @@ static void RunPass(const uint8_t* p, int cmdWords,
         else if (opc == OP_TRIS)
         {
             int n = arg, k;
-            if (!depthSkip)
+            if (!tileSkip && !depthSkip)
             {
-                if (tilePending)
+                for (k = 0; k < n; k++)
                 {
-                    if (needSync) { t3d_tri_sync(); needSync = 0; }
-                    tileSkip = !BindWorldTile(pendTref, pendPal);
-                    tilePending = 0;
+                    /* packed u8 triples across u16 words */
+                    int base = i * 2 + k * 3;
+                    t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
                 }
-                if (!tileSkip)
-                {
-                    for (k = 0; k < n; k++)
-                    {
-                        /* packed u8 triples across u16 words */
-                        int base = i * 2 + k * 3;
-                        t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
-                    }
-                    needSync = 1;
-                }
+                needSync = 1;
             }
             i += (n * 3 + 1) / 2;
         }
