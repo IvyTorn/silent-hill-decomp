@@ -1,0 +1,39 @@
+# Local libdragon patches (SH_PATCH)
+
+The libdragon SOURCE this port builds against lives OUTSIDE this repository
+(`../libdragon`, mounted at `/libdragon` by `docker_run.sh`, installed into
+`../n64_inst` by `build_libdragon.sh`). It carries local patches that version
+control here cannot see. Every patch site is marked `SH_PATCH` -- to audit or
+re-apply after refreshing the checkout:
+
+    grep -rn "SH_PATCH" ../libdragon/src
+
+Current patches (2026-09-05):
+
+1. `src/rspq/rspq.c` (4 sites) and `src/display.c` (1 site): every
+   gameplay-reachable `RSP_WAIT_LOOP(200)` raised to 2000ms. The 200ms
+   watchdog treats "RSP hasn't finished a buffer in 200ms" as a crash, but a
+   fill-saturated frame on this title legitimately queues more RDP work than
+   that (loading screens: ~150ms busy + 5ms upload spikes; room transitions
+   run `rspq_wait`). The watchdog was executing merely-slow frames: every
+   hardware "RSP crash" dump traced to one of these waits, with the reporter
+   varying by which caller needed a buffer next. 2s still catches genuine
+   hangs.
+
+2. `src/rsp.c` `__rsp_crash`: calls the weak hook `ShN64_RspCrashCommit`
+   (defined in `n64_port/src/sh_log_n64.c`) with ucode/pc/site BEFORE
+   `console_init`. The inspector's display re-init OOMs on this heap-starved
+   game (sbrk_top framebuffers cannot be reclaimed mid-run) and dies on its
+   own `surfaces[i].buffer != NULL` assert, so the on-screen dump often shows
+   the assert cascade instead of the RSP state. The hook lands the identity
+   in the SD log (`[CRASH] RSP crash: ...`) and hard-commits it first.
+
+3. `src/t3d/t3dmath.c` in ../tiny3d (pinned c2cdbf2): `t3d_mat4_to_frustum`
+   skips normalizing a plane when `len < 1e-6f` (off-centre projections make
+   a zero-length plane -> NaN -> FPU trap). Rebuilt into n64_inst the same
+   way.
+
+After changing any of these:
+
+    ./n64_port/docker_run.sh bash ./n64_port/build_libdragon.sh
+    ./n64_port/docker_run.sh bash ./n64_port/build_n64.sh

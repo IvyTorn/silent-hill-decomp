@@ -286,6 +286,22 @@ void ShLogN64_EnableSdMirror(void)
         SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log");
 }
 
+/* Called from the SH_PATCHed libdragon __rsp_crash BEFORE it touches the
+ * display: the on-screen inspector re-inits video and, on this heap-starved
+ * game (sbrk_top framebuffers cannot be reclaimed mid-run), OOMs into its
+ * own assert -- the dump pages the user photographs are the wreckage. Commit
+ * the crash identity to the SD log FIRST so every RSP crash leaves a line
+ * even when the screen shows only the assert cascade. */
+void ShN64_RspCrashCommit(unsigned pc, const char* uc, const char* func,
+                          const char* file, int line)
+{
+    void SH_DebugLogFlush(void);   /* defined below */
+    SH_DBG("[CRASH] RSP crash: ucode=%s pc=%03x at %s (%s:%d)",
+           uc ? uc : "?", pc, func ? func : "?", file ? file : "?", line);
+    SH_DebugLogFlush();
+    ShLogN64_CrashCommit();
+}
+
 /* Crash-path commit. fflush alone pushes bytes to the FAT layer but leaves
  * the directory entry's SIZE stale, so everything since the last 1-second
  * fclose cycle -- always the [CRASH] lines themselves -- reads back as
