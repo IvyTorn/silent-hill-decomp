@@ -104,10 +104,18 @@ typedef struct
     int            instCount;
     WBuf*          bufs;       /* -> own arena slot */
     T3DVertPacked* verts;      /* -> own arena slot, cache-written-back */
-    T3DMat4FP*     mats;       /* -> own arena slot, after verts */
-    float*         groupPos;   /* per-OP_VERTS-group world/8 centroids, after
-                                * the cmd streams in the arena; NULL = none
-                                * fitted (every group classifies background) */
+    T3DMat4FP*     mats;       /* -> arena: 2 x instCount, composed PER FRAME
+                                * through the game's own view path
+                                * (ShT3d_ComposeInstanceView); s_matPhase picks
+                                * the half the RSP isn't still replaying */
+    int16_t*       rawRot;     /* -> arena: 9 s16/instance, Q12 file order */
+    int32_t*       rawTrans;   /* -> arena: 3 s32/instance, Q8 world */
+    float*         viewRow;    /* -> arena: 4 floats/instance -- composed view
+                                * row 2 (R2/4096, t2/8): the painter's-split
+                                * depth axis in the game's own view space */
+    float*         groupPos;   /* per-OP_VERTS-group LOCAL centroids (in the
+                                * /8 instance-local vert space), after the cmd
+                                * streams; NULL = none fitted (all background) */
     int            groupCount;
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
     uint8_t*       cmds;       /* -> own arena slot: all passes' streams */
@@ -160,10 +168,10 @@ static int32_t s_playerPos[3];   /* Q8 world; the painter's-split reference */
 static int s_haveView;
 static int s_geomH, s_geomOfx, s_geomOfy;
 
-/* Camera basis in world/8 units + the player's view-space depth, recomputed
- * per flush in WorldFrameStart and read by RunPass to classify each instance
- * as foreground (nearer than the player) or background. */
-static float s_eyeF[3], s_fwdF[3], s_playerViewZ;
+/* The player's view-space depth (world/8), composed once per frame in
+ * WorldViewSet through the game's own view path; RunPass classifies each
+ * group as foreground (nearer than this) or background against it. */
+static float s_playerViewZ;
 
 /* Deferred draw list: (cell, buf) recorded during OT build, drawn at the
  * GsDrawOt point. The accumulation window is bounded by FLUSH, not by
@@ -175,6 +183,47 @@ static float s_eyeF[3], s_fwdF[3], s_playerViewZ;
 static struct { int16_t cx, cz, buf; } s_drawList[WORLD_DRAWLIST_MAX];
 static int s_drawCount;
 static int s_flushed = 1;   /* 1 => next WorldViewSet starts a fresh list */
+static int s_matPhase;      /* which half of each chunk's mats this frame
+                             * composes into (the RSP may still be replaying
+                             * the previous frame's half) */
+
+/* Compose every instance's view matrix for this frame THROUGH THE GAME'S OWN
+ * code (ShT3d_ComposeInstanceView -> Vw_CoordToWorldAndViewMatrices): the
+ * result carries VbWvsMatrix -- with its 3/4 Y NTSC scale that GsWSMATRIX
+ * does not have -- and the camera subtract, so the native world lands
+ * EXACTLY where the per-prim path would land it. t3d then runs with an
+ * identity camera (axis flip only, in WorldFrameStart's look_at). */
+static void ComposeChunkViews(WChunk* c)
+{
+    T3DMat4FP* dst = c->mats + s_matPhase * c->instCount;
+    int i, r, cc;
+
+    for (i = 0; i < c->instCount; i++)
+    {
+        short vR[9];
+        int   vT[3];
+        T3DMat4 m;
+        ShT3d_ComposeInstanceView((const short*)(c->rawRot + i * 9),
+                                  (const int*)(c->rawTrans + i * 3), vR, vT);
+        memset(&m, 0, sizeof m);
+        for (r = 0; r < 3; r++)
+            for (cc = 0; cc < 3; cc++)
+                m.m[cc][r] = (float)vR[r * 3 + cc] / 4096.0f;
+        /* Verts are local/8, so the view translation converts the same way;
+         * the whole pipe stays in the small /8 fixed-point-safe range. */
+        m.m[3][0] = (float)vT[0] / 8.0f;
+        m.m[3][1] = (float)vT[1] / 8.0f;
+        m.m[3][2] = (float)vT[2] / 8.0f;
+        m.m[3][3] = 1.0f;
+        t3d_mat4_to_fixed(&dst[i], &m);
+        c->viewRow[i * 4 + 0] = (float)vR[6] / 4096.0f;
+        c->viewRow[i * 4 + 1] = (float)vR[7] / 4096.0f;
+        c->viewRow[i * 4 + 2] = (float)vR[8] / 4096.0f;
+        c->viewRow[i * 4 + 3] = (float)vT[2] / 8.0f;
+    }
+    if (c->instCount > 0)
+        data_cache_hit_writeback(dst, sizeof(T3DMat4FP) * c->instCount);
+}
 
 void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
                         int plX, int plY, int plZ,
@@ -182,6 +231,7 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
 {
     const int16_t* m = (const int16_t*)wsMatrix;
     int i;
+    int firstOfFrame = 0;
     /* First camera handoff after a flush = start of a new frame's world;
      * clear the draw list here rather than on FrameBegin (which the game's
      * mid-frame VSync fires between the OT build and the GsDrawOt flush). */
@@ -189,6 +239,7 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
     {
         s_drawCount = 0;
         s_flushed = 0;
+        firstOfFrame = 1;
     }
     for (i = 0; i < 9; i++)
         s_wm[i] = m[i];
@@ -198,6 +249,32 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
     s_geomOfx = ofx;
     s_geomOfy = ofy;
     s_haveView = 1;
+
+    /* Once per frame, while the camera globals are the mesh-path values:
+     * compose every resident chunk's instance view matrices and the player's
+     * view depth through the game's own view path. */
+    if (firstOfFrame)
+    {
+        static const short idR[9] = { 4096, 0, 0, 0, 4096, 0, 0, 0, 4096 };
+        s_matPhase ^= 1;
+        for (i = 0; i < MAX_WCHUNKS; i++)
+            if (s_chunks[i].inUse)
+                ComposeChunkViews(&s_chunks[i]);
+        if (plX == 0 && plY == 0 && plZ == 0)
+        {
+            /* No valid player yet: sentinel below every depth = nothing is
+             * foreground, the whole world draws in the background pass. */
+            s_playerViewZ = -1.0e30f;
+        }
+        else
+        {
+            short dR[9];
+            int   pW[3], pT[3];
+            pW[0] = plX; pW[1] = plY; pW[2] = plZ;
+            ShT3d_ComposeInstanceView(idR, pW, dR, pT);
+            s_playerViewZ = (float)pT[2] / 8.0f;
+        }
+    }
 }
 
 /* ------------------------------------------------------------- helpers */
@@ -437,10 +514,13 @@ static int BindWorldTile(uint16_t tref, uint16_t palArg)
  * only foreground (nearer). Splitting the same stream twice around the PSX
  * character OT reproduces the OT's back-to-front order with no Z buffer.
  * groupBase = this stream's first index into groupPos (see WBuf); groupPos
- * NULL = no centroid data, everything is background. */
+ * NULL = no centroid data, everything is background. viewRow = per-instance
+ * composed view row 2 (game view space); each group classifies through the
+ * row of its own OP_MATRIX instance. */
 static void RunPass(const uint8_t* p, int cmdWords,
                     const T3DVertPacked* verts, const T3DMat4FP* mats,
-                    const float* groupPos, int groupBase, int wantFg,
+                    const float* groupPos, const float* viewRow,
+                    int groupBase, int wantFg,
                     int semi)
 {
     /* depthSkip defaults to wantFg so any geometry before the first OP_VERTS
@@ -448,6 +528,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
      * which would double-draw it. */
     int i = 0, pushed = 0, needSync = 0, tileSkip = 0, depthSkip = wantFg;
     int gIdx = groupBase;
+    const float* curRow = NULL;   /* view row 2 of the current instance */
     /* Lazy tile state: OP_TILE only records; BindWorldTile runs at the first
      * OP_TRIS that actually draws under it. A pending tile overwritten by the
      * next OP_TILE was for a fully-skipped run of groups. */
@@ -487,21 +568,22 @@ static void RunPass(const uint8_t* p, int cmdWords,
                 t3d_matrix_pop(1);
             t3d_matrix_push(&mats[arg]);
             pushed = 1;
+            curRow = viewRow ? viewRow + (int)arg * 4 : NULL;
         }
         else if (opc == OP_VERTS)
         {
             uint16_t first = rd16(p + i * 2);
             int g = gIdx++;
             i++;
-            /* Classify this <=32-vert patch: view-space depth = forward .
-             * (centroid - eye), world/8. Clearly nearer than the player =
-             * foreground (drawn after the character OT), else background. */
-            if (groupPos != NULL)
+            /* Classify this <=32-vert patch in the GAME'S view space: local
+             * centroid through its instance's composed view row 2 -- the same
+             * depth axis the PSX ordering table sorts on. Clearly nearer than
+             * the player = foreground (drawn after the character OT). */
+            if (groupPos != NULL && curRow != NULL)
             {
                 const float* P = groupPos + g * 3;
-                float vz = s_fwdF[0] * (P[0] - s_eyeF[0])
-                         + s_fwdF[1] * (P[1] - s_eyeF[1])
-                         + s_fwdF[2] * (P[2] - s_eyeF[2]);
+                float vz = curRow[0] * P[0] + curRow[1] * P[1]
+                         + curRow[2] * P[2] + curRow[3];
                 depthSkip = (((vz < s_playerViewZ - WORLD_FG_BIAS) ? 1 : 0) != wantFg);
             }
             else
@@ -675,8 +757,12 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         /* Carve verts + mats + refs + buf table + command streams from this
          * slot's fixed arena. cmdBytes counts every pass's words. */
         {
+            int nInst     = instCount ? instCount : 1;
             int vertBytes = (int)sizeof(T3DVertPacked) * (total / 2 + 1);
-            int matBytes  = (int)sizeof(T3DMat4FP) * (instCount ? instCount : 1);
+            int matBytes  = (int)sizeof(T3DMat4FP) * nInst * 2; /* double-buffered */
+            int rawRBytes = (int)sizeof(int16_t) * 9 * nInst;
+            int rawTBytes = (int)sizeof(int32_t) * 3 * nInst;
+            int rowBytes  = (int)sizeof(float) * 4 * nInst;
             int refBytes  = refCount ? refCount * 2 : 2;
             int bufBytes  = (int)sizeof(WBuf) * bufCount;
             int cmdBytes  = 0;
@@ -690,6 +776,8 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                 if (sw > 1) cmdBytes += (sw * 2 + 3) & ~3;
             }
             need = ((vertBytes + 15) & ~15) + ((matBytes + 15) & ~15)
+                 + ((rawRBytes + 15) & ~15) + ((rawTBytes + 15) & ~15)
+                 + ((rowBytes + 15) & ~15)
                  + ((refBytes + 15) & ~15) + ((bufBytes + 15) & ~15)
                  + ((cmdBytes + 15) & ~15);
             if (need > WCHUNK_ARENA_BYTES)
@@ -703,6 +791,12 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             a += (vertBytes + 15) & ~15;
             c->mats = (T3DMat4FP*)a;
             a += (matBytes + 15) & ~15;
+            c->rawRot = (int16_t*)a;
+            a += (rawRBytes + 15) & ~15;
+            c->rawTrans = (int32_t*)a;
+            a += (rawTBytes + 15) & ~15;
+            c->viewRow = (float*)a;
+            a += (rowBytes + 15) & ~15;
             c->tileRefs = (uint16_t*)a;
             a += (refBytes + 15) & ~15;
             c->bufs = (WBuf*)a;
@@ -712,8 +806,11 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             memset(c->bufs, 0, bufBytes);
         }
 
-        /* Instances -> fixed-point matrices. rot Q12/4096 with the 1/8 world
-         * scale folded in; translation Q8/8 with the cell corner added. */
+        /* Instances: keep the RAW Q12 rotation + Q8 world translation (cell
+         * corner folded in). The drawable matrices are composed PER FRAME
+         * from these through the game's own view path (ComposeChunkViews),
+         * which is what makes the native world land exactly where the
+         * per-prim path would land it. */
         tmp = malloc(instCount * 32 > 4096 ? (size_t)instCount * 32 : 4096);
         if (tmp == NULL)
             goto fail;
@@ -723,30 +820,13 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         for (i = 0; i < instCount; i++)
         {
             const uint8_t* ip = tmp + i * 32;
-            T3DMat4 m;
-            int r, cc;
-            int32_t tx = (int32_t)rd32(ip + 20) + cellX * 10240;
-            int32_t ty = (int32_t)rd32(ip + 24);
-            int32_t tz = (int32_t)rd32(ip + 28) + cellZ * 10240;
-            /* TRUE rotation: instance rot is Q12 (4096 = 1.0). Vertices are
-             * scaled to world/8 at load (see below) so they share the matrix
-             * translation's scale -- both in world/8 t3d units, small enough
-             * for t3d's fixed-point pipeline. (The old /32768 folded a 1/8
-             * scale in to compensate for raw Q8 vertices, but that left the
-             * vertices themselves world*256 -- 8x past t3d's usable range, so
-             * the RSP overflowed them off-screen.) */
-            memset(&m, 0, sizeof m);
-            for (r = 0; r < 3; r++)
-                for (cc = 0; cc < 3; cc++)
-                    m.m[cc][r] = (float)(int16_t)rd16(ip + (r * 3 + cc) * 2) / 4096.0f;
-            m.m[3][0] = (float)tx / 8.0f;
-            m.m[3][1] = (float)ty / 8.0f;
-            m.m[3][2] = (float)tz / 8.0f;
-            m.m[3][3] = 1.0f;
-            t3d_mat4_to_fixed(&c->mats[i], &m);
+            int k;
+            for (k = 0; k < 9; k++)
+                c->rawRot[i * 9 + k] = (int16_t)rd16(ip + k * 2);
+            c->rawTrans[i * 3 + 0] = (int32_t)rd32(ip + 20) + cellX * 10240;
+            c->rawTrans[i * 3 + 1] = (int32_t)rd32(ip + 24);
+            c->rawTrans[i * 3 + 2] = (int32_t)rd32(ip + 28) + cellZ * 10240;
         }
-        data_cache_hit_writeback(c->mats,
-            sizeof(T3DMat4FP) * (instCount ? instCount : 1));
 
         /* Tile refs (arena-resident, carved above). */
         c->tileRefCount = 0;
@@ -906,7 +986,6 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                                 int words = pass ? c->bufs[bi].semiWords : c->bufs[bi].opaWords;
                                 const uint8_t* p = c->cmds + (pass ? c->bufs[bi].semiOff : c->bufs[bi].opaOff);
                                 int bvbase  = c->bufs[bi].vbase;
-                                int curInst = -1;
                                 int k = 0;
                                 if (words <= 1)
                                     continue;
@@ -918,14 +997,15 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                                     k++;
                                     if (opc == OP_TILE)
                                         k++;
-                                    else if (opc == OP_MATRIX)
-                                        curInst = (int)arg;
                                     else if (opc == OP_VERTS)
                                     {
+                                        /* LOCAL centroid (the /8 vert space);
+                                         * RunPass pushes it through the
+                                         * frame's composed view row of the
+                                         * group's own OP_MATRIX instance. */
                                         int     first = rd16(p + k * 2);
                                         int     n     = arg;
                                         int32_t sx = 0, sy = 0, sz = 0;
-                                        float   lx, ly, lz, wx, wy, wz;
                                         int     v;
                                         k++;
                                         for (v = 0; v < n; v++)
@@ -935,31 +1015,25 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                                                                         : c->verts[vi / 2].posA;
                                             sx += q[0]; sy += q[1]; sz += q[2];
                                         }
-                                        if (n > 0) { lx = (float)sx / n; ly = (float)sy / n; lz = (float)sz / n; }
-                                        else       { lx = ly = lz = 0.0f; }
-                                        if (curInst >= 0 && curInst < instCount)
+                                        if (n > 0)
                                         {
-                                            /* T3DMat4FP is the float matrix verbatim in
-                                             * 16.16 (m[col].i/f[row]); world[r] =
-                                             * sum_c M(c,r)*local[c] + M(3,r), the same
-                                             * multiply the RSP applies to the verts. */
-                                            const T3DMat4FP* fm = &c->mats[curInst];
-#define MFP(cc, r) ((float)fm->m[cc].i[r] + (float)fm->m[cc].f[r] * (1.0f / 65536.0f))
-                                            wx = MFP(0,0)*lx + MFP(1,0)*ly + MFP(2,0)*lz + MFP(3,0);
-                                            wy = MFP(0,1)*lx + MFP(1,1)*ly + MFP(2,1)*lz + MFP(3,1);
-                                            wz = MFP(0,2)*lx + MFP(1,2)*ly + MFP(2,2)*lz + MFP(3,2);
-#undef MFP
+                                            gpos[g * 3 + 0] = (float)sx / n;
+                                            gpos[g * 3 + 1] = (float)sy / n;
+                                            gpos[g * 3 + 2] = (float)sz / n;
                                         }
-                                        else { wx = lx; wy = ly; wz = lz; }
-                                        gpos[g * 3 + 0] = wx;
-                                        gpos[g * 3 + 1] = wy;
-                                        gpos[g * 3 + 2] = wz;
+                                        else
+                                        {
+                                            gpos[g * 3 + 0] = 0.0f;
+                                            gpos[g * 3 + 1] = 0.0f;
+                                            gpos[g * 3 + 2] = 0.0f;
+                                        }
                                         g++;
                                     }
                                     else if (opc == OP_TRIS)
                                         k += (arg * 3 + 1) / 2;
                                     else if (opc == OP_END)
                                         break;
+                                    /* OP_MATRIX: 1 word */
                                 }
                             }
                     }
@@ -967,10 +1041,14 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             }
         }
 
+        /* First composition immediately (this frame's WorldViewSet has
+         * already run); every later frame recomposes in WorldViewSet. */
+        c->bufCount = bufCount;
+        ComposeChunkViews(c);
+
         free(tmp);
         free(table);
         fclose(f);
-        c->bufCount = bufCount;
         c->inUse = 1;
         SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tiles=%d/%d miss=%d tileRam=%dK",
                base, bufCount, instCount, c->groupCount, c->tileRefCount, refCount,
@@ -1050,43 +1128,29 @@ static void WorldFrameStart(void)
      * instance translation tx/8 and the >>3 vertices). */
     for (i = 0; i < 3; i++)
         eye[i] = (float)s_camPos[i] / 8.0f;
-    /* forward = R^T*+Z (PSX looks down +Z); up = -R^T*+Y (PSX +Y is down). */
+    /* forward = R^T*+Z (PSX looks down +Z); up = -R^T*+Y (PSX +Y is down).
+     * Probe-only now: the DRAW no longer reconstructs the camera -- instance
+     * matrices arrive per frame already IN VIEW SPACE (composed through the
+     * game's own Vw_CoordToWorldAndViewMatrices), so t3d's camera is just the
+     * fixed PSX->GL axis flip below. */
     for (i = 0; i < 3; i++)
     {
         fwd[i] =  R[2][i];
         up[i]  = -R[1][i];
     }
-
-    /* Cache the basis + the player's view-space depth for RunPass's per-
-     * instance foreground/background split (world/8 units throughout). */
-    for (i = 0; i < 3; i++)
-    {
-        s_eyeF[i] = eye[i];
-        s_fwdF[i] = fwd[i];
-    }
-    if (s_playerPos[0] == 0 && s_playerPos[1] == 0 && s_playerPos[2] == 0)
-    {
-        /* No valid player yet (pre-spawn / transition frame). A sentinel below
-         * every instance depth keeps the split degenerate-safe: nothing is
-         * foreground, so the whole world draws in the background pass -- the
-         * original behaviour, never world-over-characters. */
-        s_playerViewZ = -1.0e30f;
-    }
-    else
-    {
-        s_playerViewZ =
-              fwd[0] * ((float)s_playerPos[0] / 8.0f - eye[0])
-            + fwd[1] * ((float)s_playerPos[1] / 8.0f - eye[1])
-            + fwd[2] * ((float)s_playerPos[2] / 8.0f - eye[2]);
-    }
+    (void)up;
 
     {
         static const uint8_t ambWhite[4] = {255, 255, 255, 255};
         static const uint8_t dirWhite[4] = {255, 255, 255, 255};
         float h = (float)s_geomH;
-        T3DVec3 e   = {{ eye[0], eye[1], eye[2] }};
-        T3DVec3 tg  = {{ eye[0] + fwd[0]*256.0f, eye[1] + fwd[1]*256.0f, eye[2] + fwd[2]*256.0f }};
-        T3DVec3 u   = {{ up[0], up[1], up[2] }};
+        /* The whole camera is the fixed PSX->GL axis flip: instance matrices
+         * arrive already in the game's view space (y down, z forward); GL
+         * wants y up, -z forward. This is the exact construction the working
+         * reconstructed camera used, evaluated at R = identity, eye = 0. */
+        T3DVec3 e   = {{ 0.0f, 0.0f, 0.0f }};
+        T3DVec3 tg  = {{ 0.0f, 0.0f, 256.0f }};
+        T3DVec3 u   = {{ 0.0f, -1.0f, 0.0f }};
         T3DVec3 ld  = {{ 0.0f, 0.0f, 1.0f }};
 
         if (!s_wvpInited) { s_wvp = t3d_viewport_create(); s_wvpInited = 1; }
@@ -1235,13 +1299,15 @@ static void WorldFlushPass(int wantFg)
         if (c->bufs[b].opaWords > 1)
         {
             RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
-                    c->mats, c->groupPos, c->bufs[b].opaGroupBase, wantFg, 0);
+                    c->mats + s_matPhase * c->instCount, c->groupPos,
+                    c->viewRow, c->bufs[b].opaGroupBase, wantFg, 0);
             s_cnBlocks++;
         }
         if (c->bufs[b].semiWords > 1)
         {
             RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
-                    c->mats, c->groupPos, c->bufs[b].semiGroupBase, wantFg, 1);
+                    c->mats + s_matPhase * c->instCount, c->groupPos,
+                    c->viewRow, c->bufs[b].semiGroupBase, wantFg, 1);
             s_cnBlocks++;
         }
     }

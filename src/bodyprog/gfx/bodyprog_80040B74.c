@@ -3119,6 +3119,40 @@ void func_80044044(s_IpdHeader* ipd, s32 cellX, s32 cellZ) // 0x80044044
 }
 
 #ifdef SH_N64_PORT
+/* Compose the game's OWN instance->view matrix for a native-renderer
+ * instance, through the exact code the per-prim path uses (fabricated coord
+ * -> Vw_CoordToWorldAndViewMatrices). The native world thereby inherits
+ * VbWvsMatrix -- including its 3/4 Y NTSC scale, which GsWSMATRIX does NOT
+ * carry: reconstructing the camera from GsWSMATRIX rotation + camera position
+ * is what drew the world at subtly wrong angle-dependent proportions --
+ * plus the camera subtract and every future view quirk, automatically.
+ * rot9 is the raw row-major Q12 instance rotation (file order), trans3 the
+ * Q8 world translation; outputs are the composed view matrix likewise. */
+void ShT3d_ComposeInstanceView(const short* rot9, const int* trans3,
+                               short* outRot9, int* outTrans3)
+{
+    GsCOORDINATE2 coord;
+    MATRIX        worldMat;
+    MATRIX        viewMat;
+    s32           r, c;
+
+    coord.flg   = true;
+    coord.super = NULL;
+    for (r = 0; r < 3; r++)
+        for (c = 0; c < 3; c++)
+            coord.workm.m[r][c] = rot9[r * 3 + c];
+    coord.workm.t[0] = trans3[0];
+    coord.workm.t[1] = trans3[1];
+    coord.workm.t[2] = trans3[2];
+    Vw_CoordToWorldAndViewMatrices(&coord, &worldMat, &viewMat);
+    for (r = 0; r < 3; r++)
+        for (c = 0; c < 3; c++)
+            outRot9[r * 3 + c] = viewMat.m[r][c];
+    outTrans3[0] = viewMat.t[0];
+    outTrans3[1] = viewMat.t[1];
+    outTrans3[2] = viewMat.t[2];
+}
+
 /* A chunk finished loading and fixing up: resolve its file-table name from
  * the (still-fresh) queue entry and hand it to the native renderer, which
  * loads the matching N64W/<name>.SHW. The SHW carries its own cell coords,

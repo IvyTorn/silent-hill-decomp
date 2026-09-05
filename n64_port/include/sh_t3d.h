@@ -40,6 +40,15 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
                         int plX, int plY, int plZ,
                         int h, int ofx, int ofy);
 
+/* Compose the game's OWN instance->view matrix (defined in
+ * bodyprog_80040B74.c beside the chunk-draw path it mirrors): runs the
+ * fabricated coord through Vw_CoordToWorldAndViewMatrices so the native world
+ * inherits VbWvsMatrix (3/4 Y NTSC scale included), the camera subtract, and
+ * any future view change. rot9 row-major Q12 (file order), trans3 Q8 world;
+ * outputs the composed view rotation/translation likewise. */
+void ShT3d_ComposeInstanceView(const short* rot9, const int* trans3,
+                               short* outRot9, int* outTrans3);
+
 /* Frame boundary notifications from gpu_rdp.c. */
 void ShT3d_NotifyFrameBegin(void);
 void ShT3d_NotifyFrameEnd(void);
