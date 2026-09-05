@@ -113,8 +113,9 @@ typedef struct
     float*         viewRow;    /* -> arena: 4 floats/instance -- composed view
                                 * row 2 (R2/4096, t2/8): the painter's-split
                                 * depth axis in the game's own view space */
-    float*         groupPos;   /* per-OP_VERTS-group LOCAL centroids (in the
-                                * /8 instance-local vert space), after the cmd
+    int16_t*       groupPos;   /* per-OP_VERTS-group LOCAL AABB, 6 s16 each
+                                * (center xyz + half-extent xyz in the /8
+                                * instance-local vert space), after the cmd
                                 * streams; NULL = none fitted (all background) */
     int            groupCount;
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
@@ -464,11 +465,16 @@ static int s_cnTileMiss;   /* groups whose geometry was skipped this frame */
  * a guarded one deferred forever). Replay costs ~1-3ms of t3d calls for a
  * visible room against the ~100ms the RSP path replaces, needs zero heap,
  * and tile misses self-heal frame to frame instead of baking into a block. */
-/* A group (one OP_VERTS load) is foreground only when its centroid is nearer
- * the camera than the player by more than this margin (world/8: 16 = half a
- * world unit). Without it the floor patch at the player's own feet sits right
- * on the split plane and flickers over him frame to frame. */
-#define WORLD_FG_BIAS 16.0f
+/* A group (one OP_VERTS load) is foreground only when its ENTIRE bounding
+ * box is nearer the camera than the player (worst-case corner via interval
+ * arithmetic), by at least this margin (world/8: 8 = a quarter world unit).
+ * Centroid classification clipped the player IMMEDIATELY: the floor he
+ * stands on straddles his depth, its centroid reads "in front", and the far
+ * half painted over his feet -- with the straddling set changing every step
+ * ("random bits of Harry disappear"). A patch wholly in front (a pillar, the
+ * counter edge) still occludes; a straddler stays background and can never
+ * cut into him. */
+#define WORLD_FG_BIAS 8.0f
 
 /* Program the combiner and upload a tile's texels+palette to TMEM. Returns 0
  * (caller drops the group's draws) when the tile isn't resident -- drawing
@@ -530,7 +536,7 @@ static int BindWorldTile(uint16_t tref, uint16_t palArg)
  * row of its own OP_MATRIX instance. */
 static void RunPass(const uint8_t* p, int cmdWords,
                     const T3DVertPacked* verts, const T3DMat4FP* mats,
-                    const float* groupPos, const float* viewRow,
+                    const int16_t* groupPos, const float* viewRow,
                     int groupBase, int wantFg,
                     int semi)
 {
@@ -586,16 +592,21 @@ static void RunPass(const uint8_t* p, int cmdWords,
             uint16_t first = rd16(p + i * 2);
             int g = gIdx++;
             i++;
-            /* Classify this <=32-vert patch in the GAME'S view space: local
-             * centroid through its instance's composed view row 2 -- the same
-             * depth axis the PSX ordering table sorts on. Clearly nearer than
-             * the player = foreground (drawn after the character OT). */
+            /* Classify this <=32-vert patch in the GAME'S view space, by its
+             * WORST-CASE (farthest) depth: AABB centre through the instance's
+             * composed view row plus the interval term |row|.halfExtent. Only
+             * a patch ENTIRELY nearer than the player is foreground -- a
+             * straddler (the floor under his feet) stays background and can
+             * never paint over him. */
             if (groupPos != NULL && curRow != NULL)
             {
-                const float* P = groupPos + g * 3;
-                float vz = curRow[0] * P[0] + curRow[1] * P[1]
-                         + curRow[2] * P[2] + curRow[3];
-                depthSkip = (((vz < s_playerViewZ - WORLD_FG_BIAS) ? 1 : 0) != wantFg);
+                const int16_t* B = groupPos + g * 6;
+                float r0 = curRow[0], r1 = curRow[1], r2 = curRow[2];
+                float vzMax = r0 * B[0] + r1 * B[1] + r2 * B[2] + curRow[3]
+                            + (r0 < 0 ? -r0 : r0) * B[3]
+                            + (r1 < 0 ? -r1 : r1) * B[4]
+                            + (r2 < 0 ? -r2 : r2) * B[5];
+                depthSkip = (((vzMax < s_playerViewZ - WORLD_FG_BIAS) ? 1 : 0) != wantFg);
             }
             else
                 depthSkip = wantFg;
@@ -975,18 +986,18 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                     }
 
                 {
-                    uint32_t gbytes = gcount * 3 * (uint32_t)sizeof(float);
+                    uint32_t gbytes = gcount * 6 * (uint32_t)sizeof(int16_t);
                     uint8_t* gp     = c->cmds + ((cmdCur + 15u) & ~15u);
                     if (gcount == 0 || gp + gbytes > arena + WCHUNK_ARENA_BYTES)
                     {
                         c->groupPos = NULL;
                         if (gcount != 0)
-                            SH_DBG("[T3DW] %s: %u group centroids over the arena -- background-only",
+                            SH_DBG("[T3DW] %s: %u group AABBs over the arena -- background-only",
                                    base, (unsigned)gcount);
                     }
                     else
                     {
-                        float*   gpos = (float*)gp;
+                        int16_t* gpos = (int16_t*)gp;
                         uint32_t g    = 0;
                         c->groupPos   = gpos;
                         c->groupCount = (int)gcount;
@@ -1009,34 +1020,40 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                                         k++;
                                     else if (opc == OP_VERTS)
                                     {
-                                        /* LOCAL centroid (the /8 vert space);
-                                         * RunPass pushes it through the
-                                         * frame's composed view row of the
-                                         * group's own OP_MATRIX instance. */
-                                        int     first = rd16(p + k * 2);
-                                        int     n     = arg;
-                                        int32_t sx = 0, sy = 0, sz = 0;
-                                        int     v;
+                                        /* LOCAL AABB (the /8 vert space):
+                                         * center + half extents. RunPass
+                                         * pushes them through the frame's
+                                         * composed view row for the
+                                         * worst-case (farthest) depth. */
+                                        int first = rd16(p + k * 2);
+                                        int n     = arg;
+                                        int mnx = 32767, mny = 32767, mnz = 32767;
+                                        int mxx = -32768, mxy = -32768, mxz = -32768;
+                                        int v;
                                         k++;
                                         for (v = 0; v < n; v++)
                                         {
                                             int vi = bvbase + first + v;
                                             const int16_t* q = (vi & 1) ? c->verts[vi / 2].posB
                                                                         : c->verts[vi / 2].posA;
-                                            sx += q[0]; sy += q[1]; sz += q[2];
+                                            if (q[0] < mnx) mnx = q[0];
+                                            if (q[0] > mxx) mxx = q[0];
+                                            if (q[1] < mny) mny = q[1];
+                                            if (q[1] > mxy) mxy = q[1];
+                                            if (q[2] < mnz) mnz = q[2];
+                                            if (q[2] > mxz) mxz = q[2];
                                         }
-                                        if (n > 0)
+                                        if (n <= 0)
                                         {
-                                            gpos[g * 3 + 0] = (float)sx / n;
-                                            gpos[g * 3 + 1] = (float)sy / n;
-                                            gpos[g * 3 + 2] = (float)sz / n;
+                                            mnx = mny = mnz = 0;
+                                            mxx = mxy = mxz = 0;
                                         }
-                                        else
-                                        {
-                                            gpos[g * 3 + 0] = 0.0f;
-                                            gpos[g * 3 + 1] = 0.0f;
-                                            gpos[g * 3 + 2] = 0.0f;
-                                        }
+                                        gpos[g * 6 + 0] = (int16_t)((mnx + mxx) / 2);
+                                        gpos[g * 6 + 1] = (int16_t)((mny + mxy) / 2);
+                                        gpos[g * 6 + 2] = (int16_t)((mnz + mxz) / 2);
+                                        gpos[g * 6 + 3] = (int16_t)((mxx - mnx) / 2 + 1);
+                                        gpos[g * 6 + 4] = (int16_t)((mxy - mny) / 2 + 1);
+                                        gpos[g * 6 + 5] = (int16_t)((mxz - mnz) / 2 + 1);
                                         g++;
                                     }
                                     else if (opc == OP_TRIS)
