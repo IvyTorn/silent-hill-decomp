@@ -152,6 +152,10 @@ int main(void)
         extern void ShLogN64_EnableSdMirror(void);
         ShLogN64_EnableSdMirror();
     }
+    /* Right after the mirror is up so every SD log names its ROM: the docker
+     * build recompiles this TU every run, so the timestamp is unique per
+     * build ("which version did I actually flash?" comes up every session). */
+    SH_DBG("[SH] n64 build " __DATE__ " " __TIME__);
 
     /* Config, THEN the console overrides -- and calling these at all is the
      * fix for two hardware bugs at once. This port ran for weeks on raw PC

@@ -1319,7 +1319,10 @@ static void WorldFlushPass(int wantFg)
     if (s_drawCount == 0 || !ShT3d_Ready() || !s_haveView)
     {
         if (wantFg)
-            s_flushed = 1;
+        {
+            s_flushed   = 1;
+            s_drawCount = 0;
+        }
         return;
     }
 
@@ -1349,7 +1352,15 @@ static void WorldFlushPass(int wantFg)
         }
     }
     if (wantFg)
+    {
         s_flushed = 1;
+        /* Consume the list at the end of the frame's LAST pass. A frame
+         * whose OT build never ran WorldViewSet (menus, the inventory) then
+         * flushes NOTHING, instead of replaying the last gameplay frame's
+         * world behind an isolated screen -- which both painted the world
+         * under the inventory and raced its heavy item-texture streaming. */
+        s_drawCount = 0;
+    }
 
     /* Fence the pass boundary: the PSX walk's first rdpq mode change is
      * auto-synced only against rdpq's OWN prims -- our t3d triangles are
