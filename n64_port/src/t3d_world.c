@@ -487,6 +487,14 @@ static int s_cnTileMiss;   /* groups whose geometry was skipped this frame */
 static int BindWorldTile(uint16_t tref, uint16_t palArg)
 {
     int slot;
+    /* rdpq's AUTO-sync only tracks its own triangles; the RSP's t3d
+     * triangles are invisible to it, so every mode/TMEM change here must be
+     * fenced BY HAND exactly as t3dmodel.c does (sync_pipe before mode
+     * changes, sync_load before uploads). Racing them against in-flight
+     * world triangles corrupted draws and eventually wedged the RDP -- the
+     * rspq watchdog then reported the stall as an RSP crash from whichever
+     * caller next needed a buffer. */
+    rdpq_sync_pipe();
     if (tref == 0)
     {
         /* untextured group: shade-only, or it would sample whatever tile the
@@ -515,9 +523,9 @@ static int BindWorldTile(uint16_t tref, uint16_t palArg)
         WTile* t = &s_tiles[slot];
         surface_t surf = surface_make_linear(t->pix,
             t->fmt == 0 ? FMT_CI4 : FMT_CI8, t->w, t->h);
-        /* rdpq_sync_tile before overwriting TMEM: t3d_tri_draw is async on
-         * the RSP/RDP, so without the sync the load races the previous
-         * group's rasterisation (t3dmodel.c does this before every upload). */
+        /* sync_load before overwriting TMEM + sync_tile before reusing the
+         * tile descriptor (t3dmodel.c's exact upload fencing). */
+        rdpq_sync_load();
         rdpq_sync_tile();
         rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
         rdpq_tex_upload_tlut(s_pals + s_palOffsets[palArg], 0,
@@ -552,7 +560,9 @@ static void RunPass(const uint8_t* p, int cmdWords,
     int tilePending = 0;
     uint16_t pendTref = 0, pendPal = 0;
 
-    /* Pass-wide state the OTHER pass may have changed. */
+    /* Pass-wide state the OTHER pass may have changed. sync_pipe first: the
+     * previous stream's t3d triangles are invisible to rdpq's auto-sync. */
+    rdpq_sync_pipe();
     if (semi)
         rdpq_mode_blender(RDPQ_BLENDER_ADDITIVE);
     else
@@ -1340,6 +1350,12 @@ static void WorldFlushPass(int wantFg)
     }
     if (wantFg)
         s_flushed = 1;
+
+    /* Fence the pass boundary: the PSX walk's first rdpq mode change is
+     * auto-synced only against rdpq's OWN prims -- our t3d triangles are
+     * invisible to that tracker, so drain the pipe by hand before handing
+     * the stream back. */
+    rdpq_sync_pipe();
 
     /* t3d_frame_start reprogrammed rdpq modes; the PSX OT walk that follows
      * memoises its mode application, so tell it the mode is dirty or the
