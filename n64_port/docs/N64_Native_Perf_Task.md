@@ -258,3 +258,21 @@ some angles). Z-buffer is next once the log's [MEMN64] confirms headroom
 parts=23`, `[T3DC] native chara: parts=23/23` per census; `[PROF]` frame vs
 the 84ms Harry-only baseline (win= should drop by ~250); `[MEMN64]` heap free.
 Escape hatch: native_chara=0 in silenthill.cfg.
+
+### C2 render-debugging chain (hardware, 2026-09-06)
+1. Harry loaded+submitted (23/23) but INVISIBLE. Ruled out by inspection:
+   scale (/8 consistent), culling, matrix math, on-screen projection (chest
+   projects to ~(211,138)), palettes (pc.pal is the deduped index), winding
+   (PERIM=0,1,3,2 handles strips). [T3DCB2] probe => **838 tris reach the RDP,
+   0 misses** => drawn but composited under. FIX: CharaFlush moved AFTER
+   GsDrawOt(OT0) (was before => buried under every OT0 prim).
+2. Visible but FRAGMENTED (parts punch through). Depth-sort (mkchara one
+   buffer per part + CharaFlush sorts by viewRow[.z] farthest-first) did NOT
+   help => not inter-part order.
+3. => BACKFACES: cullMask=2 (no cull) means each closed part draws front AND
+   back faces; no Z => far faces paint over near. World is flat/single-sided
+   so needs none. FIX: T3D_FLAG_CULL_BACK for the char draw, config
+   chara_cull=1 back / 2 front / 0 none (flip if he vanishes). [T3DCB] now
+   logs all 23 part T-positions to confirm placement is coherent in parallel.
+Perf: native Harry is ~50ms/frame (233->~175ms). Native-char win CONFIRMED;
+world (~150ms) is the remaining, memory-bound bottleneck.

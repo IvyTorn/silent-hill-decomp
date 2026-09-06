@@ -102,6 +102,7 @@ int GpuNv2a_ZBufActive(void) { return ZBufOn(); }
 /* Public: t3d_world.c reads the native-character switch through here so it
  * needs no config include of its own. */
 int GpuNv2a_NativeCharaEnabled(void) { return g_PcConfig.n64NativeChara; }
+int GpuNv2a_CharaCull(void) { return g_PcConfig.n64CharaCull; }
 
 /* --------------------------------------------------------------- batch */
 

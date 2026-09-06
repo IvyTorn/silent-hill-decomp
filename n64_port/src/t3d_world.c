@@ -1747,14 +1747,17 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
      * near that = correct; huge/tiny/negative = the parts land off-screen or
      * behind the eye, which is invisible-but-submitted. Chest (0) + a limb. */
     {
+        /* Log ALL parts of the first frame (23 in bone order): their view
+         * translations should trace a standing HARRY -- head high, feet low,
+         * hands at the sides. Scattered => a placement/mapping bug; coherent
+         * but still broken on screen => rendering (backfaces/order). */
         static int s_cb;
-        if (s_cb < 6 && (partIdx == 0 || partIdx == 13))
+        if (s_cb < 24)
         {
             s_cb++;
-            SH_DBG("[T3DCB] part=%d rot.diag=%d,%d,%d T=%d,%d,%d (pvz=%d, world/8)",
-                   partIdx, (int)m9[0], (int)m9[4], (int)m9[8],
-                   (int)(m.m[3][0]), (int)(m.m[3][1]), (int)(m.m[3][2]),
-                   (int)s_playerViewZ);
+            SH_DBG("[T3DCB] part=%2d T=%d,%d,%d rotdiag=%d,%d,%d (pvz=%d)",
+                   partIdx, (int)(m.m[3][0]), (int)(m.m[3][1]), (int)(m.m[3][2]),
+                   (int)m9[0], (int)m9[4], (int)m9[8], (int)s_playerViewZ);
         }
     }
     c->viewRow[partIdx * 4 + 0] = (float)m9[6] / 4096.0f;
@@ -1809,6 +1812,18 @@ void ShT3d_CharaFlush(void)
             order[oj + 1] = key;
         }
         WorldFrameStart();
+        /* Cull backfaces for the character (WorldFrameStart left culling OFF
+         * for the flat, single-sided world). A closed character mesh drawn
+         * with no Z buffer paints its far faces over its near ones without
+         * this. Config chara_cull flips the winding if the model vanishes. */
+        {
+            extern int GpuNv2a_CharaCull(void);
+            int cull = GpuNv2a_CharaCull();
+            int df = T3D_FLAG_SHADED | T3D_FLAG_TEXTURED;
+            if (cull == 1)      df |= T3D_FLAG_CULL_BACK;
+            else if (cull == 2) df |= T3D_FLAG_CULL_FRONT;
+            t3d_state_set_drawflags(df);
+        }
         for (oi = 0; oi < nb; oi++)
         {
             const T3DVertPacked* bverts;
