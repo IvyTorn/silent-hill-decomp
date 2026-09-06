@@ -1039,9 +1039,25 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                          * Matches the instance translation (tx/8) and the eye
                          * (camPos/8); keeps every coordinate small enough that
                          * t3d's fixed-point transform does not overflow. */
-                        pos[0] = (int16_t)((int16_t)rd16(v + 0) / 8);
-                        pos[1] = (int16_t)((int16_t)rd16(v + 2) / 8);
-                        pos[2] = (int16_t)((int16_t)rd16(v + 4) / 8);
+                        /* World verts are Q8 (D*256) -> /8 = D*32 to fit t3d's
+                         * fixed-point range. CHARACTER verts are small bone-
+                         * local values (~+-120 raw); /8 rounds their fine
+                         * features to zero -> degenerate triangles / "missing
+                         * pieces". Perspective projection is scale-invariant,
+                         * so raw renders identically but keeps full precision.
+                         * The bone translation stays raw to match (CharaBone). */
+                        if (charMode)
+                        {
+                            pos[0] = (int16_t)rd16(v + 0);
+                            pos[1] = (int16_t)rd16(v + 2);
+                            pos[2] = (int16_t)rd16(v + 4);
+                        }
+                        else
+                        {
+                            pos[0] = (int16_t)((int16_t)rd16(v + 0) / 8);
+                            pos[1] = (int16_t)((int16_t)rd16(v + 2) / 8);
+                            pos[2] = (int16_t)((int16_t)rd16(v + 4) / 8);
+                        }
                         rgba = ((uint32_t)cr << 24) | ((uint32_t)cg << 16) |
                                ((uint32_t)cb << 8) | (uint32_t)v[9];
                         if (vi & 1) { vp[vi / 2].rgbaB = rgba; vp[vi / 2].normB = 0; }
@@ -1767,9 +1783,13 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
                 if (xpose) m.m[cc][r] = (float)m9[r * 3 + cc] / 4096.0f;
                 else       m.m[r][cc] = (float)m9[r * 3 + cc] / 4096.0f;
     }
-    m.m[3][0] = (float)t3[0] / 8.0f;   /* verts are local/8, like the world */
-    m.m[3][1] = (float)t3[1] / 8.0f;
-    m.m[3][2] = (float)t3[2] / 8.0f;
+    /* RAW translation (NOT /8): the character verts are loaded raw (see
+     * ShwLoadBody charMode) so the R*vert + T sum must be in the same raw
+     * scale. Perspective is scale-invariant, so this projects the same as the
+     * world's /8 but keeps the character's fine geometry from collapsing. */
+    m.m[3][0] = (float)t3[0];
+    m.m[3][1] = (float)t3[1];
+    m.m[3][2] = (float)t3[2];
     m.m[3][3] = 1.0f;
     dst = c->mats + s_charPhase * c->instCount + partIdx;
     t3d_mat4_to_fixed(dst, &m);
@@ -1794,7 +1814,7 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
     c->viewRow[partIdx * 4 + 0] = (float)m9[6] / 4096.0f;
     c->viewRow[partIdx * 4 + 1] = (float)m9[7] / 4096.0f;
     c->viewRow[partIdx * 4 + 2] = (float)m9[8] / 4096.0f;
-    c->viewRow[partIdx * 4 + 3] = (float)t3[2] / 8.0f;
+    c->viewRow[partIdx * 4 + 3] = (float)t3[2];   /* raw, matches m.m[3][2]; used only for the part depth sort */
     s_charMask |= 1u << partIdx;
     return 1;
 }
