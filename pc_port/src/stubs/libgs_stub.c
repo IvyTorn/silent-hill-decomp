@@ -655,10 +655,15 @@ static int ShN64_ItemFaceSaturated(long s0, long s1, long s2, long s3)
     return sat;
 }
 /* Bare if, NOT a do/while wrapper: the `continue` must target the drawer's
- * per-primitive for loop. Inserted as a standalone statement at each site. */
+ * per-primitive for loop. Inserted as a standalone statement at each site.
+ * REJECT3 is for the triangle drawers (item models are TRIANGLES, not quads,
+ * so the quad-only guard never ran -- no [ITEMFACE] in the log); it reuses
+ * the 4-arg check with v2 doubled. */
 #define SH_ITEM_REJECT4(a,b,c,d) if (ShN64_ItemFaceSaturated(a,b,c,d)) continue;
+#define SH_ITEM_REJECT3(a,b,c)   if (ShN64_ItemFaceSaturated(a,b,c,c)) continue;
 #else
 #define SH_ITEM_REJECT4(a,b,c,d) ((void)0)
+#define SH_ITEM_REJECT3(a,b,c)   ((void)0)
 #endif
 
 /* Flat-shaded triangle — lit + fog */
@@ -677,6 +682,7 @@ void GsTMDfastF3LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift, 
 
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         otz = p >> shift;
         if (nclip <= 0) continue;
@@ -713,6 +719,7 @@ void GsTMDfastG3LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift, 
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -752,6 +759,7 @@ void GsTMDfastF4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift, 
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
         SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
@@ -791,6 +799,7 @@ void GsTMDfastG4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift, 
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
         SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
@@ -835,6 +844,7 @@ void GsTMDfastTF3LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift,
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -876,6 +886,7 @@ void GsTMDfastTG3LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift,
 
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -919,6 +930,7 @@ void GsTMDfastTF4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift,
 
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
         SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
@@ -962,6 +974,7 @@ void GsTMDfastTG4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift,
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
         SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
@@ -1007,6 +1020,7 @@ void GsTMDfastNF3(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, un
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -1051,6 +1065,7 @@ void GsTMDfastNG3(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, un
 
             RotTransPers3(&vtx[gp->v0], &vtx[gp->v1], &vtx[gp->v2],
                           &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
             nclip = NormalClip(sxy0, sxy1, sxy2);
             if (nclip <= 0) continue;
 
@@ -1075,6 +1090,7 @@ void GsTMDfastNG3(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, un
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -1108,6 +1124,7 @@ void GsTMDfastNF4(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, un
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
         SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
@@ -1142,6 +1159,7 @@ void GsTMDfastNG4(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, un
  
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
         SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
@@ -1180,6 +1198,7 @@ void GsTMDfastNTF3(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, u
 
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         /* FCE (flag bit 1): double-sided — skip back-face cull */
         if (!(prim->dummy & 2)) {
             nclip = NormalClip(sxy0, sxy1, sxy2);
@@ -1269,6 +1288,7 @@ void GsTMDfastNTG3(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, u
 
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
+        SH_ITEM_REJECT3(sxy0, sxy1, sxy2);
         if (!(prim->flag & 2)) {
             nclip = NormalClip(sxy0, sxy1, sxy2);
             if (nclip <= 0) continue;
