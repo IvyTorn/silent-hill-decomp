@@ -126,3 +126,47 @@ sync stalls, AND fixes all remaining occlusion.
 framerate. Not starting it unilaterally because the user was previously firm
 on "no Z-buffer, painter's order like the PSX." Phase A (furniture) remains
 valid for the town areas and can proceed in parallel regardless.
+
+## 2026-09-06: decision = YES (Z-buffer). Stage log + the real numbers.
+
+Approved. Perf truth from an accidental Harry-only void: **Harry alone = 84ms**
+(~19ms CPU software-GTE transform + ~17ms CPU submit + ~48ms RDP / 254 window
+reloads). World adds ~150ms, SAME window-reload cost. Both TMEM-window-reload
+bound. Key: if the 254 reloads went to ~0, Harry is CPU-bound at ~36ms = ~28fps
+-- most of the way. So **tile-grouping is THE lever**, RSP transform is the
+follow-up to clear 30.
+
+- **Stage 1a DONE**: Z-buffer alloc/attach/clear + world writes depth. Bug found
+  and fixed: 150KB via surface_alloc starved the in-game heap -> t3d ready=0 ->
+  world void. Now static .bss. zbuffer=1 default. AWAITING confirm it renders.
+
+- **Stage 1b (designed, implement on confirmed 1a) -- character depth source.**
+  The problem: the OT walk (DrawOTag, gpu_xbox.c:1374) follows a FLAT P_TAG
+  linked list; the per-prim OT bucket (=otz=real GTE depth) is NOT recoverable
+  from the chain. Two sources:
+  * (A) DRAW-ORDER RANK: a monotonic counter over the walk = the painter's
+    order. Cheap, no new plumbing. But it is a RANK, not view depth, so it does
+    NOT share a Z-space with the world's real t3d depth -- only valid for
+    characters occluding among THEMSELVES.
+  * (B) REAL GTE SZ: capture C2_SZ like the item path's g_PsyX_RtpSz, but from
+    the CHARACTER mesh draw (func_80057090 path) and tag each prim. Invasive but
+    composes with the world.
+  PLAN: use (A) first for the Harry-ISOLATED milestone (world off -> no
+  composition needed), because it is enough to enable tile-grouping and prove
+  the fps win. Move to (B) when re-integrating the world so characters occlude
+  against furniture. Z-space conflict handling for the interim full scene: clear
+  Z once between the world pass and the character pass so characters get a fresh
+  rank-Z on top of the world (keeps current compositing: world behind, chars on
+  top, chars self-occlude).
+
+- **Stage 2 (the fps win) -- tile-group the character draw.** In the batch/OT
+  path: instead of emitting prims in OT order, bucket them by (page,pal) tile,
+  load each tile ONCE, draw all its prims, next tile. Z (1b) preserves the
+  original ordering so reordering is safe. Target: 254 reloads -> ~tile count.
+  Measure against the 84ms baseline.
+
+- **Stage 3 -- RSP transform** (t3d skinning of the character) to cut the ~19ms
+  CPU. Only if still short of 30 after Stage 2.
+
+Implementation is gated on Stage 1a rendering confirmed (don't stack unverified
+Z changes). Everything else (numbers, sources, order) is settled above.
