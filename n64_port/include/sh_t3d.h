@@ -67,4 +67,17 @@ void ShT3d_WorldFlushForeground(void);
  * own fog/brightness pass replaces them); unconverted areas keep theirs. */
 int ShT3d_WorldDrewThisFrame(void);
 
+/* Native characters (Phase C2). A character .ILM is rigid parts, one per
+ * bone; each part is drawn by the RSP with the game's own bone view matrix.
+ * DrawBegin(isHarry) returns 1 when the character draws natively -- the bone
+ * loop then feeds CharaBone(partIdx = the bone's ILM model index, the bone's
+ * composed view matrix: Q12 rotation row-major m9, Q8 translation t3) and
+ * SKIPS the software-GTE per-part draw; 0 = PSX path as before. CharaFlush
+ * draws all fed parts tile-grouped, between the background world pass and
+ * GsDrawOt(OT0). */
+int  ShT3d_CharaDrawBegin(int isHarry);
+void ShT3d_CharaDrawEnd(void);
+int  ShT3d_CharaBone(int partIdx, const short* m9, const int* t3);
+void ShT3d_CharaFlush(void);
+
 #endif

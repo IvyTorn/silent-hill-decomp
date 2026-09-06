@@ -88,6 +88,8 @@ s_PcConfig g_PcConfig = {
     .n64ZBuffer          = 0,    /* N64: Z-buffer OFF by default -- 150KB does not fit while the
                                   * native world is resident (heap 1149/1150KB). zbuffer=1 only for
                                   * the world-off Harry-isolation dev path. */
+    .n64NativeChara      = 1,    /* N64: Harry's 23 rigid parts drawn by the RSP from N64C/HERO.SHW;
+                                  * native_chara=0 = software-GTE per-part draw as before */
     .xboxVideo720p       = 0,    /* Xbox: 480p by default (720p costs texture-cache RAM) */
     .logDiag             = 0,    /* Xbox: quiet log by default (per-frame diag probes gated; log_diag=1 restores) */
     .cutsceneLineGapMs   = 300,  /* min ms between cutscene voice lines (PSX inter-line pause); tune down if it re-desyncs */
@@ -790,6 +792,10 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "zbuffer") == 0)
         {
             g_PcConfig.n64ZBuffer = (atoi(value) != 0);
+        }
+        else if (strcmp(key, "native_chara") == 0)
+        {
+            g_PcConfig.n64NativeChara = (atoi(value) != 0);
         }
         else if (strcmp(key, "rdp_probe") == 0)
         {

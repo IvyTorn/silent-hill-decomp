@@ -129,6 +129,32 @@ static WTile   s_tiles[TILE_SLOTS];
 static uint8_t s_tilePool[TILE_SLOTS][TILE_SLOT_BYTES] __attribute__((aligned(16)));
 static int     s_tileRam;
 
+/* ---- native character store (Phase C2): ONE resident character (Harry).
+ * A character .ILM is 23 RIGID parts, one per bone (no vertex skinning), so
+ * a part maps onto a world instance: geometry baked by mkchara.py, the
+ * per-frame matrix is the game's own BONE view matrix, written by the bone
+ * loop (ShT3d_CharaBone) instead of composed from the IPD. Its 21 tiles are
+ * eager-resident here in their own pool so the area SHT's slot/palette
+ * namespaces stay untouched across map changes; its parts live in a fixed
+ * arena as a WChunk. Static .bss (~84KB) -- heap headroom is the constraint
+ * on this machine, and these never move. */
+#define CTILE_SLOTS      22
+#define CHAR_ARENA_BYTES (40 * 1024)
+static WTile     s_cTiles[CTILE_SLOTS];
+static uint8_t   s_cPool[CTILE_SLOTS][TILE_SLOT_BYTES] __attribute__((aligned(16)));
+static int       s_cTileCount;
+static uint16_t* s_cPals;
+static uint32_t* s_cPalOffsets;
+static uint16_t* s_cPalWords;
+static int       s_cPalCount;
+static WChunk    s_charChunk;
+static uint8_t   s_charArena[CHAR_ARENA_BYTES] __attribute__((aligned(16)));
+static int       s_charLoaded, s_charLoadTried;
+static int       s_charActive;      /* inside a native character's bone loop */
+static int       s_charPhase;       /* double-buffered part matrices */
+static uint32_t  s_charMask;        /* parts the animation wrote this frame */
+static T3DMat4FP s_charHidden;      /* collapses an unwritten part behind the eye */
+
 static FILE*   s_sht;             /* area tile store, kept open */
 static char    s_shtPrefix[8];
 static uint16_t s_shtTileCount;
@@ -281,19 +307,22 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
 
 /* ------------------------------------------------------------- helpers */
 
-static FILE* WOpen(const char* rel)
+/* SD first (mods), then the cart. root = "N64W" (world) or "N64C" (chars). */
+static FILE* WOpenRoot(const char* root, const char* rel)
 {
     char path[96];
     FILE* f;
-    snprintf(path, sizeof path, "sd:/silenthill/gamedata/load/N64W/%s", rel);
+    snprintf(path, sizeof path, "sd:/silenthill/gamedata/load/%s/%s", root, rel);
     f = fopen(path, "rb");
     if (f == NULL)
     {
-        snprintf(path, sizeof path, "rom:/N64W/%s", rel);
+        snprintf(path, sizeof path, "rom:/%s/%s", root, rel);
         f = fopen(path, "rb");
     }
     return f;
 }
+
+static FILE* WOpen(const char* rel) { return WOpenRoot("N64W", rel); }
 
 static uint16_t rd16(const uint8_t* p) { return (uint16_t)((p[0] << 8) | p[1]); }
 static uint32_t rd32(const uint8_t* p)
@@ -536,6 +565,37 @@ static int BindWorldTile(uint16_t tref, uint16_t palArg)
     return 1;
 }
 
+/* Character tiles: eager-resident (slot == tile index), own palettes. Same
+ * hand fencing as BindWorldTile -- t3d triangles are invisible to rdpq's
+ * auto-sync. */
+static int BindCharTile(uint16_t tref, uint16_t palArg)
+{
+    int slot;
+    rdpq_sync_pipe();
+    if (tref == 0)
+    {
+        rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+        return 1;
+    }
+    slot = (int)tref - 1;
+    if (slot >= s_cTileCount || s_cTiles[slot].pix == NULL || palArg >= s_cPalCount)
+    {
+        s_cnTileMiss++;
+        return 0;
+    }
+    {
+        WTile* t = &s_cTiles[slot];
+        surface_t surf = surface_make_linear(t->pix,
+            t->fmt == 0 ? FMT_CI4 : FMT_CI8, t->w, t->h);
+        rdpq_sync_load();
+        rdpq_sync_tile();
+        rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+        rdpq_tex_upload_tlut(s_cPals + s_cPalOffsets[palArg], 0, s_cPalWords[palArg]);
+        rdpq_tex_upload(TILE0, &surf, NULL);
+    }
+    return 1;
+}
+
 /* wantFg: 0 = draw only background groups (farther than the player), 1 =
  * only foreground (nearer). Splitting the same stream twice around the PSX
  * character OT reproduces the OT's back-to-front order with no Z buffer.
@@ -547,7 +607,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
                     const T3DVertPacked* verts, const T3DMat4FP* mats,
                     const int16_t* groupPos, const float* viewRow,
                     int groupBase, int wantFg,
-                    int semi)
+                    int semi, int (*bind)(uint16_t, uint16_t))
 {
     /* depthSkip defaults to wantFg so any geometry before the first OP_VERTS
      * classification draws in the background pass only -- never in both,
@@ -630,7 +690,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
             if (tilePending)
             {
                 if (needSync) { t3d_tri_sync(); needSync = 0; }
-                tileSkip = !BindWorldTile(pendTref, pendPal);
+                tileSkip = !bind(pendTref, pendPal);
                 tilePending = 0;
             }
             if (tileSkip)
@@ -668,6 +728,11 @@ static void RunPass(const uint8_t* p, int cmdWords,
     if (pushed)
         t3d_matrix_pop(1);
 }
+
+static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
+                       const char* base, int bufCount, int instCount, int refCount,
+                       uint32_t instOff, uint32_t refsOff, int cellX, int cellZ,
+                       int charMode);
 
 void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
 {
@@ -758,6 +823,38 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     c->cellX = cellX;
     c->cellZ = cellZ;
 
+    if (!ShwLoadBody(c, s_chunkArena[(int)(c - s_chunks)], WCHUNK_ARENA_BYTES, f, base,
+                     bufCount, instCount, refCount, instOff, refsOff, cellX, cellZ, 0))
+    {
+        fclose(f);
+        c->inUse = 1;          /* let ChunkFree see a live chunk to unwind */
+        c->bufCount = 0;
+        ChunkFree(c);
+        return;
+    }
+    /* First composition immediately (this frame's WorldViewSet has
+     * already run); every later frame recomposes in WorldViewSet. */
+    ComposeChunkViews(c);
+    fclose(f);
+    c->inUse = 1;
+    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tiles=%d/%d miss=%d tileRam=%dK",
+           base, bufCount, instCount, c->groupCount, c->tileRefCount, refCount,
+           s_cnTileMiss, s_tileRam / 1024);
+}
+
+/* The SHW parser proper, shared by world chunks (charMode 0: cell-folded
+ * instance translations, tiles ref-counted into the area pool) and native
+ * characters (charMode 1: identity rest-pose instances the bone loop
+ * overwrites every frame, tiles eager-resident in the character store). On
+ * success c->bufCount is set and the tables freed; the caller closes the
+ * file, composes/marks resident and logs. On failure the tables are freed
+ * and 0 returned; the caller unwinds the chunk. */
+static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
+                       const char* base, int bufCount, int instCount, int refCount,
+                       uint32_t instOff, uint32_t refsOff, int cellX, int cellZ,
+                       int charMode)
+{
+    int i;
     /* STREAM-PARSE: the file is ~87% vertex payload; never hold it whole.
      * Small tables first, then the big vertex block into the cleanest free
      * space, then verts through a staging window and commands through a
@@ -799,7 +896,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             int bufBytes  = (int)sizeof(WBuf) * bufCount;
             int cmdBytes  = 0;
             int need;
-            uint8_t* a = s_chunkArena[(int)(c - s_chunks)];
+            uint8_t* a = arena;
             for (i = 0; i < bufCount; i++)
             {
                 int ow = rd16(table + i * 20 + 2);
@@ -812,11 +909,11 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                  + ((rowBytes + 15) & ~15)
                  + ((refBytes + 15) & ~15) + ((bufBytes + 15) & ~15)
                  + ((cmdBytes + 15) & ~15);
-            if (need > WCHUNK_ARENA_BYTES)
+            if (need > arenaBytes)
             {
                 if (WFailLog())
                     SH_DBG("[T3DW] %s: %dKB over the %dKB arena -- PSX fallback",
-                           base, need / 1024, WCHUNK_ARENA_BYTES / 1024);
+                           base, need / 1024, arenaBytes / 1024);
                 goto fail;
             }
             c->verts = (T3DVertPacked*)a;
@@ -855,9 +952,9 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             int k;
             for (k = 0; k < 9; k++)
                 c->rawRot[i * 9 + k] = (int16_t)rd16(ip + k * 2);
-            c->rawTrans[i * 3 + 0] = (int32_t)rd32(ip + 20) + cellX * 10240;
+            c->rawTrans[i * 3 + 0] = (int32_t)rd32(ip + 20) + (charMode ? 0 : cellX * 10240);
             c->rawTrans[i * 3 + 1] = (int32_t)rd32(ip + 24);
-            c->rawTrans[i * 3 + 2] = (int32_t)rd32(ip + 28) + cellZ * 10240;
+            c->rawTrans[i * 3 + 2] = (int32_t)rd32(ip + 28) + (charMode ? 0 : cellZ * 10240);
         }
 
         /* Tile refs (arena-resident, carved above). */
@@ -868,7 +965,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         for (i = 0; i < refCount; i++)
         {
             uint16_t idx = rd16(tmp + i * 2);
-            if (TileAcquire(idx) >= 0)
+            if (!charMode && TileAcquire(idx) >= 0)   /* char tiles live in their own store */
                 c->tileRefs[c->tileRefCount++] = idx;
         }
 
@@ -968,7 +1065,6 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
              * fit, groupPos stays NULL and every group draws in the
              * background pass -- the pre-split behaviour, never worse. */
             {
-                uint8_t* arena  = s_chunkArena[(int)(c - s_chunks)];
                 uint32_t gcount = 0;
                 int      bi, pass;
 
@@ -999,7 +1095,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
                 {
                     uint32_t gbytes = gcount * 6 * (uint32_t)sizeof(int16_t);
                     uint8_t* gp     = c->cmds + ((cmdCur + 15u) & ~15u);
-                    if (gcount == 0 || gp + gbytes > arena + WCHUNK_ARENA_BYTES)
+                    if (gcount == 0 || gp + gbytes > arena + arenaBytes)
                     {
                         c->groupPos = NULL;
                         if (gcount != 0)
@@ -1079,30 +1175,17 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
             }
         }
 
-        /* First composition immediately (this frame's WorldViewSet has
-         * already run); every later frame recomposes in WorldViewSet. */
         c->bufCount = bufCount;
-        ComposeChunkViews(c);
-
         free(tmp);
         free(table);
-        fclose(f);
-        c->inUse = 1;
-        SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tiles=%d/%d miss=%d tileRam=%dK",
-               base, bufCount, instCount, c->groupCount, c->tileRefCount, refCount,
-               s_cnTileMiss, s_tileRam / 1024);
-        return;
+        return 1;
 
 fail:
         if (WFailLog())
             SH_DBG("[T3DW] %s: load failed (see prior line or alloc)", base);
         free(tmp);
         free(table);
-        fclose(f);
-        c->inUse = 1;          /* let ChunkFree see a live chunk to unwind */
-        c->bufCount = 0;
-        ChunkFree(c);
-        return;
+        return 0;
     }
 }
 
@@ -1352,14 +1435,14 @@ static void WorldFlushPass(int wantFg)
         {
             RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
                     c->mats + s_matPhase * c->instCount, c->groupPos,
-                    c->viewRow, c->bufs[b].opaGroupBase, wantFg, 0);
+                    c->viewRow, c->bufs[b].opaGroupBase, wantFg, 0, BindWorldTile);
             s_cnBlocks++;
         }
         if (c->bufs[b].semiWords > 1)
         {
             RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
                     c->mats + s_matPhase * c->instCount, c->groupPos,
-                    c->viewRow, c->bufs[b].semiGroupBase, wantFg, 1);
+                    c->viewRow, c->bufs[b].semiGroupBase, wantFg, 1, BindWorldTile);
             s_cnBlocks++;
         }
     }
@@ -1428,4 +1511,260 @@ void ShT3d_NotifyFrameEnd(void)
         SH_DBG("[T3DW] blocks=%d fallback=%d tileRam=%dK",
                s_cnBlocks, s_cnFallback, s_tileRam / 1024);
     s_cnBlocks = s_cnFallback = 0;
+}
+
+/* ============================================================ characters */
+
+/* Eager-load a character SHT: every tile into the char pool (never evicted),
+ * palettes resident. Same file layout as the area SHT (see ShtOpen). */
+static int CharaShtLoad(const char* name)
+{
+    char    fn[24];
+    uint8_t hdr[8];
+    FILE*   f;
+    int     i, fileTiles, tiles, pals, total;
+
+    snprintf(fn, sizeof fn, "%s.SHT", name);
+    f = WOpenRoot("N64C", fn);
+    if (f == NULL)
+        return 0;
+    if (fread(hdr, 1, 8, f) != 8 || rd32(hdr) != SHT_MAGIC)
+    {
+        fclose(f);
+        return 0;
+    }
+    fileTiles = rd16(hdr + 4);
+    pals      = rd16(hdr + 6);
+    tiles     = fileTiles;
+    if (tiles > CTILE_SLOTS)
+    {
+        SH_DBG("[T3DC] %s: %d tiles > %d slots -- excess groups will drop", name, tiles, CTILE_SLOTS);
+        tiles = CTILE_SLOTS;
+    }
+    for (i = 0; i < tiles; i++)
+    {
+        uint8_t  meta[16];
+        WTile*   t = &s_cTiles[i];
+        uint32_t pixOff, pixLen;
+        fseek(f, 8 + i * 16, SEEK_SET);
+        if (fread(meta, 1, 16, f) != 16) { fclose(f); return 0; }
+        t->fmt = meta[0];
+        t->w   = rd16(meta + 2);
+        t->h   = rd16(meta + 4);
+        pixOff = rd32(meta + 8);
+        pixLen = rd32(meta + 12);
+        if (pixLen > TILE_SLOT_BYTES) { fclose(f); return 0; }
+        t->pix = s_cPool[i];
+        fseek(f, pixOff, SEEK_SET);
+        if (fread(t->pix, 1, pixLen, f) != pixLen) { t->pix = NULL; fclose(f); return 0; }
+        t->pixLen = pixLen;
+        data_cache_hit_writeback(t->pix, pixLen);
+        t->sthIdx = i;
+        t->refs   = 1;
+    }
+    s_cTileCount = tiles;
+
+    s_cPalOffsets = malloc(pals * 4);
+    s_cPalWords   = malloc(pals * 2);
+    if (s_cPalOffsets == NULL || s_cPalWords == NULL) { fclose(f); return 0; }
+    total = 0;
+    fseek(f, 8 + fileTiles * 16, SEEK_SET);
+    for (i = 0; i < pals; i++)
+    {
+        uint8_t pm[8];
+        if (fread(pm, 1, 8, f) != 8) { fclose(f); return 0; }
+        s_cPalWords[i]   = rd16(pm);
+        s_cPalOffsets[i] = rd32(pm + 4);
+        total += (s_cPalWords[i] + 3) & ~3;
+    }
+    s_cPals = malloc_uncached(total * 2);
+    if (s_cPals == NULL) { fclose(f); return 0; }
+    total = 0;
+    for (i = 0; i < pals; i++)
+    {
+        fseek(f, s_cPalOffsets[i], SEEK_SET);
+        fread((uint8_t*)s_cPals + total * 2, 1, s_cPalWords[i] * 2, f);
+        s_cPalOffsets[i] = total;   /* now: word offset into s_cPals */
+        total += (s_cPalWords[i] + 3) & ~3;
+    }
+    s_cPalCount = pals;
+    fclose(f);
+    SH_DBG("[T3DC] %s.SHT: %d tiles (%dKB) %d pals", name, tiles,
+           (tiles * TILE_SLOT_BYTES) / 1024, pals);
+    return 1;
+}
+
+/* Load ONE character natively (tried once; a missing asset leaves it on the
+ * PSX path for good, logged). The SHW's cell field is the character marker
+ * mkchara.py writes (-128,-128). */
+static int CharaLoad(const char* name)
+{
+    char     fn[24];
+    uint8_t  hdr[0x14];
+    FILE*    f;
+    int      bufCount, instCount, refCount;
+    uint32_t instOff, refsOff;
+
+    if (s_charLoaded)
+        return 1;
+    if (s_charLoadTried)
+        return 0;
+    s_charLoadTried = 1;
+
+    if (!CharaShtLoad(name))
+    {
+        SH_DBG("[T3DC] no N64C/%s.SHT -- %s stays on the PSX path", name, name);
+        return 0;
+    }
+    snprintf(fn, sizeof fn, "%s.SHW", name);
+    f = WOpenRoot("N64C", fn);
+    if (f == NULL)
+    {
+        SH_DBG("[T3DC] no N64C/%s.SHW", name);
+        return 0;
+    }
+    if (fread(hdr, 1, sizeof hdr, f) != sizeof hdr || rd32(hdr) != SHW_MAGIC ||
+        (int8_t)hdr[4] != -128)
+    {
+        SH_DBG("[T3DC] %s.SHW: bad header (not a character SHW)", name);
+        fclose(f);
+        return 0;
+    }
+    bufCount  = rd16(hdr + 6);
+    instCount = rd16(hdr + 8);
+    refCount  = rd16(hdr + 10);
+    instOff   = rd32(hdr + 0xC);
+    refsOff   = rd32(hdr + 0x10);
+    if (instCount > 32)
+    {
+        SH_DBG("[T3DC] %s: %d parts > 32 (mask width)", name, instCount);
+        fclose(f);
+        return 0;
+    }
+    memset(&s_charChunk, 0, sizeof s_charChunk);
+    s_charChunk.cellX = s_charChunk.cellZ = -128;
+    if (!ShwLoadBody(&s_charChunk, s_charArena, CHAR_ARENA_BYTES, f, name,
+                     bufCount, instCount, refCount, instOff, refsOff, 0, 0, 1))
+    {
+        fclose(f);
+        return 0;
+    }
+    fclose(f);
+
+    /* A part the animation never writes collapses to a point far behind the
+     * eye (PSX view -z is behind the camera after the GL flip), so a stale
+     * pose can never show. */
+    {
+        T3DMat4 hm;
+        memset(&hm, 0, sizeof hm);
+        hm.m[3][2] = -20000.0f;
+        hm.m[3][3] = 1.0f;
+        t3d_mat4_to_fixed(&s_charHidden, &hm);
+    }
+    s_charChunk.inUse = 1;
+    s_charLoaded = 1;
+    SH_DBG("[T3DC] %s resident: parts=%d groups=%d tiles=%d pals=%d",
+           name, instCount, s_charChunk.groupCount, s_cTileCount, s_cPalCount);
+    return 1;
+}
+
+/* Bracket a character's bone loop. Returns 1 when THIS character draws
+ * natively (the bone loop then feeds ShT3d_CharaBone and skips the software
+ * GTE per-part draw), 0 for the PSX path. Harry only for now; other charas
+ * reuse the path once converted. */
+int ShT3d_CharaDrawBegin(int isHarry)
+{
+    extern int GpuNv2a_NativeCharaEnabled(void);
+    s_charActive = 0;
+    if (!isHarry || !GpuNv2a_NativeCharaEnabled() || !ShT3d_Ready())
+        return 0;
+    if (!CharaLoad("HERO"))
+        return 0;
+    s_charActive = 1;
+    s_charPhase ^= 1;     /* the RSP may still replay last frame's half */
+    s_charMask   = 0;
+    return 1;
+}
+
+void ShT3d_CharaDrawEnd(void)
+{
+    s_charActive = 0;
+}
+
+/* The bone loop hands over each part's GAME view matrix (Vw_CoordToWorldAnd
+ * ViewMatrices of the bone coord: Q12 rotation m9 row-major, Q8 translation
+ * t3) -- exactly what ComposeChunkViews derives for a world instance, so the
+ * part lands where the PSX path would land it. */
+int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
+{
+    WChunk*    c = &s_charChunk;
+    T3DMat4    m;
+    T3DMat4FP* dst;
+    int        r, cc;
+
+    if (!s_charActive || partIdx < 0 || partIdx >= c->instCount)
+        return 0;
+    memset(&m, 0, sizeof m);
+    for (r = 0; r < 3; r++)
+        for (cc = 0; cc < 3; cc++)
+            m.m[cc][r] = (float)m9[r * 3 + cc] / 4096.0f;
+    m.m[3][0] = (float)t3[0] / 8.0f;   /* verts are local/8, like the world */
+    m.m[3][1] = (float)t3[1] / 8.0f;
+    m.m[3][2] = (float)t3[2] / 8.0f;
+    m.m[3][3] = 1.0f;
+    dst = c->mats + s_charPhase * c->instCount + partIdx;
+    t3d_mat4_to_fixed(dst, &m);
+    c->viewRow[partIdx * 4 + 0] = (float)m9[6] / 4096.0f;
+    c->viewRow[partIdx * 4 + 1] = (float)m9[7] / 4096.0f;
+    c->viewRow[partIdx * 4 + 2] = (float)m9[8] / 4096.0f;
+    c->viewRow[partIdx * 4 + 3] = (float)t3[2] / 8.0f;
+    s_charMask |= 1u << partIdx;
+    return 1;
+}
+
+/* Draw the character where its OT prims used to sit: after the background
+ * world pass, before GsDrawOt(OT0) (items/effects still composite on top),
+ * before the foreground world pass (which occludes him). Tile-grouped: the
+ * stream is sorted by (tile, pal, part) at convert time, so each of his tiles
+ * loads ONCE per frame instead of once per primitive. */
+void ShT3d_CharaFlush(void)
+{
+    WChunk*    c = &s_charChunk;
+    T3DMat4FP* mats;
+    int        b, i, drawn = 0;
+    static int s_census;
+
+    if (!s_charLoaded || s_charMask == 0 || !s_haveView || !ShT3d_Ready())
+        return;
+    mats = c->mats + s_charPhase * c->instCount;
+    for (i = 0; i < c->instCount; i++)
+    {
+        if (s_charMask & (1u << i))
+            drawn++;
+        else
+            memcpy(&mats[i], &s_charHidden, sizeof mats[i]);
+    }
+    data_cache_hit_writeback(mats, sizeof(T3DMat4FP) * c->instCount);
+
+    WorldFrameStart();
+    for (b = 0; b < c->bufCount; b++)
+    {
+        const T3DVertPacked* bverts = c->verts + c->bufs[b].vbase / 2;
+        if (c->bufs[b].opaWords > 1)
+            RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
+                    mats, NULL, c->viewRow, 0, 0, 0, BindCharTile);
+        if (c->bufs[b].semiWords > 1)
+            RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
+                    mats, NULL, c->viewRow, 0, 0, 1, BindCharTile);
+    }
+    /* Fence: the PSX walk's first mode change is auto-synced only against
+     * rdpq's own prims, never our t3d triangles. */
+    rdpq_sync_pipe();
+    {
+        extern void GpuNv2a_PsxModeInvalidate(void);
+        GpuNv2a_PsxModeInvalidate();
+    }
+    if ((s_census++ & 127) == 0)
+        SH_DBG("[T3DC] native chara: parts=%d/%d groups=%d", drawn, c->instCount, c->groupCount);
+    s_charMask = 0;
 }

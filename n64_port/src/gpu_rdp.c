@@ -99,6 +99,9 @@ static int       s_zbufTried;
 static int ZBufOn(void) { return g_PcConfig.n64ZBuffer && s_zbuf.buffer != NULL; }
 /* Public: t3d_world.c enables Z for the world only when the buffer is live. */
 int GpuNv2a_ZBufActive(void) { return ZBufOn(); }
+/* Public: t3d_world.c reads the native-character switch through here so it
+ * needs no config include of its own. */
+int GpuNv2a_NativeCharaEnabled(void) { return g_PcConfig.n64NativeChara; }
 
 /* --------------------------------------------------------------- batch */
 

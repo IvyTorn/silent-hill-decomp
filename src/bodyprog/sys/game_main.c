@@ -3406,6 +3406,10 @@ void MainLoop(void) // 0x80032EE0
          * but that was the broken camera/geometry -- retested once the world
          * rendered from FrameEnd.) */
         { extern void ShT3d_WorldFlush(void); ShT3d_WorldFlush(); }
+        /* Native character(s): where their OT prims used to sit -- after
+         * the background world, under OT0's items/effects, before the
+         * foreground world that occludes them. */
+        { extern void ShT3d_CharaFlush(void); ShT3d_CharaFlush(); }
 #endif
         GsDrawOt(&g_OrderingTable0[g_ActiveBufferIdx]);
 #ifdef SH_N64_PORT

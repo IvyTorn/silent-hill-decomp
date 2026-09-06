@@ -144,6 +144,10 @@ if [ -d "$SCRIPT_DIR/filesystem/maps" ]; then
     if [ -d "$SCRIPT_DIR/build/n64w" ]; then
         cp -r "$SCRIPT_DIR/build/n64w" "$SCRIPT_DIR/build/hwfs/N64W"
     fi
+    # Native character assets (mkchara.py output: N64C/HERO.SHW + .SHT).
+    if [ -d "$SCRIPT_DIR/build/chara/N64C" ]; then
+        cp -r "$SCRIPT_DIR/build/chara/N64C" "$SCRIPT_DIR/build/hwfs/N64C"
+    fi
     "$I/bin/mkdfs" "$HWDFS" "$SCRIPT_DIR/build/hwfs" >/dev/null
     rm -f "$OUT/sh_hardware.z64"
     "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh_hardware.z64"         --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"         ${MSYM:+"$MSYM"}         --align 4096 "$HWDFS"

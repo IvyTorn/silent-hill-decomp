@@ -1656,8 +1656,22 @@ void func_8003DA9C(e_CharaId charaId, GsCOORDINATE2* boneCoords, s32 arg2, q3_12
      * per-vertex; cleared right after. */
     { extern int g_PsyX_NoShadowCast; g_PsyX_NoShadowCast = (charaId == Chara_Harry) ? 1 : 0; }
 #endif
+#ifdef SH_N64_PORT
+    /* Native character bracket: inside it the bone loop feeds the RSP this
+     * character's part matrices and skips the software-GTE draw. */
+    {
+        extern int ShT3d_CharaDrawBegin(int);
+        ShT3d_CharaDrawBegin(charaId == Chara_Harry);
+    }
+#endif
     func_80045534(&g_WorldGfxWork.registeredCharaModels[charaId]->skeleton, &g_OrderingTable0[g_ActiveBufferIdx], arg2,
                   boneCoords, Q8_TO_Q12(CHARA_FILE_INFOS[charaId].field_6), ret, CHARA_FILE_INFOS[charaId].field_8);
+#ifdef SH_N64_PORT
+    {
+        extern void ShT3d_CharaDrawEnd(void);
+        ShT3d_CharaDrawEnd();
+    }
+#endif
 #ifdef SH_PC_PORT
     { extern int g_PcHideHarryFpsBody; g_PcHideHarryFpsBody = 0; }
     { extern int g_PsyX_NoShadowCast; g_PsyX_NoShadowCast = 0; }

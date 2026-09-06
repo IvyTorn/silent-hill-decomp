@@ -11,8 +11,8 @@ at draw time by the runtime (t3d_world.c's compose path, fed from the game's
 skeleton instead of the IPD). The instance transform baked here is therefore
 IDENTITY -- a rest pose placeholder the runtime overwrites.
 
-Output: <out>/CHARA/<NAME>.SHW  (24 parts as instances, one buffer)
-        <out>/CHARA/<NAME>.SHT  (HERO.TIM tiled + its CLUT palettes)
+Output: <out>/N64C/<NAME>.SHW  (the parts as instances, one buffer)
+        <out>/N64C/<NAME>.SHT  (HERO.TIM tiled + its CLUT palettes)
 
     python mkchara.py --ilm HERO.ILM --tim HERO.TIM --out build/chara
 
@@ -106,7 +106,7 @@ def main():
     stats["tris"] = len(all_pieces)
     shw = encode_shw(_IpdShim(), 1, all_pieces, instances)
 
-    outdir = os.path.join(a.out, "CHARA")
+    outdir = os.path.join(a.out, "N64C")   # rom:/N64C, sd:/.../load/N64C (t3d_world.c WOpenRoot)
     os.makedirs(outdir, exist_ok=True)
     open(os.path.join(outdir, name + ".SHW"), "wb").write(shw)
     open(os.path.join(outdir, name + ".SHT"), "wb").write(sht)

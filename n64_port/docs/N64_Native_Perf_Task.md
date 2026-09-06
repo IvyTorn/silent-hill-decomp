@@ -209,3 +209,52 @@ window reloads) -- both levers, no Z-buffer, no heap fight.
 - START with Harry only (the user's isolation); other charas reuse the path.
 
 This is multi-session; each phase is buildable+testable on its own.
+
+## 2026-09-06: C1 DONE, C2 IMPLEMENTED (first hardware build pending)
+
+**C1 -- mkchara.py** (n64_port/tools): HERO.ILM parses with sh1fmt.Lm (it is
+the same LM archive as world models). Harry = **23 RIGID parts, one per bone**
+(01CHEST_, 02HEAD1, 02NECK, 03LSHOUL ... 17RFOOT, hands), 838 tris, ONE
+material (HERO.TIM: 256x192 CI4, 15 CLUTs). No vertex skinning, so a part is
+a world "instance" whose matrix is the bone's. Output N64C/HERO.SHW (22KB,
+23 instances, 1 buffer, 1204 verts) + N64C/HERO.SHT (42KB, **21 tiles**, 7
+pals). Staged by build_n64.sh from build/chara/N64C into rom:/N64C.
+
+**C2 -- runtime** (t3d_world.c + hooks):
+- `ShwLoadBody(c, arena, arenaBytes, f, ..., charMode)`: the SHW parser split
+  out of ShT3d_WorldChunkLoaded and SHARED. charMode=1: no cell fold, no
+  area-pool TileAcquire. World path byte-identical (charMode=0).
+- Character store: `s_cTiles/s_cPool` (22 slots, eager-resident, never
+  evicted, own palettes s_cPals) + `s_charChunk` in a 40KB `s_charArena`.
+  ~84KB static .bss total. Separate from the area SHT so map changes never
+  touch it. `BindCharTile` = BindWorldTile over that store (slot == tref-1).
+- `RunPass(..., bind)`: takes the bind function; world passes BindWorldTile.
+- API (sh_t3d.h): `ShT3d_CharaDrawBegin(isHarry)` brackets the bone loop
+  (lazy CharaLoad("HERO") once; config native_chara=1; flips a 2-phase
+  matrix buffer, clears the part mask) / `ShT3d_CharaBone(partIdx, m9, t3)`
+  converts the bone's GAME view matrix (Q12 rot, Q8 t -> /8 like the world)
+  into the part's T3DMat4FP and sets the mask bit / `ShT3d_CharaDrawEnd` /
+  `ShT3d_CharaFlush` draws all fed parts (unwritten parts get a
+  behind-the-eye collapse matrix), tile-grouped, groupPos=NULL (no fg/bg
+  split -- the whole character is one unit).
+- Hooks: bodyprog_bone_80044F14.c per-bone draw (both the SH_PC_PORT branch
+  and the #else) -> `if (!ShT3d_CharaBone(modelInfo.modelIdx, &viewMat.m,
+  viewMat.t)) func_80057090(...)`; world_draw.c ShxCharaDrawImpl brackets
+  func_80045534 with DrawBegin(charaId==Chara_Harry)/DrawEnd; game_main.c
+  calls ShT3d_CharaFlush after the background world flush and BEFORE
+  GsDrawOt(OT0) (items/effects composite on top, foreground world occludes).
+- partIdx == `modelInfo.modelIdx` == the ILM model-header index ==
+  mkchara's part order (Bone_ModelAssign indexes the same header array).
+
+**What this build removes**: BOTH levers at once for Harry -- the software-
+GTE per-part draw is skipped (the ~19ms `chara` CPU) AND his ~254 per-prim
+TMEM window reloads become ~21 tile loads. The held weapon (world_draw.c:
+1112) and other charas stay on the PSX path. **Known limitation**: no Z, so
+his tile-grouped parts can mis-order among themselves (arm through torso at
+some angles). Z-buffer is next once the log's [MEMN64] confirms headroom
+(PAGE_N can now drop: HERO pages left the PSX texture cache).
+
+**Test read-out**: log `[T3DC] HERO.SHT: 21 tiles`, `[T3DC] HERO resident:
+parts=23`, `[T3DC] native chara: parts=23/23` per census; `[PROF]` frame vs
+the 84ms Harry-only baseline (win= should drop by ~250); `[MEMN64]` heap free.
+Escape hatch: native_chara=0 in silenthill.cfg.

@@ -443,11 +443,27 @@ void func_80045534(s_Skeleton* skel, GsOT* ot, s32 arg2, GsCOORDINATE2* boneCoor
                 int _hb = (u8)curBone->bone.idx;
                 if (!(g_PcHideHarryFpsBody && (_hb == 2 || _hb >= 18)))
                 {
+#ifdef SH_N64_PORT
+                    /* Native character: hand the RSP this part's bone view
+                     * matrix instead of running the software GTE over it. */
+                    extern int ShT3d_CharaBone(int, const short*, const int*);
+                    if (!ShT3d_CharaBone(curBone->bone.modelInfo.modelIdx,
+                                         (const short*)&viewMat.m[0][0], (const int*)viewMat.t))
+#endif
                     func_80057090(&curBone->bone.modelInfo, ot, arg2, &viewMat, &worldMat, arg5);
                 }
             }
 #else
+#ifdef SH_N64_PORT
+            {
+                extern int ShT3d_CharaBone(int, const short*, const int*);
+                if (!ShT3d_CharaBone(curBone->bone.modelInfo.modelIdx,
+                                     (const short*)&viewMat.m[0][0], (const int*)viewMat.t))
+                    func_80057090(&curBone->bone.modelInfo, ot, arg2, &viewMat, &worldMat, arg5);
+            }
+#else
             func_80057090(&curBone->bone.modelInfo, ot, arg2, &viewMat, &worldMat, arg5);
+#endif
 #endif
 
             if (g_WorldEnvWork.isFogEnabled)
