@@ -1714,6 +1714,21 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
     m.m[3][3] = 1.0f;
     dst = c->mats + s_charPhase * c->instCount + partIdx;
     t3d_mat4_to_fixed(dst, &m);
+    /* [T3DCB] one-shot: is this part's view matrix SANE? Compare to the
+     * player split depth (s_playerViewZ, world/8) -- a part translation Z
+     * near that = correct; huge/tiny/negative = the parts land off-screen or
+     * behind the eye, which is invisible-but-submitted. Chest (0) + a limb. */
+    {
+        static int s_cb;
+        if (s_cb < 6 && (partIdx == 0 || partIdx == 13))
+        {
+            s_cb++;
+            SH_DBG("[T3DCB] part=%d rot.diag=%d,%d,%d T=%d,%d,%d (pvz=%d, world/8)",
+                   partIdx, (int)m9[0], (int)m9[4], (int)m9[8],
+                   (int)(m.m[3][0]), (int)(m.m[3][1]), (int)(m.m[3][2]),
+                   (int)s_playerViewZ);
+        }
+    }
     c->viewRow[partIdx * 4 + 0] = (float)m9[6] / 4096.0f;
     c->viewRow[partIdx * 4 + 1] = (float)m9[7] / 4096.0f;
     c->viewRow[partIdx * 4 + 2] = (float)m9[8] / 4096.0f;
