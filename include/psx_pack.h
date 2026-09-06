@@ -73,6 +73,12 @@ typedef unsigned int SH_PACK_U32;
 #define PSX_ST_XY(p, f, w)   (*(SH_PACK_U32*)&(p)->f = (SH_PACK_U32)((((SH_PACK_U32)(w)) << 16) | \
                                                     (((SH_PACK_U32)(w)) >> 16)))
 
+/* Store of a word that is ALREADY the {x,y} memory image (a gte_stsxy /
+ * RotTransPers* output -- see SH_MEM_SXY): raw on both endians. Feeding an
+ * image through PSX_ST_XY double-converted it, which is what drew every
+ * GsTMDfast model (inventory items, pickups, the wall map) transposed. */
+#define PSX_ST_XY_IMG(p, f, w) (*(SH_PACK_U32*)&(p)->f = (SH_PACK_U32)(w))
+
 /* Load of a CVECTOR-shaped quartet (memory order r,g,b,code -- the GTE store
  * macros keep PSX byte order on both endians) as the composed PSX word with r
  * in the LOW byte, i.e. what every packed colour STORE macro above takes. */
@@ -92,6 +98,7 @@ typedef unsigned int SH_PACK_U32;
 #define PSX_ST_RGB(p, f, w)  (*(SH_PACK_U32*)&(p)->f  = (SH_PACK_U32)(w))
 #define PSX_ST_UV(p, f, w)   (*(SH_PACK_U32*)&(p)->f  = (SH_PACK_U32)(w))
 #define PSX_ST_XY(p, f, w)   (*(SH_PACK_U32*)&(p)->f  = (SH_PACK_U32)(w))
+#define PSX_ST_XY_IMG(p, f, w) (*(SH_PACK_U32*)&(p)->f = (SH_PACK_U32)(w))
 #define PSX_LD_CVEC(ptr)     (*(const SH_PACK_U32*)(ptr))
 #define PSX_LD_XY(ptr)       (*(const SH_PACK_U32*)(ptr))
 

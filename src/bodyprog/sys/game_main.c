@@ -1968,7 +1968,13 @@ void MainLoop(void) // 0x80032EE0
     #define H_BLANKS_PER_FRAME_MIN            (H_BLANKS_PER_SECOND / TICKS_PER_SECOND_MIN)                // 1052
     #define H_BLANKS_Q12_TO_SEC_SCALE         (s32)(H_BLANKS_TO_SEC_CONVERSION_FACTOR * (float)Q12(1.0f)) // 1063
     #define H_BLANKS_GRAVITY_SCALE            Q12(9.8f * H_BLANKS_TO_SEC_CONVERSION_FACTOR)               // 10419
+#ifdef SH_N64_PORT
+    /* Paired with the /8 dt cap below: 60/8 vblanks of catch-up per frame,
+     * as 4 pairs with the Xbox /15 (60/15=4). */
+    #define V_BLANKS_MAX                      8
+#else
     #define V_BLANKS_MAX                      4
+#endif
 
     s32 vBlanks;
     s32 vCount;
@@ -2664,7 +2670,18 @@ void MainLoop(void) // 0x80032EE0
              * correctly near a single frame rate (~50fps). Reverted per user
              * request: cap the cutscene step like normal gameplay so cutscenes
              * behave the same across frame rates as they did before. */
-#ifdef SH_XBOX_PORT
+#if defined(SH_N64_PORT)
+            /* N64: same reasoning as the Xbox /15 below, continued down the
+             * frame-rate curve. Hardware sustains 4-8fps in the reception
+             * ([PROF] 130-268ms frames), so under /15 the game plays at
+             * 2-4x SLOW MOTION -- the reported "8 seconds to aim a gun".
+             * /8 = real-time down to 8fps; the wall-sweep over-reach at
+             * x3.75 the PSX 30fps step (~34-45u, by the Xbox note's own
+             * arithmetic) stays inside Harry's 76u standoff. Below 8fps
+             * still slow-mos rather than risk the sweep; raising fps past
+             * 8 everywhere is the actual performance work. */
+            vCount = MIN(vCount, H_BLANKS_PER_SECOND / 8);
+#elif defined(SH_XBOX_PORT)
             /* Xbox: cap the gameplay step at the 15fps move. Measured hardware:
              * the DENSE TOWN dips to 15-20fps (48-68ms frames, 400-509 draws —
              * genuine software-GTE + draw load, not a bug). A dt-cap tighter than

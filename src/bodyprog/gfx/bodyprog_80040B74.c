@@ -3182,11 +3182,17 @@ static void ShN64_GteSelfTest(void)
     otz = RotTransPers3(&va, &vb, &vc, &sxy0, &sxy1, &sxy2, &p, &flag);
     SH_DBG("[GTETEST] rtp3 raw=%08lx,%08lx,%08lx otz=%ld flag=%08lx",
            (u32)sxy0, (u32)sxy1, (u32)sxy2, otz, (u32)flag);
+    /* In-flight sxy longs are the {x,y} MEMORY IMAGE (x in the numeric HIGH
+     * half on this big-endian port -- SH_MEM_SXY); decode accordingly. The
+     * 2026-09-05 run decoded numerically and read (0,21)/(21,0) "transposed"
+     * with nclip=-441: half of that was this decode, the real half was the
+     * drawers/NormalClip consuming images as numeric words (now fixed via
+     * PSX_ST_XY_IMG + SH_LD_SXY). */
     SH_DBG("[GTETEST] xy0=(%d,%d) xy1=(%d,%d) xy2=(%d,%d) nclip=%ld h=%d"
            " (want ~(0,0)(22,0)(0,22), positive nclip)",
-           (int)(s16)sxy0, (int)(s16)((u32)sxy0 >> 16),
-           (int)(s16)sxy1, (int)(s16)((u32)sxy1 >> 16),
-           (int)(s16)sxy2, (int)(s16)((u32)sxy2 >> 16),
+           (int)(s16)((u32)sxy0 >> 16), (int)(s16)sxy0,
+           (int)(s16)((u32)sxy1 >> 16), (int)(s16)sxy1,
+           (int)(s16)((u32)sxy2 >> 16), (int)(s16)sxy2,
            NormalClip(sxy0, sxy1, sxy2), (int)ReadGeomScreen());
 }
 

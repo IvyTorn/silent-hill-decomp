@@ -258,7 +258,7 @@ static int ShLog_Write(void* cookie, const char* buf, int len)
         {
             static uint32_t s_lastCommitMs;
             uint32_t nowMs = (uint32_t)get_ticks_ms();
-            if (nowMs - s_lastCommitMs > 1000)
+            if (nowMs - s_lastCommitMs > 5000)  /* 1s cost a 12ms fclose hitch per second in [PROF] */
             {
                 s_lastCommitMs = nowMs;
                 if (s_sdMirror != NULL)
