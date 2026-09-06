@@ -621,6 +621,46 @@ extern int g_PsxUsePgxp;
         Shadow_Copy(&(pl)->x3, &(a3)); \
     } } while (0)
  
+#ifdef SH_N64_PORT
+/* Reject a projected face whose screen coords hit the GTE's +-1024 saturation
+ * (Lm_G1/Lm_G2 in the software GTE): it is off-screen, and the OT walk on this
+ * port does not clip it, so it rasterises as a screen-spanning garbage
+ * triangle -- the exploded inventory items. Real PSX discarded these via the
+ * GTE flag; the software GTE saturates but nothing checks the flag. sxy words
+ * are {x,y} memory IMAGES here (x in the numeric HIGH half). One-shot logs the
+ * first faces so the projection is on record either way. */
+static int ShN64_ItemFaceSaturated(long s0, long s1, long s2, long s3)
+{
+    const long v[4] = { s0, s1, s2, s3 };
+    int sat = 0, i, x, y;
+    for (i = 0; i < 4; i++)
+    {
+        x = (short)((unsigned)v[i] >> 16);
+        y = (short)((unsigned)v[i] & 0xFFFF);
+        if (x > 1000 || x < -1000 || y > 1000 || y < -1000)
+            sat = 1;
+    }
+    {
+        static int s_probe;
+        if (s_probe < 8)
+        {
+            s_probe++;
+            SH_DBG("[ITEMFACE] xy=(%d,%d)(%d,%d)(%d,%d)(%d,%d) sat=%d",
+                   (int)(short)((unsigned)s0 >> 16), (int)(short)((unsigned)s0 & 0xFFFF),
+                   (int)(short)((unsigned)s1 >> 16), (int)(short)((unsigned)s1 & 0xFFFF),
+                   (int)(short)((unsigned)s2 >> 16), (int)(short)((unsigned)s2 & 0xFFFF),
+                   (int)(short)((unsigned)s3 >> 16), (int)(short)((unsigned)s3 & 0xFFFF), sat);
+        }
+    }
+    return sat;
+}
+/* Bare if, NOT a do/while wrapper: the `continue` must target the drawer's
+ * per-primitive for loop. Inserted as a standalone statement at each site. */
+#define SH_ITEM_REJECT4(a,b,c,d) if (ShN64_ItemFaceSaturated(a,b,c,d)) continue;
+#else
+#define SH_ITEM_REJECT4(a,b,c,d) ((void)0)
+#endif
+
 /* Flat-shaded triangle — lit + fog */
 void GsTMDfastF3LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift, GsOT* ot, unsigned long* scratch)
 {
@@ -713,6 +753,7 @@ void GsTMDfastF4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift, 
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
+        SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -751,6 +792,7 @@ void GsTMDfastG4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift, 
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
+        SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -878,6 +920,7 @@ void GsTMDfastTF4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift,
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
+        SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
 
@@ -920,6 +963,7 @@ void GsTMDfastTG4LFG(void* op, VERT* vp, VERT* np, PACKET* pk, int n, int shift,
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
+        SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -1065,6 +1109,7 @@ void GsTMDfastNF4(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, un
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
+        SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
@@ -1098,6 +1143,7 @@ void GsTMDfastNG4(void* op, VERT* vp, PACKET* pk, int n, int shift, GsOT* ot, un
         RotTransPers3(&vtx[prim->v0], &vtx[prim->v1], &vtx[prim->v2],
                       &sxy0, &sxy1, &sxy2, &p, &flg);
         RotTransPers(&vtx[prim->v3], (int*)&sxy3, &p, &flg);
+        SH_ITEM_REJECT4(sxy0, sxy1, sxy2, sxy3);
         nclip = NormalClip(sxy0, sxy1, sxy2);
         if (nclip <= 0) continue;
  
