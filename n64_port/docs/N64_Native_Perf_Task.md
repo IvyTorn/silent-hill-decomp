@@ -170,3 +170,42 @@ follow-up to clear 30.
 
 Implementation is gated on Stage 1a rendering confirmed (don't stack unverified
 Z changes). Everything else (numbers, sources, order) is settled above.
+
+## 2026-09-06 (later): Z-BUFFER SHELVED, going native-RSP characters instead.
+
+The Z-buffer does NOT fit: the malloc heap is only ~1150KB (g_PsxRam is a
+2.125MB static array + the 6.6MB image leave that little of 8MB), and it runs
+1149/1150 used at gameplay -- so a 150KB Z-buffer starves t3d (void) and fails
+room-load mallocs (the door NULL-deref crash). "Fits in 8MB" was wrong; the
+HEAP is the limit. zbuffer defaulted OFF; it is only viable world-off.
+
+The heap is small BY DESIGN (PSX emulation), not a small-map bug. Reclaimable
+if ever needed: texture cache PAGE_N 6->4 (~128KB, I bumped it for the counter
+fix), the 2x96KB packet arenas. Not a bug to chase now.
+
+USER CALL: do it RIGHT -- NATIVE CHARACTERS ON THE RSP (not the no-Z tile
+grouping band-aid). Rationale: Harry's ~19ms is software-GTE per-vertex
+transform (Gfx_MeshDraw / gte_rtpt in bodyprog_80055028.c) running on the CPU
+because the port emulates the PSX GTE; the RSP is idle and is the right HW.
+Native chars cut the CPU transform AND batch the geometry (collapsing the 254
+window reloads) -- both levers, no Z-buffer, no heap fight.
+
+### Native character plan (the real work)
+- Harry is a SKINNED model: an ILM (skeleton + per-bone mesh headers,
+  Bone_ModelAssign, s_Skeleton) animated by bone matrices. Draw path today:
+  func_80057090 (bodyprog_80055028.c:1790) -> Gfx_MeshDraw (:2343) -> per-vertex
+  gte_ldv3c/gte_rtpt (software GTE, the ~19ms).
+- Phase C1: offline, convert Harry's ILM meshes to a t3d model (per-bone parts)
+  + pre-tile his TIM pages into SHT-style tiles (reuse mkworld's tile baker).
+- Phase C2: runtime, at the character-draw hook, feed t3d the per-bone matrices
+  the game already computes (the skeleton's world/view mats) and let the RSP
+  transform + the tile-grouped stream draw -- exactly the world's model, per
+  character. Skip the PSX Gfx_MeshDraw for converted characters (fallback for
+  unconverted).
+- Phase C3: composite. Characters draw in the OT today; native chars need a
+  draw point + depth handling vs the world (painter's split like the world, or
+  the small per-char sort). Measure vs the 84ms baseline; target <33ms then
+  <25ms.
+- START with Harry only (the user's isolation); other charas reuse the path.
+
+This is multi-session; each phase is buildable+testable on its own.
