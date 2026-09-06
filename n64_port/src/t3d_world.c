@@ -173,6 +173,7 @@ static int s_geomH, s_geomOfx, s_geomOfy;
  * WorldViewSet through the game's own view path; RunPass classifies each
  * group as foreground (nearer than this) or background against it. */
 static float s_playerViewZ;
+static int   s_zActive;   /* Z-buffer live this frame (gpu_rdp.c) -> world writes depth */
 
 /* Deferred draw list: (cell, buf) recorded during OT build, drawn at the
  * GsDrawOt point. The accumulation window is bounded by FLUSH, not by
@@ -1157,7 +1158,15 @@ static void WorldFrameStart(void)
      * FIRST, then combiner/lights/drawflags, then draw. Setting lights or the
      * combiner before the viewport attach left them stale. */
     t3d_frame_start();
-    rdpq_mode_zbuf(false, false);            /* no Z buffer attached yet */
+    {
+        /* Stage 1: with a real Z-buffer attached (gpu_rdp.c), the world writes
+         * true depth and self-occludes by Z instead of painter's tile order.
+         * Without it, the old no-Z path (t3d_frame_start turns Z ON, and with
+         * no buffer that scribbles RDRAM -- so force it OFF). */
+        extern int GpuNv2a_ZBufActive(void);
+        s_zActive = GpuNv2a_ZBufActive();
+        rdpq_mode_zbuf(s_zActive, s_zActive);
+    }
 
     for (i = 0; i < 9; i++)
         R[i / 3][i % 3] = (float)s_wm[i] / 4096.0f;
@@ -1241,11 +1250,14 @@ static void WorldFrameStart(void)
         fm_vec3_norm(&ld, &ld);
         t3d_light_set_directional(0, dirWhite, &ld);
         t3d_light_set_count(1);
-#if SH_T3DW_FLAT
-        t3d_state_set_drawflags(T3D_FLAG_SHADED);
-#else
-        t3d_state_set_drawflags(T3D_FLAG_SHADED | T3D_FLAG_TEXTURED);
+        {
+            int df = T3D_FLAG_SHADED;
+#if !SH_T3DW_FLAT
+            df |= T3D_FLAG_TEXTURED;
 #endif
+            if (s_zActive) df |= T3D_FLAG_DEPTH;
+            t3d_state_set_drawflags(df);
+        }
 
         {
             static int s_cs;

@@ -86,6 +86,18 @@ static surface_t* s_fb;
 static int        s_inited;
 static unsigned long long s_frameStart;
 
+/* Z-buffer (Stage 1 of the native-perf work): 320x240x16 = 150KB, allocated
+ * once on the 8MB Expansion Pak (image is 6.6MB). The world writes real depth
+ * so it self-occludes by Z instead of painter's tile order; characters begin
+ * to Z-test against it in a later stage, which is what lets their draws be
+ * reordered by texture tile (the actual fps win). ZBUF disabled -> s_zbuf.buffer
+ * NULL and every attach passes NULL, i.e. the old no-Z path. */
+static surface_t s_zbuf;
+static int       s_zbufTried;
+static int ZBufOn(void) { return g_PcConfig.n64ZBuffer && s_zbuf.buffer != NULL; }
+/* Public: t3d_world.c enables Z for the world only when the buffer is live. */
+int GpuNv2a_ZBufActive(void) { return ZBufOn(); }
+
 /* --------------------------------------------------------------- batch */
 
 /* 1024 vertices is 64 KB at ShVertex's 64-byte stride. It does NOT have to hold
@@ -246,6 +258,13 @@ static void ApplyMode(void)
     s_cnModeSets++;
 
     rdpq_set_mode_standard();
+    /* Stage 1: the PSX path (characters, items, 2D) has no real per-vertex
+     * depth yet (pos[2]=0), so it must NOT touch the Z-buffer -- otherwise it
+     * would write Z=0 (nearest) and wrongly occlude the foreground world pass.
+     * It keeps compositing by painter's order exactly as before. Characters
+     * begin Z-testing in a later stage once they carry real depth. */
+    if (ZBufOn())
+        rdpq_mode_zbuf(false, false);
     if (texOn)
     {
         rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
@@ -1055,7 +1074,19 @@ void GpuNv2a_FrameBegin(void)
         s_fb = display_get();
         s_cnWaitFbTicks = get_ticks() - _t0;
     }
-    rdpq_attach(s_fb, NULL);
+
+    /* Lazy one-time Z-buffer alloc, gated by config (zbuffer=1). Done here
+     * rather than Init so a failed 150KB alloc on a 4MB machine just falls
+     * back to no-Z instead of wedging boot. */
+    if (!s_zbufTried && g_PcConfig.n64ZBuffer)
+    {
+        s_zbufTried = 1;
+        s_zbuf = surface_alloc(FMT_RGBA16, SCR_W, SCR_H);
+        SH_DBG("[GPU] z-buffer %s (%dKB)", s_zbuf.buffer ? "ON" : "alloc FAILED -> no-Z",
+               (SCR_W * SCR_H * 2) / 1024);
+    }
+
+    rdpq_attach(s_fb, ZBufOn() ? &s_zbuf : NULL);
 
     /* The PSX draw-env isbg background -- the fog colour in-game. Taking it
      * from gpu_xbox.c rather than picking one here is what keeps a map's fog
@@ -1063,6 +1094,8 @@ void GpuNv2a_FrameBegin(void)
     clear = GpuXbox_GetClearColor();
     rdpq_set_mode_fill(RGBA32((clear >> 16) & 0xFF, (clear >> 8) & 0xFF, clear & 0xFF, 0xFF));
     rdpq_fill_rectangle(0, 0, SCR_W, SCR_H);
+    if (ZBufOn())
+        rdpq_clear_z(ZBUF_MAX);   /* far; the world writes nearer as it draws */
 
     ShT3d_NotifyFrameBegin();
 }
