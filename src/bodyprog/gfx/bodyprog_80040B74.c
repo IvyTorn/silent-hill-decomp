@@ -3153,6 +3153,43 @@ void ShT3d_ComposeInstanceView(const short* rot9, const int* trans3,
     outTrans3[2] = viewMat.t[2];
 }
 
+/* One-shot numeric GTE self-test, logged to the SD card on the first in-game
+ * frame. The TMD item path (inventory carousel, world pickups, the wall map)
+ * renders rotated ~90deg and stretched on hardware while characters are
+ * correct; every accessor audited reads clean in source, so per the BE-GTE
+ * playbook the next step is NUMBERS, not theory: known inputs through the
+ * EXACT ops the item drawers use (identity matrix multiply = the scalar
+ * path; RotTransPers3 + NormalClip = the packed path the drawers call).
+ * Decode key: a packed sxy word carries x in the numeric LOW half. If the
+ * item bug lives here, xy1/xy2 come back transposed. */
+static void ShN64_GteSelfTest(void)
+{
+    MATRIX  id = {{{4096, 0, 0}, {0, 4096, 0}, {0, 0, 4096}}, {0, 0, 0}};
+    MATRIX  out;
+    VECTOR  tz = {0, 0, 0};
+    SVECTOR va = {0, 0, 1024, 0};
+    SVECTOR vb = {100, 0, 1024, 0};
+    SVECTOR vc = {0, 100, 1024, 0};
+    long    sxy0, sxy1, sxy2, p, flag, otz;
+
+    MulMatrix0(&id, &id, &out);
+    SH_DBG("[GTETEST] mul diag=%d,%d,%d off=%d,%d,%d (want 4096 diag, 0 off)",
+           out.m[0][0], out.m[1][1], out.m[2][2],
+           out.m[0][1], out.m[1][2], out.m[2][0]);
+
+    SetRotMatrix(&id);
+    SetTransVector(&tz);
+    otz = RotTransPers3(&va, &vb, &vc, &sxy0, &sxy1, &sxy2, &p, &flag);
+    SH_DBG("[GTETEST] rtp3 raw=%08lx,%08lx,%08lx otz=%ld flag=%08lx",
+           (u32)sxy0, (u32)sxy1, (u32)sxy2, otz, (u32)flag);
+    SH_DBG("[GTETEST] xy0=(%d,%d) xy1=(%d,%d) xy2=(%d,%d) nclip=%ld h=%d"
+           " (want ~(0,0)(22,0)(0,22), positive nclip)",
+           (int)(s16)sxy0, (int)(s16)((u32)sxy0 >> 16),
+           (int)(s16)sxy1, (int)(s16)((u32)sxy1 >> 16),
+           (int)(s16)sxy2, (int)(s16)((u32)sxy2 >> 16),
+           NormalClip(sxy0, sxy1, sxy2), (int)ReadGeomScreen());
+}
+
 /* A chunk finished loading and fixing up: resolve its file-table name from
  * the (still-fresh) queue entry and hand it to the native renderer, which
  * loads the matching N64W/<name>.SHW. The SHW carries its own cell coords,
@@ -3188,6 +3225,12 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                            Q12_TO_Q8(g_SysWork.playerWork.player.position.vy),
                            Q12_TO_Q8(g_SysWork.playerWork.player.position.vz),
                            ReadGeomScreen(), gofx, gofy);
+        /* One in-game GTE numeric probe per boot; models re-set rot/trans
+         * before every draw, so the clobber is invisible. */
+        {
+            static int s_gteTested;
+            if (!s_gteTested) { s_gteTested = 1; ShN64_GteSelfTest(); }
+        }
     }
 #endif
 
@@ -3388,8 +3431,9 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
              * pre-recorded RSP block. Falls back per-buffer when no native
              * data exists (chunk streaming in, area unconverted, tile budget
              * miss) -- both renderers coexist within one frame. */
-            if (!ShT3d_WorldDrawBuffer(ipdHdr->cellX, ipdHdr->cellZ,
-                                       ipdHdr->modelOrderList[i]))
+            {
+            int n64NativeBuf = ShT3d_WorldDrawBuffer(ipdHdr->cellX, ipdHdr->cellZ,
+                                                     ipdHdr->modelOrderList[i]);
 #endif
             for (curBufC = ipdModelBuf->modelInstances; curBufC < &ipdModelBuf->modelInstances[ipdModelBuf->modelInstanceCount]; curBufC++)
             {
@@ -3398,6 +3442,17 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                 {
 #ifdef SH_N64_PORT
                     s_wdInst++;
+                    /* A native buffer covers only the chunk's LOCAL models
+                     * (headers inside the IPD region). Instances whose model
+                     * lives elsewhere -- the global LM pool's shared PLMs,
+                     * e.g. the reception counter -- were skipped by mkworld,
+                     * so with a whole-buffer skip they drew NOWHERE ("the
+                     * counter is missing near the front"). Region bounds =
+                     * IPD_BUFFER .. +0x2C000 (Map_Init's ipdBufSize). */
+                    if (n64NativeBuf &&
+                        (u8*)modelInfo.modelHdr >= (u8*)IPD_BUFFER &&
+                        (u8*)modelInfo.modelHdr <  (u8*)IPD_BUFFER + 0x2C000)
+                        continue;
 #endif
                     // Set model matrix.
                     modelCoord.workm = curBufC->mat;
@@ -3410,6 +3465,9 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                     func_80057090(&modelInfo, ot, arg4, &viewMat, &worldMat, 0);
                 }
             }
+#ifdef SH_N64_PORT
+            }
+#endif
 
             for (curUnk = ipdModelBuf->field_10; curUnk < &ipdModelBuf->field_10[ipdModelBuf->field_1]; curUnk++)
             {
