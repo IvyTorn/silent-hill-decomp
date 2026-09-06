@@ -163,6 +163,7 @@ static uint16_t  s_lastBoundTref, s_lastBoundPal;
 static int       s_lastBoundOk;
 static int       s_cnTileUp, s_cnTileDedup;   /* per-frame: tile uploads vs deduped */
 static int       s_charActive;      /* inside a native character's bone loop */
+static int       s_charDiagMode = -1;   /* auto-cycled: 0 textured, 1 flat solid */
 static int       s_charPhase;       /* double-buffered part matrices */
 static uint32_t  s_charMask;        /* parts the animation wrote this frame */
 static T3DMat4FP s_charHidden;      /* collapses an unwritten part behind the eye */
@@ -586,9 +587,10 @@ static int BindCharTile(uint16_t tref, uint16_t palArg)
     rdpq_sync_pipe();
     {
         /* Diagnostic: draw the character solid/untextured to read the raw
-         * silhouette (geometry vs texture). */
+         * silhouette (geometry vs texture). Auto-cycled mode wins; config
+         * chara_debug forces it. */
         extern int GpuNv2a_CharaDebug(void);
-        if (GpuNv2a_CharaDebug())
+        if (s_charDiagMode == 1 || GpuNv2a_CharaDebug())
         {
             rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
             return 1;
@@ -1721,6 +1723,20 @@ int ShT3d_CharaDrawBegin(int isHarry)
     s_charActive = 1;
     s_charPhase ^= 1;     /* the RSP may still replay last frame's half */
     s_charMask   = 0;
+    /* Auto-cycle the diagnostic every ~3s (the game runs ~6fps, so ~18
+     * frames) so ONE flash shows every mode with no config edits/reboots:
+     * 0 = textured (normal), 1 = flat solid (raw silhouette -- coherent =>
+     * the fragmentation is texture/UV, scattered => geometry). Logged on
+     * change so the log timeline says which mode was on. */
+    {
+        extern int g_Nv2aFrameCount;
+        int m = (g_Nv2aFrameCount / 18) & 1;
+        if (m != s_charDiagMode)
+        {
+            s_charDiagMode = m;
+            SH_DBG("[CHARADBG] mode=%d (%s)", m, m ? "FLAT SOLID silhouette" : "textured");
+        }
+    }
     return 1;
 }
 
