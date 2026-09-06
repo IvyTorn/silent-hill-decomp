@@ -86,12 +86,15 @@ static surface_t* s_fb;
 static int        s_inited;
 static unsigned long long s_frameStart;
 
-/* Z-buffer (Stage 1 of the native-perf work): 320x240x16 = 150KB, allocated
- * once on the 8MB Expansion Pak (image is 6.6MB). The world writes real depth
- * so it self-occludes by Z instead of painter's tile order; characters begin
- * to Z-test against it in a later stage, which is what lets their draws be
- * reordered by texture tile (the actual fps win). ZBUF disabled -> s_zbuf.buffer
- * NULL and every attach passes NULL, i.e. the old no-Z path. */
+/* Z-buffer (Stage 1 of the native-perf work): 320x240x16 = 150KB. It MUST live
+ * in static .bss, NOT surface_alloc: the game heap has only ~220KB free in-game
+ * and a 150KB malloc there starved t3d's own init -> ShT3d_Ready() stayed false
+ * and the WHOLE native world stopped drawing (the "void"). .bss lands in the
+ * 8MB budget (image 6.6MB + 150KB) and never touches the runtime heap.
+ * The world writes real depth so it self-occludes by Z instead of painter's
+ * tile order; characters Z-test against it in a later stage, which is what lets
+ * their draws be reordered by texture tile (the actual fps win). */
+static uint16_t s_zbufMem[SCR_W * SCR_H] __attribute__((aligned(64)));
 static surface_t s_zbuf;
 static int       s_zbufTried;
 static int ZBufOn(void) { return g_PcConfig.n64ZBuffer && s_zbuf.buffer != NULL; }
@@ -1081,9 +1084,9 @@ void GpuNv2a_FrameBegin(void)
     if (!s_zbufTried && g_PcConfig.n64ZBuffer)
     {
         s_zbufTried = 1;
-        s_zbuf = surface_alloc(FMT_RGBA16, SCR_W, SCR_H);
-        SH_DBG("[GPU] z-buffer %s (%dKB)", s_zbuf.buffer ? "ON" : "alloc FAILED -> no-Z",
-               (SCR_W * SCR_H * 2) / 1024);
+        /* static .bss, no heap -> cannot starve t3d init (see s_zbufMem). */
+        s_zbuf = surface_make(s_zbufMem, FMT_RGBA16, SCR_W, SCR_H, SCR_W * 2);
+        SH_DBG("[GPU] z-buffer ON (%dKB, static bss)", (SCR_W * SCR_H * 2) / 1024);
     }
 
     rdpq_attach(s_fb, ZBufOn() ? &s_zbuf : NULL);
