@@ -3406,13 +3406,17 @@ void MainLoop(void) // 0x80032EE0
          * but that was the broken camera/geometry -- retested once the world
          * rendered from FrameEnd.) */
         { extern void ShT3d_WorldFlush(void); ShT3d_WorldFlush(); }
-        /* Native character(s): where their OT prims used to sit -- after
-         * the background world, under OT0's items/effects, before the
-         * foreground world that occludes them. */
-        { extern void ShT3d_CharaFlush(void); ShT3d_CharaFlush(); }
 #endif
         GsDrawOt(&g_OrderingTable0[g_ActiveBufferIdx]);
 #ifdef SH_N64_PORT
+        /* Native character(s) draw AFTER GsDrawOt(OT0), not before: [T3DCB2]
+         * proved all 838 of Harry's tris reach the RDP, but drawing before the
+         * OT walk buried him under every OT0 prim (the environment showed, the
+         * gun -- a late/near OT0 prim -- peeked through). Here he composites
+         * over the background world + OT0, and the foreground world below still
+         * occludes him. OT0 effects meant to sit IN FRONT of Harry now draw
+         * behind him -- a depth refinement for later; visibility first. */
+        { extern void ShT3d_CharaFlush(void); ShT3d_CharaFlush(); }
         /* Foreground native world: instances NEARER the camera than the player,
          * drawn after the character OT (OT0) and before the 2D UI (OT2). A
          * pillar or counter the player walks behind now occludes him -- the
