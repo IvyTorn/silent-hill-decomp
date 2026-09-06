@@ -85,7 +85,8 @@ s_PcConfig g_PcConfig = {
     .n64ClipScreen       = 1,    /* N64: CPU screen clipping before the RDP (escape hatch: clip_screen=0) */
     .n64RdpProbe         = 0,    /* N64: RDP measurement mode off */
     .n64CullBackfaces    = 0,    /* N64: PSX parity (no culling); cull_backfaces=1/-1 to try */
-    .n64ZBuffer          = 1,    /* N64: 150KB Z-buffer (8MB pak); zbuffer=0 = old no-Z path */
+    .n64ZBuffer          = 0,    /* N64: Z-buffer OFF by default -- Stage 1a's world depth range
+                                  * is wrong (world drops to a void); zbuffer=1 to develop it */
     .xboxVideo720p       = 0,    /* Xbox: 480p by default (720p costs texture-cache RAM) */
     .logDiag             = 0,    /* Xbox: quiet log by default (per-frame diag probes gated; log_diag=1 restores) */
     .cutsceneLineGapMs   = 300,  /* min ms between cutscene voice lines (PSX inter-line pause); tune down if it re-desyncs */
