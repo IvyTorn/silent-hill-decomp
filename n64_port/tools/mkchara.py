@@ -72,7 +72,11 @@ def collect_parts(lm, tim_get, pieces_by_key, untex, stats):
                     else:
                         stats["missing_tim"] += 1
                 for tri in fan(poly):
-                    pc = Piece(0, 0, part_idx, prim.is_transparent, tri, key)
+                    # buf == inst == part index: ONE buffer per part, so the
+                    # runtime can draw parts in per-frame DEPTH order (painter's,
+                    # no Z buffer) instead of the tile order the stream is baked
+                    # in -- otherwise rigid parts punch through each other.
+                    pc = Piece(0, part_idx, part_idx, prim.is_transparent, tri, key)
                     (untex if key is None else pieces_by_key[key]).append(pc)
     return instances
 
@@ -104,7 +108,8 @@ def main():
 
     all_pieces = [pc for plist in pieces_by_key.values() for pc in plist] + untex
     stats["tris"] = len(all_pieces)
-    shw = encode_shw(_IpdShim(), 1, all_pieces, instances)
+    # one buffer per part (see collect_parts): buffer_count = part count
+    shw = encode_shw(_IpdShim(), len(instances), all_pieces, instances)
 
     outdir = os.path.join(a.out, "N64C")   # rom:/N64C, sd:/.../load/N64C (t3d_world.c WOpenRoot)
     os.makedirs(outdir, exist_ok=True)

@@ -1791,10 +1791,29 @@ void ShT3d_CharaFlush(void)
 
     {
         int tris0 = s_cnRunPassTris, miss0 = s_cnTileMiss;
-        WorldFrameStart();
-        for (b = 0; b < c->bufCount; b++)
+        /* Draw parts BACK-TO-FRONT (painter's -- no Z buffer): each buffer is
+         * one rigid part (mkchara: buf == inst == part index), so sort the
+         * buffers by their part's composed view depth (viewRow[.z], world/8)
+         * FARTHEST first and nearer parts paint over. Without this the parts
+         * draw in the stream's tile order and punch through each other. */
+        int order[64], nb = c->bufCount, oi, oj;
+        if (nb > 64) nb = 64;
+        for (oi = 0; oi < nb; oi++) order[oi] = oi;
+        for (oi = 1; oi < nb; oi++)
         {
-            const T3DVertPacked* bverts = c->verts + c->bufs[b].vbase / 2;
+            int   key = order[oi];
+            float kz  = c->viewRow[key * 4 + 3];
+            oj = oi - 1;
+            while (oj >= 0 && c->viewRow[order[oj] * 4 + 3] < kz)
+            { order[oj + 1] = order[oj]; oj--; }
+            order[oj + 1] = key;
+        }
+        WorldFrameStart();
+        for (oi = 0; oi < nb; oi++)
+        {
+            const T3DVertPacked* bverts;
+            b = order[oi];
+            bverts = c->verts + c->bufs[b].vbase / 2;
             if (c->bufs[b].opaWords > 1)
                 RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
                         mats, NULL, c->viewRow, 0, 0, 0, BindCharTile);
@@ -1803,8 +1822,8 @@ void ShT3d_CharaFlush(void)
                         mats, NULL, c->viewRow, 0, 0, 1, BindCharTile);
         }
         if ((s_census & 127) == 0)
-            SH_DBG("[T3DCB2] chara drew %d tris, %d tile-misses this frame (0 tris => skipped, misses => bind failed)",
-                   s_cnRunPassTris - tris0, s_cnTileMiss - miss0);
+            SH_DBG("[T3DCB2] chara drew %d tris, %d tile-misses (depth-sorted %d parts)",
+                   s_cnRunPassTris - tris0, s_cnTileMiss - miss0, nb);
     }
     /* Fence: the PSX walk's first mode change is auto-synced only against
      * rdpq's own prims, never our t3d triangles. */
