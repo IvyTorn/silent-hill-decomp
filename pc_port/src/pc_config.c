@@ -85,8 +85,9 @@ s_PcConfig g_PcConfig = {
     .n64ClipScreen       = 1,    /* N64: CPU screen clipping before the RDP (escape hatch: clip_screen=0) */
     .n64RdpProbe         = 0,    /* N64: RDP measurement mode off */
     .n64CullBackfaces    = 0,    /* N64: PSX parity (no culling); cull_backfaces=1/-1 to try */
-    .n64ZBuffer          = 1,    /* N64: 150KB static-.bss Z-buffer (world writes real depth).
-                                  * The earlier void was heap starvation (now .bss); zbuffer=0 reverts */
+    .n64ZBuffer          = 0,    /* N64: Z-buffer OFF by default -- 150KB does not fit while the
+                                  * native world is resident (heap 1149/1150KB). zbuffer=1 only for
+                                  * the world-off Harry-isolation dev path. */
     .xboxVideo720p       = 0,    /* Xbox: 480p by default (720p costs texture-cache RAM) */
     .logDiag             = 0,    /* Xbox: quiet log by default (per-frame diag probes gated; log_diag=1 restores) */
     .cutsceneLineGapMs   = 300,  /* min ms between cutscene voice lines (PSX inter-line pause); tune down if it re-desyncs */
