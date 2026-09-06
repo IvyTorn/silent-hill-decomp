@@ -203,6 +203,32 @@ void func_8004BD74(s32 displayItemIdx, GsDOBJ2* arg1, s32 arg2)  // 0x8004BD74
 
     localToScreenMat = viewMat;
 
+#ifdef SH_N64_PORT
+    /* [ITEMMAT] probe: on hardware the inventory item explodes into saturated
+     * triangles while [GTETEST] proves the GTE path and every accessor here
+     * audits clean (scale=4096, the PC aspect block is inert at 640x480). So:
+     * numbers. The matrix the item is actually drawn with (game view compose
+     * of coord2), the camera globals it was composed against, and H. If the
+     * camera is the stale GAMEPLAY one, the item lands near/behind the eye
+     * and that is the whole story. First draws only. */
+    {
+        static int s_im;
+        extern MATRIX D_800C3868;
+        extern MATRIX VbWvsMatrix;
+        if (s_im < 4)
+        {
+            s_im++;
+            SH_DBG("[ITEMMAT] idx=%d scale=%d H=%d c2t=%d,%d,%d vm.diag=%d,%d,%d vm.t=%d,%d,%d cam.t=%d,%d,%d wvs.diag=%d,%d,%d",
+                   (int)displayItemIdx, (int)g_Items_Transforms[displayItemIdx].scale.vx, (int)ReadGeomScreen(),
+                   (int)arg1->coord2->coord.t[0], (int)arg1->coord2->coord.t[1], (int)arg1->coord2->coord.t[2],
+                   (int)viewMat.m[0][0], (int)viewMat.m[1][1], (int)viewMat.m[2][2],
+                   (int)viewMat.t[0], (int)viewMat.t[1], (int)viewMat.t[2],
+                   (int)D_800C3868.t[0], (int)D_800C3868.t[1], (int)D_800C3868.t[2],
+                   (int)VbWvsMatrix.m[0][0], (int)VbWvsMatrix.m[1][1], (int)VbWvsMatrix.m[2][2]);
+        }
+    }
+#endif
+
     for (i = 0; i < 3; i++)
     {
         for (j = 0; j < 3; j++)
