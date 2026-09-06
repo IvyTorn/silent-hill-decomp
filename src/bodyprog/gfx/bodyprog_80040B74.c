@@ -3178,7 +3178,7 @@ static void ShN64_GteSelfTest(void)
            out.m[0][1], out.m[1][2], out.m[2][0]);
 
     SetRotMatrix(&id);
-    SetTransVector(&tz);
+    gte_SetTransVector(&tz);   /* macro: the C libgte exports no SetTransVector */
     otz = RotTransPers3(&va, &vb, &vc, &sxy0, &sxy1, &sxy2, &p, &flag);
     SH_DBG("[GTETEST] rtp3 raw=%08lx,%08lx,%08lx otz=%ld flag=%08lx",
            (u32)sxy0, (u32)sxy1, (u32)sxy2, otz, (u32)flag);
