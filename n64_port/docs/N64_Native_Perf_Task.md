@@ -97,9 +97,32 @@ mounted; the only thing I would need from the user is confirmation of the disc
 path and permission to read it. No hand-editing of assets is required — every
 step is a converter run.
 
-## Status
+## Status / REDIRECT (2026-09-06, after extracting the disc BG dir)
 
-- Diagnosis corrected and recorded ([[project_n64_port]] g8).
-- Phase A converter change: STARTED (see mkworld.py `--plm-file`).
-- Awaiting: extract the ER PLM pool from the BIN, run, verify the counter draws
-  natively and `win=`/`pipe=` drop in the next `[PROF]`.
+Phase A is NEARLY EMPTY for the police station and does not help it:
+- Extracted all 11 `*.PLM` pools + every `ER*.IPD` from the BIN. Parsed with
+  sh1fmt: ER's cells reference **320 local models (all resolve in the cell LM,
+  already native) and exactly ONE** global/missing model, `BOOK1`, which is in
+  NO pool file. So there is no furniture to convert here; the world is already
+  native. (Other town areas DO have big `_GLB.PLM` pools -- APR/DR/SP/RS/MGR/THR,
+  14-41KB each -- so Phase A still matters for THEM, later.)
+- Therefore the police-station `tri=835` / `win~492` per-frame load is
+  **CHARACTERS** (Harry), not furniture.
+
+Character textures are 256x256 CI4 PSX pages; TMEM holds 64x64 (2KB). A
+character's prims sample many windows of its page -> the per-prim window
+reload thrash. There is NO "texture fits TMEM" shortcut. The only cure is to
+draw TILE-GROUPED (each tile loaded once), which needs occlusion handled
+without per-prim depth order == a **Z-BUFFER**.
+
+Z-buffer feasibility CHANGED: 8MB Expansion Pak, image 6.6MB, a 320x240x16 Z
+is 150KB -> it FITS now (the old "no Z-buffer" was a PSX-parity choice made
+before the char-perf wall, README line 31). A Z-buffer + draw-by-tile is the
+"real N64 game" architecture: kills the ~492 loads -> kills the ~168ms of
+sync stalls, AND fixes all remaining occlusion.
+
+**DECISION NEEDED (reverses a documented choice): adopt a Z-buffer + tile
+-grouped character drawing?** It is the one lever that turns 4fps into a real
+framerate. Not starting it unilaterally because the user was previously firm
+on "no Z-buffer, painter's order like the PSX." Phase A (furniture) remains
+valid for the town areas and can proceed in parallel regardless.
