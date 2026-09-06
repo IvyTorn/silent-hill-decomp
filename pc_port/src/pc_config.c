@@ -93,6 +93,10 @@ s_PcConfig g_PcConfig = {
     .n64CharaCull        = 1,    /* N64 native chara backface cull: 1=back, 2=front, 0=none.
                                   * A closed mesh w/o a Z buffer shows backfaces over fronts;
                                   * cull them. Flip to 2 if the model vanishes. Key: chara_cull */
+    .n64CharaDebug       = 0,    /* N64 native chara DIAGNOSTIC: 1 = flat solid (no texture) to
+                                  * read the raw silhouette. Key: chara_debug */
+    .n64CharaXpose       = 0,    /* N64 native chara rotation: 0 = transpose (matches the world
+                                  * compose), 1 = direct. Try 1 if parts scatter. Key: chara_xpose */
     .xboxVideo720p       = 0,    /* Xbox: 480p by default (720p costs texture-cache RAM) */
     .logDiag             = 0,    /* Xbox: quiet log by default (per-frame diag probes gated; log_diag=1 restores) */
     .cutsceneLineGapMs   = 300,  /* min ms between cutscene voice lines (PSX inter-line pause); tune down if it re-desyncs */
@@ -803,6 +807,14 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "chara_cull") == 0)
         {
             g_PcConfig.n64CharaCull = atoi(value);
+        }
+        else if (strcmp(key, "chara_debug") == 0)
+        {
+            g_PcConfig.n64CharaDebug = (atoi(value) != 0);
+        }
+        else if (strcmp(key, "chara_xpose") == 0)
+        {
+            g_PcConfig.n64CharaXpose = (atoi(value) != 0);
         }
         else if (strcmp(key, "rdp_probe") == 0)
         {

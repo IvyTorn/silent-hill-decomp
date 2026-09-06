@@ -584,6 +584,16 @@ static int BindCharTile(uint16_t tref, uint16_t palArg)
 {
     int slot;
     rdpq_sync_pipe();
+    {
+        /* Diagnostic: draw the character solid/untextured to read the raw
+         * silhouette (geometry vs texture). */
+        extern int GpuNv2a_CharaDebug(void);
+        if (GpuNv2a_CharaDebug())
+        {
+            rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+            return 1;
+        }
+    }
     if (tref == 0)
     {
         rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
@@ -1733,9 +1743,14 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
     if (!s_charActive || partIdx < 0 || partIdx >= c->instCount)
         return 0;
     memset(&m, 0, sizeof m);
-    for (r = 0; r < 3; r++)
-        for (cc = 0; cc < 3; cc++)
-            m.m[cc][r] = (float)m9[r * 3 + cc] / 4096.0f;
+    {
+        extern int GpuNv2a_CharaXpose(void);
+        int xpose = !GpuNv2a_CharaXpose();   /* default: transpose (matches the world) */
+        for (r = 0; r < 3; r++)
+            for (cc = 0; cc < 3; cc++)
+                if (xpose) m.m[cc][r] = (float)m9[r * 3 + cc] / 4096.0f;
+                else       m.m[r][cc] = (float)m9[r * 3 + cc] / 4096.0f;
+    }
     m.m[3][0] = (float)t3[0] / 8.0f;   /* verts are local/8, like the world */
     m.m[3][1] = (float)t3[1] / 8.0f;
     m.m[3][2] = (float)t3[2] / 8.0f;
