@@ -150,6 +150,18 @@ static int       s_cPalCount;
 static WChunk    s_charChunk;
 static uint8_t   s_charArena[CHAR_ARENA_BYTES] __attribute__((aligned(16)));
 static int       s_charLoaded, s_charLoadTried;
+static int       s_cnRunPassTris;   /* [T3DCB2] probe: tris t3d_tri_draw'd */
+
+/* Tile-bind dedup: the command stream re-emits OP_TILE for a tile it already
+ * used in an earlier BUFFER or in the other half of the fg/bg split, so the
+ * same (tref,pal) is uploaded to TMEM several times per frame for nothing.
+ * Track the last SUCCESSFUL bind and skip an identical one -- the tile is
+ * still resident (RunPass draws never touch TMEM between binds). Reset per
+ * flush pass in WorldFrameStart, because the PSX OT walk between passes
+ * clobbers TMEM. */
+static uint16_t  s_lastBoundTref, s_lastBoundPal;
+static int       s_lastBoundOk;
+static int       s_cnTileUp, s_cnTileDedup;   /* per-frame: tile uploads vs deduped */
 static int       s_charActive;      /* inside a native character's bone loop */
 static int       s_charPhase;       /* double-buffered part matrices */
 static uint32_t  s_charMask;        /* parts the animation wrote this frame */
@@ -689,8 +701,21 @@ static void RunPass(const uint8_t* p, int cmdWords,
              * still never upload. */
             if (tilePending)
             {
-                if (needSync) { t3d_tri_sync(); needSync = 0; }
-                tileSkip = !bind(pendTref, pendPal);
+                if (s_lastBoundOk && pendTref == s_lastBoundTref && pendPal == s_lastBoundPal)
+                {
+                    /* identical tile+pal already resident -- no upload, no sync */
+                    tileSkip = 0;
+                    s_cnTileDedup++;
+                }
+                else
+                {
+                    if (needSync) { t3d_tri_sync(); needSync = 0; }
+                    tileSkip = !bind(pendTref, pendPal);
+                    s_lastBoundOk   = !tileSkip;
+                    s_lastBoundTref = pendTref;
+                    s_lastBoundPal  = pendPal;
+                    if (!tileSkip) s_cnTileUp++;
+                }
                 tilePending = 0;
             }
             if (tileSkip)
@@ -708,6 +733,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
                     /* packed u8 triples across u16 words */
                     int base = i * 2 + k * 3;
                     t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
+                    s_cnRunPassTris++;
                 }
                 needSync = 1;
             }
@@ -1241,6 +1267,7 @@ static void WorldFrameStart(void)
      * FIRST, then combiner/lights/drawflags, then draw. Setting lights or the
      * combiner before the viewport attach left them stale. */
     t3d_frame_start();
+    s_lastBoundOk = 0;   /* TMEM was clobbered since the last flush pass */
     {
         /* Stage 1: with a real Z-buffer attached (gpu_rdp.c), the world writes
          * true depth and self-occludes by Z instead of painter's tile order.
@@ -1508,9 +1535,10 @@ void ShT3d_NotifyFrameEnd(void)
     static int s_census;
     s_frameActive = 0;
     if (s_worldStarted && (s_census++ & 127) == 0)
-        SH_DBG("[T3DW] blocks=%d fallback=%d tileRam=%dK",
-               s_cnBlocks, s_cnFallback, s_tileRam / 1024);
+        SH_DBG("[T3DW] blocks=%d fallback=%d tileRam=%dK tileUp=%d dedup=%d",
+               s_cnBlocks, s_cnFallback, s_tileRam / 1024, s_cnTileUp, s_cnTileDedup);
     s_cnBlocks = s_cnFallback = 0;
+    s_cnTileUp = s_cnTileDedup = 0;
 }
 
 /* ============================================================ characters */
@@ -1761,16 +1789,22 @@ void ShT3d_CharaFlush(void)
     }
     data_cache_hit_writeback(mats, sizeof(T3DMat4FP) * c->instCount);
 
-    WorldFrameStart();
-    for (b = 0; b < c->bufCount; b++)
     {
-        const T3DVertPacked* bverts = c->verts + c->bufs[b].vbase / 2;
-        if (c->bufs[b].opaWords > 1)
-            RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
-                    mats, NULL, c->viewRow, 0, 0, 0, BindCharTile);
-        if (c->bufs[b].semiWords > 1)
-            RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
-                    mats, NULL, c->viewRow, 0, 0, 1, BindCharTile);
+        int tris0 = s_cnRunPassTris, miss0 = s_cnTileMiss;
+        WorldFrameStart();
+        for (b = 0; b < c->bufCount; b++)
+        {
+            const T3DVertPacked* bverts = c->verts + c->bufs[b].vbase / 2;
+            if (c->bufs[b].opaWords > 1)
+                RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
+                        mats, NULL, c->viewRow, 0, 0, 0, BindCharTile);
+            if (c->bufs[b].semiWords > 1)
+                RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
+                        mats, NULL, c->viewRow, 0, 0, 1, BindCharTile);
+        }
+        if ((s_census & 127) == 0)
+            SH_DBG("[T3DCB2] chara drew %d tris, %d tile-misses this frame (0 tris => skipped, misses => bind failed)",
+                   s_cnRunPassTris - tris0, s_cnTileMiss - miss0);
     }
     /* Fence: the PSX walk's first mode change is auto-synced only against
      * rdpq's own prims, never our t3d triangles. */
