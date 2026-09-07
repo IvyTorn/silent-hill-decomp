@@ -3,37 +3,41 @@
 SHW/SHT (the same formats mkworld.py emits for the world).
 
 A character .ILM is an LM archive whose "models" are RIGID BODY PARTS, one per
-bone (HERO.ILM = 23 parts: chest, head, neck, shoulders, arms, hands, hips,
-legs, feet). There is NO per-vertex skinning -- each part is a rigid mesh
-transformed by its bone's matrix at runtime. So a part maps 1:1 onto a world
-"instance": the geometry is baked here, the per-frame BONE matrix is supplied
-at draw time by the runtime (t3d_world.c's compose path, fed from the game's
-skeleton instead of the IPD). The instance transform baked here is therefore
-IDENTITY -- a rest pose placeholder the runtime overwrites.
+bone (HERO.ILM = 23 parts). There is NO per-vertex skinning -- each part is a
+rigid mesh transformed by its bone's matrix at runtime.
 
-Output: <out>/N64C/<NAME>.SHW  (the parts as instances, one buffer)
-        <out>/N64C/<NAME>.SHT  (HERO.TIM tiled + its CLUT palettes)
+THE VERTEX POOL (the thing that makes characters different from the world):
+primitive vertex indices are NOT local to their own mesh. func_8005759C copies
+each part's vertices into a per-character scratch pool (screenXy_0) at
+ModelHeader.vertexOffset; parts replay in LmHeader.modelOrder and their pool
+ranges OVERLAP ON PURPOSE, so a part reads vertices an earlier part deposited
+wherever they meet -- that is how joint seams weld. The pool holds each vertex
+already transformed by its OWNER's bone matrix, so a seam vertex read by part A
+but owned by part B must be transformed by B's matrix, not A's. (Resolving it to
+A's mesh, or to A's matrix, is what produced "the spikes.")
 
+So each part's buffer loads the verts IT references GROUPED BY OWNER: one
+OP_MATRIX(owner)+OP_VERTS per owner, accumulating into one cache window, then
+OP_TRIS. Max distinct verts a HERO part references = 51 (fits the 70 cache).
+
+Output: <out>/N64C/<NAME>.SHW / .SHT
     python mkchara.py --ilm HERO.ILM --tim HERO.TIM --out build/chara
-
-Reuses mkworld's tile assigner/baker and stream encoder verbatim; only the
-front-end (parts instead of cells) is new.
 """
 import argparse
 import os
-import struct
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from sh1fmt.lm import Lm
 from sh1fmt.tim import Tim
 import mkworld
 from mkworld import (Piece, fan, prim_corner_order, assign_tiles, bake_tiles,
-                     encode_shw, encode_sht)
+                     encode_shw, encode_sht, op, OP_TILE, OP_MATRIX, OP_VERTS,
+                     OP_TRIS, OP_END)
 
 
 class _Inst:
-    """Rest-pose instance: identity rotation (Q12), zero translation. The
-    runtime replaces this with the live bone matrix each frame."""
+    """Rest-pose placeholder: the runtime replaces every part's matrix each frame
+    from the live skeleton (ShT3d_CharaBone), so what is baked here is unused."""
     __slots__ = ("rot", "trans")
     def __init__(self):
         self.rot = [[4096, 0, 0], [0, 4096, 0], [0, 0, 4096]]
@@ -41,44 +45,144 @@ class _Inst:
 
 
 class _IpdShim:
-    """encode_shw only reads .cell_x/.cell_z off the ipd. A character has no
-    cell; -128 marks the SHW as a character (the loader keys on it)."""
     cell_x = -128
     cell_z = -128
 
 
-def collect_parts(lm, tim_get, pieces_by_key, untex, stats):
-    """One Piece list, inst = part index (= bone index by ILM order)."""
-    instances = []
-    for part_idx, model in enumerate(lm.models):
-        instances.append(_Inst())
+def resolve_pool(lm):
+    """Replay the shared vertex pool in modelOrder. Returns, per model index, a
+    list of resolved prims: (prim, [(x, y, z, owner) per corner]). A corner whose
+    global index is not yet in the pool at this part's turn is dropped (never
+    happens for a well-formed character -- the draw order guarantees deposits
+    precede reads)."""
+    order = list(lm.model_order)
+    if sorted(order) != list(range(len(lm.models))):
+        order = list(range(len(lm.models)))
+    vpool = {}   # global index -> (x, y, z, owner)
+    out = {}     # model index -> [(prim, corners)]
+    for mi in order:
+        model = lm.models[mi]
+        for mesh in model.meshes:
+            for j, v in enumerate(mesh.verts):
+                vpool[model.vertex_offset + j] = (v[0], v[1], v[2], mi)
         for mesh in model.meshes:
             for prim in mesh.prims:
-                corners = prim_corner_order(prim)
-                if len(corners) < 3:
-                    stats["degenerate"] += 1
+                cor = prim_corner_order(prim)
+                if len(cor) < 3:
                     continue
-                poly = []
-                for c in corners:
-                    vi = prim.vi[c]
-                    x, y, z = mesh.verts[vi] if vi < len(mesh.verts) else (0, 0, 0)
-                    u, v = prim.uv[c]
-                    poly.append((float(x), float(y), float(z), float(u), float(v)))
-                key = None
-                if prim.material_idx >= 0:
-                    mat = lm.materials[prim.material_idx]
-                    if tim_get(mat.name) is not None:
-                        key = (mat.name, prim.clut // 64)
-                    else:
-                        stats["missing_tim"] += 1
-                for tri in fan(poly):
-                    # buf == inst == part index: ONE buffer per part, so the
-                    # runtime can draw parts in per-frame DEPTH order (painter's,
-                    # no Z buffer) instead of the tile order the stream is baked
-                    # in -- otherwise rigid parts punch through each other.
-                    pc = Piece(0, part_idx, part_idx, prim.is_transparent, tri, key)
-                    (untex if key is None else pieces_by_key[key]).append(pc)
+                pts = []
+                ok = True
+                for c in cor:
+                    rec = vpool.get(prim.vi[c])
+                    if rec is None:
+                        ok = False
+                        break
+                    pts.append((rec, c))
+                if ok:
+                    out.setdefault(mi, []).append((prim, pts))
+    return out
+
+
+def collect_parts(lm, tim_get, pieces_by_key, untex, stats):
+    """One Piece list, buf == part index. Each vertex tuple carries its OWNER as
+    a 6th field: (x, y, z, u, v, owner)."""
+    resolved = resolve_pool(lm)
+    instances = []
+    for part_idx in range(len(lm.models)):
+        instances.append(_Inst())
+        for (prim, pts) in resolved.get(part_idx, []):
+            poly = []
+            for ((x, y, z, owner), c) in pts:
+                u, v = prim.uv[c]
+                poly.append((float(x), float(y), float(z), float(u), float(v), owner))
+            key = None
+            if prim.material_idx >= 0:
+                mat = lm.materials[prim.material_idx]
+                if tim_get(mat.name) is not None:
+                    key = (mat.name, prim.clut // 64)
+                else:
+                    stats["missing_tim"] += 1
+            for tri in fan(poly):
+                pc = Piece(0, part_idx, part_idx, prim.is_transparent, tri, key)
+                (untex if key is None else pieces_by_key[key]).append(pc)
     return instances
+
+
+def _ckey(p):
+    """Vertex identity for dedup: coord + uv + OWNER (two verts at the same place
+    owned by different bones are DISTINCT -- different matrix)."""
+    return (round(p[0] * 2), round(p[1] * 2), round(p[2] * 2),
+            round(p[3] * 32), round(p[4] * 32), p[5])
+
+
+def encode_buffer_cmds_chara(pieces, verts_out):
+    """Character buffer encoder: within each tile window, load the referenced
+    verts GROUPED BY OWNER -- OP_MATRIX(owner) + OP_VERTS per owner, accumulating
+    into one cache window (the runtime's vertFill) -- then OP_TRIS. Seam verts
+    thus land transformed by their owner's bone matrix."""
+    cmds = []
+    by_tile = OrderedDict()
+    for pc in pieces:
+        tkey = (0, 0) if pc.tile is None else (pc.tile.final + 1, pc.pal)
+        by_tile.setdefault(tkey, []).append(pc)
+
+    for tkey, tpieces in by_tile.items():
+        tile = tpieces[0].tile
+        u0 = tile.u0 if tile else 0
+        v0 = tile.v0 if tile else 0
+        # distinct verts grouped by owner (first-seen order within the group)
+        groups = OrderedDict()          # owner -> OrderedDict(ckey -> vert)
+        for pc in tpieces:
+            for p in pc.verts:
+                groups.setdefault(p[5], OrderedDict()).setdefault(_ckey(p), p)
+        # cache index of every vert; each owner group padded to an EVEN size
+        cidx = {}
+        ci = 0
+        for owner, g in groups.items():
+            for k in g:
+                cidx[k] = ci
+                ci += 1
+            if len(g) & 1:
+                ci += 1
+        if ci > 70:
+            raise ValueError("char window %d verts > 70 cache" % ci)
+
+        cmds.append(op(OP_TILE, tkey[1]))
+        cmds.append(tkey[0])
+        for owner, g in groups.items():
+            if len(verts_out) & 1:
+                verts_out.append(verts_out[-1] if verts_out else
+                                 (0, 0, 0, 0, 0, 0, 0, 0, 0))
+            base = len(verts_out)
+            for k, p in g.items():
+                s = p[3] - u0
+                t = p[4] - v0
+                verts_out.append((int(round(p[0])), int(round(p[1])),
+                                  int(round(p[2])), 128, 128, 128, 255, s, t))
+            cnt = len(g)
+            if cnt & 1:                 # pad the group to an even vert count
+                verts_out.append(verts_out[-1])
+                cnt += 1
+            cmds.append(op(OP_MATRIX, owner))
+            cmds.append(op(OP_VERTS, cnt))
+            cmds.append(base)
+
+        tris = []
+        for pc in tpieces:
+            idx = [cidx[_ckey(p)] for p in pc.verts]
+            for k in range(len(idx) - 2):
+                tris.append((idx[0], idx[k + 1], idx[k + 2]))
+        cmds.append(op(OP_TRIS, len(tris)))
+        packed = []
+        for t in tris:
+            packed += list(t)
+        if len(packed) & 1:
+            packed.append(0)
+        for i in range(0, len(packed), 2):
+            cmds.append((packed[i] << 8) | packed[i + 1])
+
+    cmds.append(op(OP_END, 0))
+    return cmds
 
 
 def main():
@@ -108,10 +212,10 @@ def main():
 
     all_pieces = [pc for plist in pieces_by_key.values() for pc in plist] + untex
     stats["tris"] = len(all_pieces)
-    # one buffer per part (see collect_parts): buffer_count = part count
-    shw = encode_shw(_IpdShim(), len(instances), all_pieces, instances)
+    shw = encode_shw(_IpdShim(), len(instances), all_pieces, instances,
+                     buf_encoder=encode_buffer_cmds_chara)
 
-    outdir = os.path.join(a.out, "N64C")   # rom:/N64C, sd:/.../load/N64C (t3d_world.c WOpenRoot)
+    outdir = os.path.join(a.out, "N64C")
     os.makedirs(outdir, exist_ok=True)
     open(os.path.join(outdir, name + ".SHW"), "wb").write(shw)
     open(os.path.join(outdir, name + ".SHT"), "wb").write(sht)
@@ -119,7 +223,7 @@ def main():
     print(f"[{name}] parts={len(lm.models)} tris={stats['tris']} "
           f"tiles={len(tiles)} uniqueTiles={len(payloads)} pals={len(pal_table)} "
           f"sht={len(sht)//1024}KB shw={len(shw)//1024}KB")
-    for k in ("degenerate", "missing_tim", "tile_dedup", "split"):
+    for k in ("degenerate", "missing_tim", "unresolved"):
         if stats[k]:
             print(f"    {k}={stats[k]}")
 

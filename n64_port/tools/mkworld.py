@@ -99,7 +99,9 @@ def clip_tri_line(poly, axis, line, keep_less):
             out.append(a)
         if a_in != b_in:
             t = (line - av) / (bv - av)
-            out.append(tuple(a[k] + (b[k] - a[k]) * t for k in range(5)))
+            # interpolate x,y,z,u,v; carry any extra fields (mkchara's per-vertex
+            # owner) unchanged from a -- owner is discrete, not interpolable.
+            out.append(tuple(a[k] + (b[k] - a[k]) * t for k in range(5)) + tuple(a[5:]))
     return out
 
 
@@ -411,7 +413,7 @@ def encode_buffer_cmds(pieces, verts_out):
     return cmds
 
 
-def encode_shw(ipd, buffer_count, cell_pieces, instances):
+def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
     """SHW1 layout (all big-endian, the console's own order):
       0x00 u32 magic 'SHW1'
       0x04 s8 cellX, s8 cellZ, u16 bufferCount
@@ -443,8 +445,9 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances):
         opa.sort(key=sort_key)
         semi.sort(key=sort_key)
         verts = []
-        c_opa = encode_buffer_cmds(opa, verts)
-        c_semi = encode_buffer_cmds(semi, verts)
+        enc = buf_encoder or encode_buffer_cmds
+        c_opa = enc(opa, verts)
+        c_semi = enc(semi, verts)
         # The runtime concatenates buffers into one T3DVertPacked array and
         # rebases per buffer, so every buffer must hold an EVEN vert count.
         if len(verts) & 1:

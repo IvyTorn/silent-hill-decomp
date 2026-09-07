@@ -638,6 +638,12 @@ static void RunPass(const uint8_t* p, int cmdWords,
      * which would double-draw it. */
     int i = 0, pushed = 0, needSync = 0, tileSkip = 0, depthSkip = wantFg;
     int gIdx = groupBase;
+    /* Vertex-cache fill cursor. The world emits one OP_VERTS per window (loads
+     * at 0); a CHARACTER window emits several OP_VERTS -- one per owner bone,
+     * each under its own OP_MATRIX -- that must ACCUMULATE into the same cache
+     * so seam verts land beside the part's own. Reset after each OP_TRIS, so the
+     * world's single-load windows stay at 0 unchanged. */
+    int vertFill = 0;
     const float* curRow = NULL;   /* view row 2 of the current instance */
     /* Lazy tile state: OP_TILE only records; BindWorldTile runs at the first
      * OP_TRIS that actually draws under it. A pending tile overwritten by the
@@ -733,7 +739,8 @@ static void RunPass(const uint8_t* p, int cmdWords,
             if (tileSkip)
                 continue;
             if (needSync) { t3d_tri_sync(); needSync = 0; }
-            t3d_vert_load(verts + first / 2, 0, arg);
+            t3d_vert_load(verts + first / 2, vertFill, arg);
+            vertFill += arg;
         }
         else if (opc == OP_TRIS)
         {
@@ -750,6 +757,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
                 needSync = 1;
             }
             i += (n * 3 + 1) / 2;
+            vertFill = 0;   /* window closed; next OP_VERTS starts at cache 0 */
         }
         else if (opc == OP_END)
         {
@@ -1806,9 +1814,14 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
         if (s_cb < 24)
         {
             s_cb++;
-            SH_DBG("[T3DCB] part=%2d T=%d,%d,%d rotdiag=%d,%d,%d (pvz=%d)",
-                   partIdx, (int)(m.m[3][0]), (int)(m.m[3][1]), (int)(m.m[3][2]),
-                   (int)m9[0], (int)m9[4], (int)m9[8], (int)s_playerViewZ);
+            /* FULL matrix (all 9 rot shorts + 3 trans) so the runtime geometry
+             * can be reproduced offline vs the ilm_obj bake -- if THIS renders
+             * coherent, the bug is downstream (cull/t3d), not the transform. */
+            SH_DBG("[T3DCBM] part=%2d m9=%d,%d,%d,%d,%d,%d,%d,%d,%d t=%d,%d,%d",
+                   partIdx, (int)m9[0], (int)m9[1], (int)m9[2],
+                   (int)m9[3], (int)m9[4], (int)m9[5],
+                   (int)m9[6], (int)m9[7], (int)m9[8],
+                   (int)t3[0], (int)t3[1], (int)t3[2]);
         }
     }
     c->viewRow[partIdx * 4 + 0] = (float)m9[6] / 4096.0f;
@@ -1869,6 +1882,9 @@ void ShT3d_CharaFlush(void)
          * this. Config chara_cull flips the winding if the model vanishes. */
         {
             extern int GpuNv2a_CharaCull(void);
+            /* Backface cull (config chara_cull: 0 none, 1 back, 2 front). With
+             * the pool-resolved geometry each closed part is single-sided-correct
+             * under CULL_BACK; set chara_cull=2 if a build ever renders inside-out. */
             int cull = GpuNv2a_CharaCull();
             int df = T3D_FLAG_SHADED | T3D_FLAG_TEXTURED;
             if (cull == 1)      df |= T3D_FLAG_CULL_BACK;
