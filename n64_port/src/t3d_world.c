@@ -1747,20 +1747,7 @@ int ShT3d_CharaDrawBegin(int isHarry)
     s_charActive = 1;
     s_charPhase ^= 1;     /* the RSP may still replay last frame's half */
     s_charMask   = 0;
-    /* Auto-cycle the diagnostic every ~3s (the game runs ~6fps, so ~18
-     * frames) so ONE flash shows every mode with no config edits/reboots:
-     * 0 = textured (normal), 1 = flat solid (raw silhouette -- coherent =>
-     * the fragmentation is texture/UV, scattered => geometry). Logged on
-     * change so the log timeline says which mode was on. */
-    {
-        extern int g_Nv2aFrameCount;
-        int m = (g_Nv2aFrameCount / 18) & 1;
-        if (m != s_charDiagMode)
-        {
-            s_charDiagMode = m;
-            SH_DBG("[CHARADBG] mode=%d (%s)", m, m ? "FLAT SOLID silhouette" : "textured");
-        }
-    }
+    s_charDiagMode = 0;   /* always textured; config chara_debug forces flat */
     return 1;
 }
 
