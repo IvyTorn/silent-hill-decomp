@@ -170,8 +170,13 @@ def encode_buffer_cmds_chara(pieces, verts_out):
         tris = []
         for pc in tpieces:
             idx = [cidx[_ckey(p)] for p in pc.verts]
+            # REVERSED winding (idx[0], k+2, k+1): t3d's viewport uses an axis-flip
+            # camera (up=-Y), which inverts screen-space winding for all geometry.
+            # The world draws un-culled so it never noticed; the character is the
+            # only CULL_BACK geometry, so its front faces must be emitted reversed
+            # or standard back-cull removes the NEAR side (Harry renders inside-out).
             for k in range(len(idx) - 2):
-                tris.append((idx[0], idx[k + 1], idx[k + 2]))
+                tris.append((idx[0], idx[k + 2], idx[k + 1]))
         cmds.append(op(OP_TRIS, len(tris)))
         packed = []
         for t in tris:
