@@ -276,3 +276,35 @@ Escape hatch: native_chara=0 in silenthill.cfg.
    logs all 23 part T-positions to confirm placement is coherent in parallel.
 Perf: native Harry is ~50ms/frame (233->~175ms). Native-char win CONFIRMED;
 world (~150ms) is the remaining, memory-bound bottleneck.
+
+## PERF DIAGNOSIS 2026-09-07 (RDP-bound, concrete)
+
+Police-station reception, [PROF] with native world + native Harry both live:
+- frame ~203ms (~5fps); **rdp pipe busy ~182ms of 203ms = RDP-bound** (CPU
+  chunk=48ms, chara=3.4ms overlap under it).
+- Native world [T3DW]: **blocks=12 tileRam=166K tileUp=215 dedup=0**; the
+  resident chunk (ERFF00) has **tiles=83/83** unique. So **83 unique tiles are
+  re-uploaded 215x/frame (~2.6x)** — painter's depth order interleaves tiles so
+  the consecutive-bind dedup never hits (dedup=0). Each upload forces a pipe sync
+  (BindWorldTile: sync_pipe+sync_load+sync_tile — t3d RSP tris race rdpq uploads,
+  see its comment), and the pipe drains the previous batch's triangles each time.
+  That load->draw->sync serialization x215 IS the 182ms (texture DMA itself is
+  only tmem=12ms; fill is ~2ms for px=128K; per old analysis "texture <5%").
+
+THE FIX (draw each unique tile ONCE -> uploads 215->83, syncs with them, ~2x+ fps):
+needs a Z-buffer so OPAQUE geometry can be globally sorted BY TILE instead of by
+depth. Plan:
+1. Z-buffer 320x240x16 = 150KB. Heap is FULL (1152/1208, 56KB free) and a static
+   .bss buffer just shrinks the heap (same RAM), so **150KB must be RECLAIMED
+   first**. Candidates: s_swzScratch 64KB (swizzle identity on N64 -> likely
+   dead), trim s_vram(1MB)/s_spuRam(512KB) to actual use, or lower internal res
+   (256x240x16=120KB Z). g_PsxRam(2.125MB)'s +128KB is a REAL overrun guard — do
+   not cut.
+2. Opaque pass: rdpq_mode_zbuf(true,true); collect all opaque tile-groups across
+   the frame's blocks, SORT BY TILE, draw each tile's groups together.
+3. Semitrans pass AFTER: rdpq_mode_zbuf(true,false) (Z-test, no write), in
+   submission order — preserves PSX blending (the reason a naive Z was rejected).
+GATE behind zbuffer=1 so the working painter's path stays default (nothing to
+revert; toggle to compare). Confirm the split first with rdp_probe=1 (config-only,
+no rebuild): mode 1 NOFILL keeps commands/loads/syncs — if pipe stays high it's
+the syncs (expected), mode 2 NOTEX drops loads.
