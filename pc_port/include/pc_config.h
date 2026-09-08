@@ -165,6 +165,7 @@ typedef struct {
     int   n64NativeChara;   /* N64 only: 1 = Harry's rigid parts drawn by the RSP from N64C/HERO.SHW (default), 0 = software-GTE per-part draw. Config key: native_chara. */
     int   n64CharaCull;     /* N64 only: native-character backface cull. 1 = cull back (default), 2 = cull front, 0 = none. Config key: chara_cull. */
     int   n64WorldCull;     /* N64 only: native-world backface cull. 1 = cull the side the PSX mesh emitter rejects by nclip (default), 2 = the other side, 0 = none. Config key: world_cull. */
+    int   n64WorldAa;       /* N64 only: RDP antialiasing for the native world. 0 = none (default; the PSX had none and the VI runs without the AA filter), 1 = standard, 2 = reduced. Config key: world_aa. */
     int   n64CharaDebug;    /* N64 only: 1 = draw native characters flat/untextured to read the raw silhouette. Config key: chara_debug. */
     int   n64CharaXpose;    /* N64 only: native-character rotation. 0 = transpose (default, matches world compose), 1 = direct. Config key: chara_xpose. */
     int   xboxVideo720p;    /* Xbox only: 0 = 480p (default), 1 = 1280x720 pillarboxed 4:3 (config key: video_720p; applied at boot, reboot to change) */

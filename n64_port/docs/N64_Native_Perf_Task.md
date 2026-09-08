@@ -372,3 +372,14 @@ flips it, `0` disables. Re-applied every flush pass because CharaFlush sets
 Harry's CULL_BACK between the background and foreground passes.
 Also: the chunk-resident log line now carries `tris=` (static count over all
 passes) so a `[PROF]` pipe time can be read against the chunk's fill bound.
+
+## FOURTH: t3d_frame_start LEFT RDP ANTIALIASING ON FOR THE NATIVE WORLD
+`t3d_frame_start()` (tiny3d c2cdbf2, t3d.c:146) resets the mode to
+`rdpq_mode_antialias(AA_STANDARD)`; t3d_world.c overrode filter/zbuf/combiner
+but never AA, so every native-world pixel went through the blender against the
+framebuffer for edge coverage. The PSX path runs AA off (`rdpq_set_mode_standard`
+default), the PSX itself had no AA, and gpu_rdp.c's `display_init` is
+`FILTERS_RESAMPLE` -- the VI never displays RDP coverage, so the work bought
+nothing. FIX: `world_aa` (default 0 = AA_NONE, 1 = standard, 2 = reduced) applied
+in WorldFrameStart right after t3d_frame_start's reset. Fill-bound frames should
+move with this; it is a config toggle for a hardware A/B.

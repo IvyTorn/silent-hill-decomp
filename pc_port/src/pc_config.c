@@ -97,6 +97,10 @@ s_PcConfig g_PcConfig = {
                                   * nclip rejection (every world quad is single-sided there), 2 =
                                   * other side, 0 = none. World SHW keeps PSX winding; t3d reads
                                   * its visible side as BACK, so 1 = CULL_FRONT. Key: world_cull */
+    .n64WorldAa          = 0,    /* N64 native world RDP antialiasing: 0 = none (PSX had none; the
+                                  * VI is FILTERS_RESAMPLE so RDP coverage is never displayed and
+                                  * t3d_frame_start's AA_STANDARD only cost a framebuffer read per
+                                  * pixel), 1 = standard, 2 = reduced. Key: world_aa */
     .n64CharaDebug       = 0,    /* N64 native chara DIAGNOSTIC: 1 = flat solid (no texture) to
                                   * read the raw silhouette. Key: chara_debug */
     .n64CharaXpose       = 0,    /* N64 native chara rotation: 0 = transpose (matches the world
@@ -815,6 +819,10 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "world_cull") == 0)
         {
             g_PcConfig.n64WorldCull = atoi(value);
+        }
+        else if (strcmp(key, "world_aa") == 0)
+        {
+            g_PcConfig.n64WorldAa = atoi(value);
         }
         else if (strcmp(key, "chara_debug") == 0)
         {

@@ -104,6 +104,7 @@ int GpuNv2a_ZBufActive(void) { return ZBufOn(); }
 int GpuNv2a_NativeCharaEnabled(void) { return g_PcConfig.n64NativeChara; }
 int GpuNv2a_CharaCull(void) { return g_PcConfig.n64CharaCull; }
 int GpuNv2a_WorldCull(void) { return g_PcConfig.n64WorldCull; }
+int GpuNv2a_WorldAa(void) { return g_PcConfig.n64WorldAa; }
 int GpuNv2a_CharaDebug(void) { return g_PcConfig.n64CharaDebug; }
 int GpuNv2a_CharaXpose(void) { return g_PcConfig.n64CharaXpose; }
 

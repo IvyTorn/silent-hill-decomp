@@ -1391,6 +1391,17 @@ static void WorldFrameStart(void)
         t3d_viewport_attach(&s_wvp);
 
         rdpq_mode_filter(FILTER_POINT);
+        {
+            /* t3d_frame_start turns on AA_STANDARD, which runs every pixel
+             * through the blender against the framebuffer for edge coverage.
+             * The PSX had no antialiasing, the PSX path here runs with it off
+             * (rdpq_set_mode_standard), and display_init is FILTERS_RESAMPLE
+             * so the coverage the RDP computes is never displayed -- it only
+             * cost fill bandwidth. */
+            extern int GpuNv2a_WorldAa(void);
+            int aa = GpuNv2a_WorldAa();
+            rdpq_mode_antialias(aa == 1 ? AA_STANDARD : aa == 2 ? AA_REDUCED : AA_NONE);
+        }
 #if SH_T3DW_FLAT
         rdpq_mode_alphacompare(0);
         rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
