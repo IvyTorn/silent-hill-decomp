@@ -32,7 +32,7 @@ from sh1fmt.tim import Tim
 import mkworld
 from mkworld import (Piece, fan, prim_corner_order, assign_tiles, bake_tiles,
                      encode_shw, encode_sht, op, OP_TILE, OP_MATRIX, OP_VERTS,
-                     OP_TRIS, OP_END)
+                     OP_TRIS, OP_END, VERT_WINDOW)
 
 
 class _Inst:
@@ -115,26 +115,33 @@ def _ckey(p):
             round(p[3] * 32), round(p[4] * 32), p[5])
 
 
+def _window_slots(groups):
+    """Cache slots a window occupies: each owner group is even-padded (t3d loads
+    vertex PAIRS), so a group of n verts costs (n+1)&~1 slots."""
+    return sum((len(g) + 1) & ~1 for g in groups.values())
+
+
 def encode_buffer_cmds_chara(pieces, verts_out):
     """Character buffer encoder: within each tile window, load the referenced
     verts GROUPED BY OWNER -- OP_MATRIX(owner) + OP_VERTS per owner, accumulating
     into one cache window (the runtime's vertFill) -- then OP_TRIS. Seam verts
-    thus land transformed by their owner's bone matrix."""
+    thus land transformed by their owner's bone matrix.
+
+    Windows are capped at VERT_WINDOW (64) like the world's, NOT the cache's 70:
+    the RSP VERT_BUFFER is exactly 70*36 bytes and sits directly before
+    CLIP_BUFFER_TMP in DMEM, and a 70-vert load (the original-ILM head face)
+    corrupted it -> garbage verts then an RSP crash. A tile group that needs
+    more is split into several windows under ONE OP_TILE: the tile stays bound
+    (no re-upload) and the runtime resets vertFill after each OP_TRIS."""
     cmds = []
     by_tile = OrderedDict()
     for pc in pieces:
         tkey = (0, 0) if pc.tile is None else (pc.tile.final + 1, pc.pal)
         by_tile.setdefault(tkey, []).append(pc)
 
-    for tkey, tpieces in by_tile.items():
-        tile = tpieces[0].tile
+    def flush_window(tile, groups, wtris):
         u0 = tile.u0 if tile else 0
         v0 = tile.v0 if tile else 0
-        # distinct verts grouped by owner (first-seen order within the group)
-        groups = OrderedDict()          # owner -> OrderedDict(ckey -> vert)
-        for pc in tpieces:
-            for p in pc.verts:
-                groups.setdefault(p[5], OrderedDict()).setdefault(_ckey(p), p)
         # cache index of every vert; each owner group padded to an EVEN size
         cidx = {}
         ci = 0
@@ -144,11 +151,8 @@ def encode_buffer_cmds_chara(pieces, verts_out):
                 ci += 1
             if len(g) & 1:
                 ci += 1
-        if ci > 70:
-            raise ValueError("char window %d verts > 70 cache" % ci)
-
-        cmds.append(op(OP_TILE, tkey[1]))
-        cmds.append(tkey[0])
+        if ci > VERT_WINDOW:
+            raise ValueError("char window %d slots > VERT_WINDOW %d" % (ci, VERT_WINDOW))
         for owner, g in groups.items():
             if len(verts_out) & 1:
                 verts_out.append(verts_out[-1] if verts_out else
@@ -166,9 +170,8 @@ def encode_buffer_cmds_chara(pieces, verts_out):
             cmds.append(op(OP_MATRIX, owner))
             cmds.append(op(OP_VERTS, cnt))
             cmds.append(base)
-
         tris = []
-        for pc in tpieces:
+        for pc in wtris:
             idx = [cidx[_ckey(p)] for p in pc.verts]
             # REVERSED winding (idx[0], k+2, k+1): t3d's viewport uses an axis-flip
             # camera (up=-Y), which inverts screen-space winding for all geometry.
@@ -185,6 +188,28 @@ def encode_buffer_cmds_chara(pieces, verts_out):
             packed.append(0)
         for i in range(0, len(packed), 2):
             cmds.append((packed[i] << 8) | packed[i + 1])
+
+    for tkey, tpieces in by_tile.items():
+        tile = tpieces[0].tile
+        cmds.append(op(OP_TILE, tkey[1]))
+        cmds.append(tkey[0])
+        groups = OrderedDict()          # owner -> OrderedDict(ckey -> vert)
+        wtris = []
+        for pc in tpieces:
+            trial = OrderedDict((o, OrderedDict(g)) for o, g in groups.items())
+            for p in pc.verts:
+                trial.setdefault(p[5], OrderedDict()).setdefault(_ckey(p), p)
+            if _window_slots(trial) > VERT_WINDOW and wtris:
+                flush_window(tile, groups, wtris)
+                groups = OrderedDict()
+                wtris = []
+                for p in pc.verts:
+                    groups.setdefault(p[5], OrderedDict()).setdefault(_ckey(p), p)
+            else:
+                groups = trial
+            wtris.append(pc)
+        if wtris:
+            flush_window(tile, groups, wtris)
 
     cmds.append(op(OP_END, 0))
     return cmds
