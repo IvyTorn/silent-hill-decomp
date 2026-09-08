@@ -3448,16 +3448,25 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                 {
 #ifdef SH_N64_PORT
                     s_wdInst++;
-                    /* A native buffer covers only the chunk's LOCAL models
-                     * (headers inside the IPD region). Instances whose model
-                     * lives elsewhere -- the global LM pool's shared PLMs,
-                     * e.g. the reception counter -- were skipped by mkworld,
-                     * so with a whole-buffer skip they drew NOWHERE ("the
-                     * counter is missing near the front"). Region bounds =
-                     * IPD_BUFFER .. +0x2C000 (Map_Init's ipdBufSize). */
-                    if (n64NativeBuf &&
-                        (u8*)modelInfo.modelHdr >= (u8*)IPD_BUFFER &&
-                        (u8*)modelInfo.modelHdr <  (u8*)IPD_BUFFER + 0x2C000)
+                    /* A native buffer covers only the chunk's LOCAL models.
+                     * Instances whose model lives elsewhere -- the global LM
+                     * pool's shared PLMs, e.g. a reception counter -- were
+                     * skipped by mkworld, so with a whole-buffer skip they drew
+                     * NOWHERE; they must fall through to the PSX path.
+                     *
+                     * "Local" = a header inside THIS chunk's own LM table
+                     * (exactly what LmHeader_ModelHeaderSearch resolves locals
+                     * from). The previous test used the PSX's fixed window
+                     * IPD_BUFFER..+0x2C000, but N64 chunks live in heap
+                     * owned-slot callocs far outside it, so it NEVER matched:
+                     * every world instance was re-transformed, re-culled and
+                     * the survivors re-drawn through the OT each frame on top
+                     * of the native world (chunk=40ms CPU, ~460 PSX tris + 256
+                     * texture-window uploads/frame, and the RDP overload that
+                     * tripped rspq's 2s watchdog as an "RSP crash"). */
+                    if (n64NativeBuf && ipdHdr->lmHdr != NULL &&
+                        modelInfo.modelHdr >= ipdHdr->lmHdr->modelHdrs &&
+                        modelInfo.modelHdr <  ipdHdr->lmHdr->modelHdrs + ipdHdr->lmHdr->modelCount)
                         continue;
 #endif
                     // Set model matrix.

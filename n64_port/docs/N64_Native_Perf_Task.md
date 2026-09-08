@@ -333,3 +333,24 @@ the syncs (expected), mode 2 NOTEX drops loads.
   -> native Harry (Z-write) -> semitrans world (Z-test) -> OT2 2D (no Z).
 VERIFY on hardware with zbuffer=1: `[GPU] z-buffer ON`, `[T3DW] tileUp` should
 fall from ~215 toward the ~83 unique tiles, `[PROF] rdp pipe` should drop.
+
+## ROOT CAUSE FOUND 2026-09-08: THE WORLD WAS DRAWN TWICE (user's "old view underneath")
+Ipd_ChunkDraw's per-instance native skip (the g5 counter fix) tested "local
+model" as `modelHdr in [IPD_BUFFER, IPD_BUFFER+0x2C000)` -- the PSX's FIXED IPD
+window (PSX_ADDR(0x00175600) inside g_PsxRam, ~0x803F97B0). N64 chunks live in
+heap owned-slot callocs (s_pcSlotOwnedBuf, 0x8072xxxx), so the test NEVER
+matched and NO instance was ever skipped. Consequences, all measured:
+- the PSX mesh path re-transformed + re-culled the whole world every frame
+  (chunk=40ms CPU, pure waste -- native draws it);
+- the ~460 cull survivors were drawn AGAIN through the OT with per-primitive
+  texture windows: that IS the "509 PSX tris / 256 uploads" half of the RDP
+  cost (not items/effects, not PLM -- ER has plmFileIdx=NO_VALUE);
+- the RDP overload made a command buffer take >2s and rspq.c:973's watchdog
+  reported it as an "RSP crash" at whatever pc the RSP held (5f8, then 018) --
+  the walking-around crash. ([OTS] prims is a 60-frame sum: 28214 ~= 470/frame.)
+FIX: test local membership in THIS chunk's LM table, `modelHdr in
+[ipdHdr->lmHdr->modelHdrs, +modelCount)` (what LmHeader_ModelHeaderSearch uses),
+so native buffers' local instances skip the PSX path and global-PLM instances
+still fall through. Expect: chunk CPU -> ~0, PSX uploads 256 -> ~0, RDP pipe
+drops by the double-draw share, watchdog crash gone. Then zbuffer=1 tile-batching
+attacks the remaining native 215 uploads.
