@@ -354,3 +354,21 @@ so native buffers' local instances skip the PSX path and global-PLM instances
 still fall through. Expect: chunk CPU -> ~0, PSX uploads 256 -> ~0, RDP pipe
 drops by the double-draw share, watchdog crash gone. Then zbuffer=1 tile-batching
 attacks the remaining native 215 uploads.
+
+## THIRD CAUSE 2026-09-08: THE NATIVE WORLD DREW BOTH SIDES OF EVERY WALL
+t3d_world.c never set a cull flag for world blocks (`cull_backfaces` only drives
+the PSX-path software cull in gpu_rdp.c). The PSX game is NOT double-sided:
+every mesh emitter in bodyprog_80055028.c rejects a quad when
+`nclip(v0,v1,v2) <= 0` (the second nclip on v3 only rescues twisted quads), so
+the RSP drawing both faces filled every wall, floor and ceiling twice over what
+the PSX rasterised -- and the counters said fill, not uploads: `rdp pipe=147ms`
+with `tmem=10ms` (loads are cheap; the pipe was rasterising).
+FIX: `world_cull` (pc_config, default 1) adds T3D_FLAG_CULL_FRONT to the world
+draw flags in WorldFrameStart. Direction: mkworld keeps PSX winding (fan over
+the perimeter order) and Harry proved that PSX winding + CULL_BACK culls the
+VISIBLE side under the axis-flip camera (mkchara reverses its winding for that
+reason), so the PSX's own rejection is CULL_FRONT for the world. `world_cull=2`
+flips it, `0` disables. Re-applied every flush pass because CharaFlush sets
+Harry's CULL_BACK between the background and foreground passes.
+Also: the chunk-resident log line now carries `tris=` (static count over all
+passes) so a `[PROF]` pipe time can be read against the chunk's fill bound.

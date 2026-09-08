@@ -121,6 +121,7 @@ typedef struct
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
     uint8_t*       cmds;       /* -> own arena slot: all passes' streams */
     int            tileRefCount;
+    int            triCount;   /* all passes, all buffers: the chunk's fill upper bound */
 } WChunk;
 
 static WChunk  s_chunks[MAX_WCHUNKS];
@@ -889,8 +890,8 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     ComposeChunkViews(c);
     fclose(f);
     c->inUse = 1;
-    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tiles=%d/%d miss=%d tileRam=%dK",
-           base, bufCount, instCount, c->groupCount, c->tileRefCount, refCount,
+    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tris=%d tiles=%d/%d miss=%d tileRam=%dK",
+           base, bufCount, instCount, c->groupCount, c->triCount, c->tileRefCount, refCount,
            s_cnTileMiss, s_tileRam / 1024);
 }
 
@@ -1154,7 +1155,7 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                             k++;
                             if (opc == OP_TILE)       k++;
                             else if (opc == OP_VERTS) { k++; gcount++; }
-                            else if (opc == OP_TRIS)  k += (arg * 3 + 1) / 2;
+                            else if (opc == OP_TRIS)  { k += (arg * 3 + 1) / 2; c->triCount += arg; }
                             else if (opc == OP_END)   break;
                             /* OP_MATRIX: 1 word, nothing to skip */
                         }
@@ -1403,10 +1404,23 @@ static void WorldFrameStart(void)
         t3d_light_set_directional(0, dirWhite, &ld);
         t3d_light_set_count(1);
         {
+            /* The PSX mesh emitters reject every world quad whose
+             * nclip(v0,v1,v2) <= 0 (bodyprog_80055028.c), so world geometry
+             * is single-sided by design and drawing both sides doubled the
+             * fill. mkworld keeps the PSX winding; under the axis-flip camera
+             * above t3d reads the PSX-visible side as BACK (Harry, same
+             * winding, vanished under CULL_BACK until mkchara reversed his),
+             * so the side the PSX rejects is t3d's FRONT: CULL_FRONT is the
+             * PSX's own rejection here. Re-applied every pass: CharaFlush sets
+             * Harry's CULL_BACK between the background and foreground. */
+            extern int GpuNv2a_WorldCull(void);
+            int cull = GpuNv2a_WorldCull();
             int df = T3D_FLAG_SHADED;
 #if !SH_T3DW_FLAT
             df |= T3D_FLAG_TEXTURED;
 #endif
+            if (cull == 1)      df |= T3D_FLAG_CULL_FRONT;
+            else if (cull == 2) df |= T3D_FLAG_CULL_BACK;
             if (s_zActive) df |= T3D_FLAG_DEPTH;
             t3d_state_set_drawflags(df);
         }

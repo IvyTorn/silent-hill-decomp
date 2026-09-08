@@ -85,14 +85,18 @@ s_PcConfig g_PcConfig = {
     .n64ClipScreen       = 1,    /* N64: CPU screen clipping before the RDP (escape hatch: clip_screen=0) */
     .n64RdpProbe         = 0,    /* N64: RDP measurement mode off */
     .n64CullBackfaces    = 0,    /* N64: PSX parity (no culling); cull_backfaces=1/-1 to try */
-    .n64ZBuffer          = 0,    /* N64: Z-buffer OFF by default -- 150KB does not fit while the
-                                  * native world is resident (heap 1149/1150KB). zbuffer=1 only for
-                                  * the world-off Harry-isolation dev path. */
+    .n64ZBuffer          = 0,    /* N64: Z-buffer OFF until the tile-batched Z path is verified on
+                                  * hardware. The 150KB surface fits now that s_poolBoneCoords
+                                  * (205KB, dead on N64) was reclaimed; zbuffer=1 enables it. */
     .n64NativeChara      = 1,    /* N64: Harry's 23 rigid parts drawn by the RSP from N64C/HERO.SHW;
                                   * native_chara=0 = software-GTE per-part draw as before */
     .n64CharaCull        = 1,    /* N64 native chara backface cull: 1=back, 2=front, 0=none.
                                   * A closed mesh w/o a Z buffer shows backfaces over fronts;
                                   * cull them. Flip to 2 if the model vanishes. Key: chara_cull */
+    .n64WorldCull        = 1,    /* N64 native world backface cull: 1 = the PSX mesh emitter's own
+                                  * nclip rejection (every world quad is single-sided there), 2 =
+                                  * other side, 0 = none. World SHW keeps PSX winding; t3d reads
+                                  * its visible side as BACK, so 1 = CULL_FRONT. Key: world_cull */
     .n64CharaDebug       = 0,    /* N64 native chara DIAGNOSTIC: 1 = flat solid (no texture) to
                                   * read the raw silhouette. Key: chara_debug */
     .n64CharaXpose       = 0,    /* N64 native chara rotation: 0 = transpose (matches the world
@@ -807,6 +811,10 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "chara_cull") == 0)
         {
             g_PcConfig.n64CharaCull = atoi(value);
+        }
+        else if (strcmp(key, "world_cull") == 0)
+        {
+            g_PcConfig.n64WorldCull = atoi(value);
         }
         else if (strcmp(key, "chara_debug") == 0)
         {
