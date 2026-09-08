@@ -486,12 +486,49 @@ static int ShtOpen(const char* prefix)
 
 /* ------------------------------------------------------------- chunks */
 
+/* A resident chunk's arena pointers must all land inside THIS slot's 80KB
+ * arena. s_chunkArena ends exactly where s_chunks begins in .bss, so an
+ * overrun in the last slot rewrites a chunk header (seen: bufs=0x3c, a NULL
+ * deref in WorldFlushPass reading c->bufs[b]). Validate before every use so a
+ * corrupt chunk is dropped for the frame instead of crashing, and log it once
+ * so the next hardware run names which cell/slot overran. */
+static int ChunkArenaValid(const WChunk* c)
+{
+    const uint8_t* base = s_chunkArena[(int)(c - s_chunks)];
+    const uint8_t* end  = base + WCHUNK_ARENA_BYTES;
+    const uint8_t* p[4];
+    int i;
+    if (c < s_chunks || c >= s_chunks + MAX_WCHUNKS)
+        return 0;                       /* not a world slot (character chunk) */
+    if (c->bufCount <= 0 || c->bufCount > 64 || c->instCount < 0 || c->instCount > 256)
+        return 0;
+    p[0] = (const uint8_t*)c->bufs;
+    p[1] = (const uint8_t*)c->verts;
+    p[2] = (const uint8_t*)c->cmds;
+    p[3] = (const uint8_t*)c->mats;
+    for (i = 0; i < 4; i++)
+        if (p[i] < base || p[i] >= end)
+            return 0;
+    return 1;
+}
+
 static WChunk* ChunkFind(int cellX, int cellZ)
 {
     int i;
     for (i = 0; i < MAX_WCHUNKS; i++)
         if (s_chunks[i].inUse && s_chunks[i].cellX == cellX && s_chunks[i].cellZ == cellZ)
+        {
+            if (!ChunkArenaValid(&s_chunks[i]))
+            {
+                static int s_corrupt;
+                if ((s_corrupt++ & 63) == 0)
+                    SH_DBG("[T3DW] CORRUPT chunk slot=%d cell=%d,%d bufs=%p bufCount=%d insts=%d -- dropped",
+                           i, s_chunks[i].cellX, s_chunks[i].cellZ,
+                           (void*)s_chunks[i].bufs, s_chunks[i].bufCount, s_chunks[i].instCount);
+                return NULL;
+            }
             return &s_chunks[i];
+        }
     return NULL;
 }
 
