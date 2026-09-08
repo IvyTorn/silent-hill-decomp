@@ -302,6 +302,65 @@ void ShN64_RspCrashCommit(unsigned pc, const char* uc, const char* func,
     ShLogN64_CrashCommit();
 }
 
+/* Second half of the same SH_PATCH, called right after RspCrashCommit with
+ * what libdragon's own rspq crash handler would have printed on the console
+ * it can never open here: the SP/DP status words, whether the RDP was still
+ * making progress, the RSP's queue view (where it was READING commands from,
+ * against the two CPU-side queue buffers) and the 16 words at that read
+ * pointer. A watchdog "RSP crash" with pc=018 is the ucode parked at
+ * RSPQCmd_WaitNewInput -- it read a zero command word and went to sleep --
+ * so those 16 words say whether the queue really was empty there (a lost
+ * wake-up) or held commands the RSP never saw (a clobbered queue). Bits
+ * decoded up front because a phone photo of the red screen is otherwise the
+ * only copy of them. */
+void ShN64_RspCrashDetail(unsigned spStatus, int sigMore, int bufdoneLo, int bufdoneHi,
+                          unsigned dpStatus, int rdpCrashed,
+                          unsigned dpStart, unsigned dpEnd, unsigned dpCurrent,
+                          unsigned qLow, unsigned qHigh, unsigned qDram, unsigned qGp,
+                          unsigned rdpBuf0, unsigned rdpBuf1, unsigned rdpCur,
+                          unsigned rdpSentinel, unsigned ovl)
+{
+    void SH_DebugLogFlush(void);
+    unsigned cur = qDram + qGp;
+
+    /* The commit above closed the mirror; reopen in append so these land too. */
+    if (s_sdMirror == NULL)
+        s_sdMirror = ShLogN64_SdOpen("a");
+
+    SH_DBG("[CRASH] sp=%08x halt=%u broke=%u dmaBusy=%u sigMore=%d bufdone=%d/%d | dp=%08x rdpCrashed=%d "
+           "xbus=%u freeze=%u flush=%u pipeBusy=%u cmdBusy=%u dmaBusy=%u | dpStart=%08x dpEnd=%08x dpCur=%08x",
+           spStatus, spStatus & 1u, (spStatus >> 1) & 1u, (spStatus >> 2) & 1u,
+           sigMore, bufdoneLo, bufdoneHi,
+           dpStatus, rdpCrashed,
+           dpStatus & 1u, (dpStatus >> 1) & 1u, (dpStatus >> 2) & 1u,
+           (dpStatus >> 5) & 1u, (dpStatus >> 6) & 1u, (dpStatus >> 8) & 1u,
+           dpStart, dpEnd, dpCurrent);
+    SH_DBG("[CRASH] rspq low=%08x high=%08x reading=%08x (dram %08x + gp %x) ovl=%x | rdp buf=%08x/%08x cur=%08x sentinel=%08x",
+           qLow, qHigh, cur, qDram, qGp, ovl, rdpBuf0, rdpBuf1, rdpCur, rdpSentinel);
+    /* The CPU's side of the hand-off: where rspq_write was putting commands
+     * (uncached pointer) and its buffer-switch sentinel. reading vs cpuWrite
+     * says whether both sides even agree on which 2KB buffer is live. */
+    SH_DBG("[CRASH] cpuWrite=%08x cpuSentinel=%08x",
+           (unsigned)(uintptr_t)rspq_cur_pointer, (unsigned)(uintptr_t)rspq_cur_sentinel);
+    if ((cur & 0x7FFFFFu) < 0x7FFF00u)
+    {
+        /* Uncached RDRAM read of the queue around the RSP's read pointer;
+         * -8..+7 words, '*' marks the word at the pointer. */
+        const volatile unsigned* q = (const volatile unsigned*)(0xA0000000u | (cur & 0x7FFFFCu));
+        char line[200];
+        int  i, n = 0;
+        for (i = -8; i < 8 && n < (int)sizeof(line) - 12; i++)
+        {
+            if (i < 0 && (cur & 0x7FFFFCu) < (unsigned)(-i * 4))
+                continue;
+            n += snprintf(line + n, sizeof(line) - n, "%08x%c", q[i], i == 0 ? '*' : ' ');
+        }
+        SH_DBG("[CRASH] queue@reading: %s", line);
+    }
+    SH_DebugLogFlush();
+    ShLogN64_CrashCommit();
+}
+
 /* Crash-path commit. fflush alone pushes bytes to the FAT layer but leaves
  * the directory entry's SIZE stale, so everything since the last 1-second
  * fclose cycle -- always the [CRASH] lines themselves -- reads back as

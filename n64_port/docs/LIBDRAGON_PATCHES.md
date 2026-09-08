@@ -20,13 +20,21 @@ Current patches (2026-09-05):
    varying by which caller needed a buffer next. 2s still catches genuine
    hangs.
 
-2. `src/rsp.c` `__rsp_crash`: calls the weak hook `ShN64_RspCrashCommit`
-   (defined in `n64_port/src/sh_log_n64.c`) with ucode/pc/site BEFORE
-   `console_init`. The inspector's display re-init OOMs on this heap-starved
-   game (sbrk_top framebuffers cannot be reclaimed mid-run) and dies on its
-   own `surfaces[i].buffer != NULL` assert, so the on-screen dump often shows
-   the assert cascade instead of the RSP state. The hook lands the identity
-   in the SD log (`[CRASH] RSP crash: ...`) and hard-commits it first.
+2. `src/rsp.c` `__rsp_crash`: calls the weak hooks `ShN64_RspCrashCommit`
+   and `ShN64_RspCrashDetail` (both in `n64_port/src/sh_log_n64.c`) BEFORE
+   `console_init`. The console's display re-init (640x240, 2 buffers) OOMs on
+   this heap-starved game (sbrk_top framebuffers cannot be reclaimed mid-run)
+   and dies on its own `surfaces[i].buffer != NULL` assert, so the on-screen
+   dump only ever shows the assert cascade. The hooks land in the SD log
+   what the console would have shown: ucode/pc/site (`[CRASH] RSP crash:`),
+   then SP/DP status with the rspq signal bits decoded, libdragon's own
+   "did DP_CURRENT move" RDP-hang probe, the RSP's queue read pointer
+   (`rsp_queue_t.rspq_dram_addr + gp`, as rspq_crash_handler computes it)
+   against the CPU-side buffers, and the 16 queue words at that pointer.
+   Reading note: pc=018 in rsp_queue is `wakeup:` right after the `break`
+   in RSPQCmd_WaitNewInput -- the RSP read a ZERO command word and slept.
+   `rsp.c` includes `rspq/rspq_internal.h` for the struct; `-Isrc` is on the
+   libdragon build's include path (rdpq.c does the same).
 
 3. `src/t3d/t3dmath.c` in ../tiny3d (pinned c2cdbf2): `t3d_mat4_to_frustum`
    skips normalizing a plane when `len < 1e-6f` (off-centre projections make

@@ -1356,14 +1356,35 @@ void GpuNv2a_SetDepthWrite(int enable) { (void)enable; }
 
 void GpuNv2a_SetScissor(int x, int y, int w, int h)
 {
+    int x1 = x + w, y1 = y + h;
+
+    /* The RDP has no render-target bounds: the scissor is the only thing
+     * between a primitive and RDRAM, and rdpq accepts any rectangle up to
+     * 1024x1024. A clip past the 320x240 surface therefore makes the RDP
+     * rasterise straight into whatever the heap holds after the framebuffer
+     * -- here the two 2KB rspq command queues rspq_init allocated right
+     * after display_init's surfaces, where a black fill writes the zero
+     * command words the RSP parks on (the watchdog "RSP crash" at rsp_queue
+     * pc=018 = RSPQCmd_WaitNewInput). PutDrawEnv's sub-region clip is a PSX
+     * VRAM rectangle transformed disp-relative, so it can extend past the
+     * surface; clamp it. w/h <= 0 is gpu_xbox's "reset to the content rect",
+     * which the Xbox GPU did implicitly and this backend used to ignore. */
     if (w <= 0 || h <= 0)
-        return;
+    {
+        x = 0; y = 0; x1 = SCR_W; y1 = SCR_H;
+    }
+    if (x < 0)      x = 0;
+    if (y < 0)      y = 0;
+    if (x1 > SCR_W) x1 = SCR_W;
+    if (y1 > SCR_H) y1 = SCR_H;
+    if (x1 < x)     x1 = x;   /* entirely outside: empty scissor, nothing draws */
+    if (y1 < y)     y1 = y;
     GpuNv2a_FlushBatch();
-    rdpq_set_scissor(x, y, x + w, y + h);
+    rdpq_set_scissor(x, y, x1, y1);
     s_clipX0 = (float)x;
     s_clipY0 = (float)y;
-    s_clipX1 = (float)(x + w);
-    s_clipY1 = (float)(y + h);
+    s_clipX1 = (float)x1;
+    s_clipY1 = (float)y1;
 }
 
 /* Decoded-page and palette storage for psx_vram.c's cache. 8-byte aligned: the
