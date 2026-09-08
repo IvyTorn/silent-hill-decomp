@@ -86,14 +86,14 @@ static surface_t* s_fb;
 static int        s_inited;
 static unsigned long long s_frameStart;
 
-/* Z-buffer (Stage 1 of the native-perf work): 320x240x16 = 150KB. THE HARD
- * CONSTRAINT: there is no 150KB of slack while the native world is resident --
- * the heap runs 1149/1150KB used with the world's chunk buffers in, so a Z-
- * buffer (heap malloc OR static .bss, which just shrinks the heap region) hits
- * 0KB free and both t3d init (-> void) and room-load mallocs (-> NULL-deref
- * crash) fail. So it is surface_alloc, ONLY when zbuffer=1, and the world must
- * be OFF for it to fit (the Harry-isolation dev path). zbuffer=0 (default) does
- * NOT allocate it, so the heap is whole and the world works. */
+/* Z-buffer: 320x240x16 = 150KB, surface_alloc'd ONLY when zbuffer=1. It did
+ * not fit while the heap ran 1152/1208KB with the world resident (a static
+ * .bss buffer only shrinks the heap region -- same RAM); pc_chara_pool.c's
+ * s_poolBoneCoords (205KB, dead on N64: globalCharaPool=0) was reclaimed to
+ * make room, ~260KB free now. With Z live, t3d_world.c draws the opaque world
+ * TILE-SORTED across blocks (each unique tile uploads once instead of ~2.6x)
+ * and semitransparent geometry after it Z-tested-not-written, keeping PSX
+ * blend order. zbuffer=0 (default) keeps the painter's path untouched. */
 static surface_t s_zbuf;
 static int       s_zbufTried;
 static int ZBufOn(void) { return g_PcConfig.n64ZBuffer && s_zbuf.buffer != NULL; }
@@ -1090,12 +1090,24 @@ void GpuNv2a_FrameBegin(void)
     {
         s_zbufTried = 1;
         s_zbuf = surface_alloc(FMT_RGBA16, SCR_W, SCR_H);
-        SH_DBG("[GPU] z-buffer %s (%dKB) -- world must be off to fit",
-               s_zbuf.buffer ? "ON" : "alloc FAILED (no heap) -> no-Z",
+        SH_DBG("[GPU] z-buffer %s (%dKB) -> world tile-sorted, semitrans Z-tested",
+               s_zbuf.buffer ? "ON" : "alloc FAILED (no heap) -> painter's path",
                (SCR_W * SCR_H * 2) / 1024);
     }
 
     rdpq_attach(s_fb, ZBufOn() ? &s_zbuf : NULL);
+
+    /* Clear the depth buffer to far (0xFFFC, t3d's own clear value) every
+     * frame, else stale depth from the last frame Z-rejects this one. Done
+     * through rdpq (this TU has no t3d): retarget the colour image at the Z
+     * surface, fill, and hand it back to the framebuffer. */
+    if (ZBufOn())
+    {
+        rdpq_set_color_image(&s_zbuf);
+        rdpq_set_mode_fill(color_from_packed16(0xFFFC));
+        rdpq_fill_rectangle(0, 0, SCR_W, SCR_H);
+        rdpq_set_color_image(s_fb);
+    }
 
     /* The PSX draw-env isbg background -- the fog colour in-game. Taking it
      * from gpu_xbox.c rather than picking one here is what keeps a map's fog

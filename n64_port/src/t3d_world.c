@@ -631,7 +631,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
                     const T3DVertPacked* verts, const T3DMat4FP* mats,
                     const int16_t* groupPos, const float* viewRow,
                     int groupBase, int wantFg,
-                    int semi, int (*bind)(uint16_t, uint16_t))
+                    int semi, int (*bind)(uint16_t, uint16_t), int preamble)
 {
     /* depthSkip defaults to wantFg so any geometry before the first OP_VERTS
      * classification draws in the background pass only -- never in both,
@@ -652,12 +652,18 @@ static void RunPass(const uint8_t* p, int cmdWords,
     uint16_t pendTref = 0, pendPal = 0;
 
     /* Pass-wide state the OTHER pass may have changed. sync_pipe first: the
-     * previous stream's t3d triangles are invisible to rdpq's auto-sync. */
-    rdpq_sync_pipe();
-    if (semi)
-        rdpq_mode_blender(RDPQ_BLENDER_ADDITIVE);
-    else
-        rdpq_mode_blender(0);
+     * previous stream's t3d triangles are invisible to rdpq's auto-sync.
+     * preamble=0 when the caller runs many streams of the SAME pass back to
+     * back (the Z path's tile-sorted records): the blender is unchanged, and
+     * a pipe drain per record would cost what the sort saves. */
+    if (preamble)
+    {
+        rdpq_sync_pipe();
+        if (semi)
+            rdpq_mode_blender(RDPQ_BLENDER_ADDITIVE);
+        else
+            rdpq_mode_blender(0);
+    }
 
     while (i < cmdWords)
     {
@@ -1462,6 +1468,76 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
  * character correctly occludes / is occluded by world geometry with no Z
  * buffer -- the PSX ordering table's back-to-front model, at instance
  * granularity. The draw list is cleared (s_flushed) only by the LAST pass. */
+/* Z-buffer path (zbuffer=1). Under painter's order the 4KB TMEM re-uploaded
+ * the frame's ~83 unique tiles ~215 times (dedup=0: depth order interleaves
+ * them), and every upload drains the RDP pipe -- that serialisation WAS the
+ * 182ms RDP-bound frame. With depth from the Z-buffer the opaque geometry
+ * can instead be drawn sorted BY TILE across every block: one record per
+ * OP_TILE run of every opaque stream, sorted by (tile, pal), replayed back
+ * to back so RunPass's consecutive-bind dedup collapses each tile to ONE
+ * upload. The background/foreground painter split is then unnecessary: the
+ * background call draws all opaque (Z-write), the character flush Z-writes
+ * between, and the foreground call draws the semitransparent streams in
+ * submission order (Z-test, NO write) so PSX blend order survives. */
+typedef struct
+{
+    uint16_t       tref, pal, buf, words;
+    WChunk*        c;
+    const uint8_t* p;
+} ZRec;
+#define ZREC_MAX 1024
+static ZRec s_zrec[ZREC_MAX];
+static int  s_cnZRecOverflow;
+
+static int ZRecCmp(const void* a, const void* b)
+{
+    const ZRec* x = (const ZRec*)a;
+    const ZRec* y = (const ZRec*)b;
+    if (x->tref != y->tref) return (int)x->tref - (int)y->tref;
+    return (int)x->pal - (int)y->pal;
+}
+
+static int ZRecPush(int n, WChunk* c, int b, const uint8_t* p, int start, int end,
+                    uint16_t tref, uint16_t pal)
+{
+    if (n >= ZREC_MAX) { s_cnZRecOverflow++; return n; }
+    s_zrec[n].tref  = tref;
+    s_zrec[n].pal   = pal;
+    s_zrec[n].buf   = (uint16_t)b;
+    s_zrec[n].words = (uint16_t)(end - start);
+    s_zrec[n].c     = c;
+    s_zrec[n].p     = p + start * 2;
+    return n + 1;
+}
+
+/* Split one command stream at every OP_TILE into records [tile, next tile).
+ * Word strides mirror RunPass exactly; a record never includes OP_END. */
+static int ZSplitStream(WChunk* c, int b, const uint8_t* p, int words, int n)
+{
+    int      i = 0, start = -1;
+    uint16_t tref = 0, pal = 0;
+    while (i < words)
+    {
+        uint16_t w = rd16(p + i * 2), opc = w >> 12, arg = w & 0xFFF;
+        if (opc == OP_TILE)
+        {
+            if (start >= 0)
+                n = ZRecPush(n, c, b, p, start, i, tref, pal);
+            start = i;
+            tref  = rd16(p + (i + 1) * 2);
+            pal   = arg;
+            i += 2;
+        }
+        else if (opc == OP_MATRIX) i += 1;
+        else if (opc == OP_VERTS)  i += 2;
+        else if (opc == OP_TRIS)   i += 1 + (arg * 3 + 1) / 2;
+        else break;                 /* OP_END (or a bad opcode) */
+    }
+    if (start >= 0)
+        n = ZRecPush(n, c, b, p, start, i, tref, pal);
+    return n;
+}
+
 static void WorldFlushPass(int wantFg)
 {
     int i;
@@ -1470,8 +1546,8 @@ static void WorldFlushPass(int wantFg)
     {
         static int s_fl;
         if ((s_fl++ & 127) == 0)
-            SH_DBG("[T3DWF] flush call: drawCount=%d ready=%d haveView=%d",
-                   s_drawCount, ShT3d_Ready(), s_haveView);
+            SH_DBG("[T3DWF] flush call: drawCount=%d ready=%d haveView=%d zsort=%d",
+                   s_drawCount, ShT3d_Ready(), s_haveView, s_zActive);
     }
 
     if (s_drawCount == 0 || !ShT3d_Ready() || !s_haveView)
@@ -1486,27 +1562,76 @@ static void WorldFlushPass(int wantFg)
 
     WorldFrameStart();
 
-    for (i = 0; i < s_drawCount; i++)
+    if (s_zActive)
     {
-        WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
-        int b = s_drawList[i].buf;
-        const T3DVertPacked* bverts;
-        if (c == NULL || b >= c->bufCount)
-            continue;
-        bverts = c->verts + c->bufs[b].vbase / 2;
-        if (c->bufs[b].opaWords > 1)
+        int first = 1;
+        if (!wantFg)
         {
-            RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
-                    c->mats + s_matPhase * c->instCount, c->groupPos,
-                    c->viewRow, c->bufs[b].opaGroupBase, wantFg, 0, BindWorldTile);
-            s_cnBlocks++;
+            int n = 0;
+            for (i = 0; i < s_drawCount; i++)
+            {
+                WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
+                int b = s_drawList[i].buf;
+                if (c == NULL || b >= c->bufCount || c->bufs[b].opaWords <= 1)
+                    continue;
+                n = ZSplitStream(c, b, c->cmds + c->bufs[b].opaOff,
+                                 c->bufs[b].opaWords, n);
+            }
+            qsort(s_zrec, n, sizeof(ZRec), ZRecCmp);
+            for (i = 0; i < n; i++)
+            {
+                const ZRec* r = &s_zrec[i];
+                RunPass(r->p, r->words, r->c->verts + r->c->bufs[r->buf].vbase / 2,
+                        r->c->mats + s_matPhase * r->c->instCount, NULL,
+                        r->c->viewRow, 0, 0, 0, BindWorldTile, first);
+                first = 0;
+                s_cnBlocks++;
+            }
         }
-        if (c->bufs[b].semiWords > 1)
+        else
         {
-            RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
-                    c->mats + s_matPhase * c->instCount, c->groupPos,
-                    c->viewRow, c->bufs[b].semiGroupBase, wantFg, 1, BindWorldTile);
-            s_cnBlocks++;
+            /* Semitransparent: Z-tested against opaque world + character, not
+             * written, in submission order. */
+            rdpq_mode_zbuf(true, false);
+            for (i = 0; i < s_drawCount; i++)
+            {
+                WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
+                int b = s_drawList[i].buf;
+                if (c == NULL || b >= c->bufCount || c->bufs[b].semiWords <= 1)
+                    continue;
+                RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords,
+                        c->verts + c->bufs[b].vbase / 2,
+                        c->mats + s_matPhase * c->instCount, NULL, c->viewRow,
+                        0, 0, 1, BindWorldTile, first);
+                first = 0;
+                s_cnBlocks++;
+            }
+        }
+    }
+    else
+    {
+        for (i = 0; i < s_drawCount; i++)
+        {
+            WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
+            int b = s_drawList[i].buf;
+            const T3DVertPacked* bverts;
+            if (c == NULL || b >= c->bufCount)
+                continue;
+            bverts = c->verts + c->bufs[b].vbase / 2;
+            if (c->bufs[b].opaWords > 1)
+            {
+                RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
+                        c->mats + s_matPhase * c->instCount, c->groupPos,
+                        c->viewRow, c->bufs[b].opaGroupBase, wantFg, 0, BindWorldTile, 1);
+                s_cnBlocks++;
+            }
+            if (c->bufs[b].semiWords > 1)
+            {
+                RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
+                        c->mats + s_matPhase * c->instCount, c->groupPos,
+                        c->viewRow, c->bufs[b].semiGroupBase, wantFg, 1, BindWorldTile, 1);
+                s_cnBlocks++;
+            }
         }
     }
     if (wantFg)
@@ -1876,6 +2001,7 @@ void ShT3d_CharaFlush(void)
             int df = T3D_FLAG_SHADED | T3D_FLAG_TEXTURED;
             if (cull == 1)      df |= T3D_FLAG_CULL_BACK;
             else if (cull == 2) df |= T3D_FLAG_CULL_FRONT;
+            if (s_zActive)      df |= T3D_FLAG_DEPTH;   /* Z-write: occludes / is occluded */
             t3d_state_set_drawflags(df);
         }
         for (oi = 0; oi < nb; oi++)
@@ -1885,10 +2011,10 @@ void ShT3d_CharaFlush(void)
             bverts = c->verts + c->bufs[b].vbase / 2;
             if (c->bufs[b].opaWords > 1)
                 RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
-                        mats, NULL, c->viewRow, 0, 0, 0, BindCharTile);
+                        mats, NULL, c->viewRow, 0, 0, 0, BindCharTile, 1);
             if (c->bufs[b].semiWords > 1)
                 RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords, bverts,
-                        mats, NULL, c->viewRow, 0, 0, 1, BindCharTile);
+                        mats, NULL, c->viewRow, 0, 0, 1, BindCharTile, 1);
         }
         if ((s_census & 127) == 0)
             SH_DBG("[T3DCB2] chara drew %d tris, %d tile-misses (depth-sorted %d parts)",

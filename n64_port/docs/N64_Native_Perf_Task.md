@@ -308,3 +308,28 @@ GATE behind zbuffer=1 so the working painter's path stays default (nothing to
 revert; toggle to compare). Confirm the split first with rdp_probe=1 (config-only,
 no rebuild): mode 1 NOFILL keeps commands/loads/syncs — if pipe stays high it's
 the syncs (expected), mode 2 NOTEX drops loads.
+
+## IMPLEMENTED 2026-09-08 (gated: zbuffer=1; default 0 = untouched painter's path)
+- **Memory**: `pc_chara_pool.c` s_poolBoneCoords `[Chara_Count][57]` (205KB .bss)
+  is dead on N64 (globalCharaPool=0 -> every pool entry point early-returns);
+  now `[POOL_BONE_ROWS=1][57]` under SH_N64_PORT with an index guard in the
+  loader. Heap gains ~205KB -> the 150KB `surface_alloc` Z-buffer fits (~110KB
+  margin). `s_swzScratch` (64KB, identity swizzle on N64) is a further reclaim
+  if ever needed.
+- **Z clear**: gpu_rdp.c frame begin, after `rdpq_attach(fb, zbuf)`: retarget
+  colour image at the Z surface, fill 0xFFFC (t3d's clear value), restore.
+- **RunPass(..., int preamble)**: the top-of-pass `rdpq_sync_pipe` + blender set
+  is skipped for the 2nd..Nth record of a same-pass run — a pipe drain per record
+  would have cost what the sort saves. All 7 call sites updated.
+- **WorldFlushPass Z path** (`s_zActive`): background call = ALL opaque streams
+  split at OP_TILE into `ZRec`s (`s_zrec[1024]`, overflow counted), `qsort` by
+  (tref,pal), replayed back to back -> the consecutive-bind dedup makes each
+  unique tile ONE upload. Foreground call = semitransparent streams in
+  submission order under `rdpq_mode_zbuf(true,false)` (test, no write).
+  groupPos=NULL / wantFg=0 in the Z path (no depth classification needed).
+- **Char**: CharaFlush drawflags add T3D_FLAG_DEPTH when s_zActive (its own
+  set_drawflags had been dropping WorldFrameStart's DEPTH).
+- Order per frame: opaque world (Z-write) -> PSX OT0 items (no Z, as before)
+  -> native Harry (Z-write) -> semitrans world (Z-test) -> OT2 2D (no Z).
+VERIFY on hardware with zbuffer=1: `[GPU] z-buffer ON`, `[T3DW] tileUp` should
+fall from ~215 toward the ~83 unique tiles, `[PROF] rdp pipe` should drop.

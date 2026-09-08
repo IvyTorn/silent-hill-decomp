@@ -54,8 +54,17 @@ typedef struct
 
 static PcPoolChara   s_pool[Chara_Count];
 /* One posed-skeleton coord array per TYPE (56-bone model cap + root), same
- * contract as g_SysWork.npcBoneCoordBuffer consumption in fs_chara_anim.c. */
-static GsCOORDINATE2 s_poolBoneCoords[Chara_Count][57];
+ * contract as g_SysWork.npcBoneCoordBuffer consumption in fs_chara_anim.c.
+ * N64: the global pool is OFF (globalCharaPool=0 -- every entry point below
+ * early-returns), so this 205KB (Chara_Count*57*80B) of .bss was dead weight
+ * that shrank the heap under the 150KB Z-buffer. One row keeps the code
+ * compiling; PoolLoad guards the index. */
+#if defined(SH_N64_PORT)
+#define POOL_BONE_ROWS 1
+#else
+#define POOL_BONE_ROWS Chara_Count
+#endif
+static GsCOORDINATE2 s_poolBoneCoords[POOL_BONE_ROWS][57];
 static int           s_poolReady;
 
 /* Debug/pool spawns carry no savegame identity: Savegame_EnemyStateUpdate
@@ -197,6 +206,8 @@ static int PoolChara_Load(s32 id)
         saved = *tbl;
         *tbl  = want;
 
+        if (id >= POOL_BONE_ROWS)   /* N64: pool is off, one row only */
+            return 0;
         Fs_CharaAnimDataAlloc(PC_CHARA_ANIM_SLOT(id), id, (s_AnmHeader*)p->anmBuf, s_poolBoneCoords[id]);
 
         /* Drain synchronously by pumping the queue directly. Reads are
