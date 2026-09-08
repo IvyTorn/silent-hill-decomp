@@ -147,7 +147,17 @@ static PageEntry s_pages[PAGE_N];
 static PalEntry  s_pals[PAL_N];
 static int       s_palPathReady;
 static unsigned  s_swzX[TEX_DIM], s_swzY[TEX_DIM];
+#if !defined(SH_N64_PORT)
 static uint8_t   s_swzScratch[PAGE_BYTES];    /* cached staging for the scatter */
+#endif
+/* N64: the swizzle is the identity (s_swzX[i]=i, s_swzY[v]=v<<8), so the
+ * decodes write straight into the page and the 64KB staging buffer is
+ * retired -- t3d_world.c's chunk arenas took the room. */
+#if defined(SH_N64_PORT)
+#define SWZ_DST(out) (out)
+#else
+#define SWZ_DST(out) s_swzScratch
+#endif
 
 static TexEntry s_cache[CACHE_N];
 static int      s_cacheReady;
@@ -423,6 +433,7 @@ static void PageDecodeIndices(int tpage, uint8_t* out)
     const int tx = (tpage & 0x0F) * 64;
     const int ty = ((tpage >> 4) & 1) * 256;
     const int tp = (tpage >> 7) & 3;          /* 0 = 4bit, 1 = 8bit */
+    uint8_t*  dst = SWZ_DST(out);
     int u, v;
 
     for (v = 0; v < TEX_DIM; v++) {
@@ -433,20 +444,22 @@ static void PageDecodeIndices(int tpage, uint8_t* out)
         if (tp == 0) {                        /* one VRAM word feeds 4 texels */
             for (u = 0; u < TEX_DIM; u += 4, i++) {
                 uint16_t w = VRAM_RD(row[(tx + i) & (VRAM_W - 1)]);
-                s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w        & 0x0F);
-                s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >>  4) & 0x0F);
-                s_swzScratch[s_swzX[u + 2] | sy] = (uint8_t)((w >>  8) & 0x0F);
-                s_swzScratch[s_swzX[u + 3] | sy] = (uint8_t)((w >> 12) & 0x0F);
+                dst[s_swzX[u]     | sy] = (uint8_t)( w        & 0x0F);
+                dst[s_swzX[u + 1] | sy] = (uint8_t)((w >>  4) & 0x0F);
+                dst[s_swzX[u + 2] | sy] = (uint8_t)((w >>  8) & 0x0F);
+                dst[s_swzX[u + 3] | sy] = (uint8_t)((w >> 12) & 0x0F);
             }
         } else {                              /* one VRAM word feeds 2 texels */
             for (u = 0; u < TEX_DIM; u += 2, i++) {
                 uint16_t w = VRAM_RD(row[(tx + i) & (VRAM_W - 1)]);
-                s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w       & 0xFF);
-                s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >> 8) & 0xFF);
+                dst[s_swzX[u]     | sy] = (uint8_t)( w       & 0xFF);
+                dst[s_swzX[u + 1] | sy] = (uint8_t)((w >> 8) & 0xFF);
             }
         }
     }
+#if !defined(SH_N64_PORT)
     memcpy(out, s_swzScratch, PAGE_BYTES);    /* sequential: write-combines cleanly */
+#endif
     SH_STORE_BARRIER();
 }
 
@@ -459,9 +472,10 @@ static void PageDecodeIndices(int tpage, uint8_t* out)
 static void PageDecodeIndicesResident(const uint16_t* src, const s_XbResidentDesc* d,
                                       uint8_t* out)
 {
+    uint8_t* dst = SWZ_DST(out);
     int u, v;
 
-    memset(s_swzScratch, 0, PAGE_BYTES);
+    memset(dst, 0, PAGE_BYTES);
     for (v = 0; v < TEX_DIM && v < d->h; v++) {
         const uint16_t* row = src + (size_t)v * d->pitchWords;
         unsigned        sy  = s_swzY[v];
@@ -470,20 +484,22 @@ static void PageDecodeIndicesResident(const uint16_t* src, const s_XbResidentDes
         if (d->bpp == 4) {
             for (u = 0; u < TEX_DIM && i < d->pitchWords; u += 4, i++) {
                 uint16_t w = VRAM_RD(row[i]);
-                s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w        & 0x0F);
-                s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >>  4) & 0x0F);
-                s_swzScratch[s_swzX[u + 2] | sy] = (uint8_t)((w >>  8) & 0x0F);
-                s_swzScratch[s_swzX[u + 3] | sy] = (uint8_t)((w >> 12) & 0x0F);
+                dst[s_swzX[u]     | sy] = (uint8_t)( w        & 0x0F);
+                dst[s_swzX[u + 1] | sy] = (uint8_t)((w >>  4) & 0x0F);
+                dst[s_swzX[u + 2] | sy] = (uint8_t)((w >>  8) & 0x0F);
+                dst[s_swzX[u + 3] | sy] = (uint8_t)((w >> 12) & 0x0F);
             }
         } else {
             for (u = 0; u < TEX_DIM && i < d->pitchWords; u += 2, i++) {
                 uint16_t w = VRAM_RD(row[i]);
-                s_swzScratch[s_swzX[u]     | sy] = (uint8_t)( w       & 0xFF);
-                s_swzScratch[s_swzX[u + 1] | sy] = (uint8_t)((w >> 8) & 0xFF);
+                dst[s_swzX[u]     | sy] = (uint8_t)( w       & 0xFF);
+                dst[s_swzX[u + 1] | sy] = (uint8_t)((w >> 8) & 0xFF);
             }
         }
     }
+#if !defined(SH_N64_PORT)
     memcpy(out, s_swzScratch, PAGE_BYTES);
+#endif
     SH_STORE_BARRIER();
 }
 

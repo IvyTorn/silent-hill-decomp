@@ -62,9 +62,13 @@
  * fragments the rest, which first starved these allocations and then crashed
  * libdragon mid-block-recording (rspq_next_buffer memsets an unchecked
  * malloc). The arena caps what a cell may need; bigger cells stay PSX. */
-#define WCHUNK_ARENA_BYTES (60 * 1024)  /* 56K left no room for the group
-                                         * centroids (ERFF00: 144 groups =
-                                         * 1.7K over); heap had 242K free */
+#define WCHUNK_ARENA_BYTES (80 * 1024)  /* 60K held 45/58 DECIMATED ER cells
+                                         * but only 28 of the ORIGINAL bake
+                                         * (the reception itself is 67.7K +
+                                         * group centroids); 80K holds 43,
+                                         * incl. ER0001/ERFE00 next door. The
+                                         * +60K is paid for by psx_vram.c's
+                                         * retired 64K swizzle staging. */
 
 /* Every SHT tile is at most 2048 bytes BY CONSTRUCTION (the TMEM budget:
  * 4096 CI4 texels or 2048 CI8 texels, both 2KB), so tile pixels live in a

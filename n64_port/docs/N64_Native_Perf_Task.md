@@ -389,6 +389,19 @@ RDP pipe from 44-50ms to 41-44ms and `cmd` (BUFBUSY) from ~31 to ~21ms; frame
 ~7ms, PSX path 8-17 tris); next probe should partition it (rdp_probe=1 modes,
 or a run with the world alone vs Harry alone).
 
+## WORLD DATA: ORIGINAL IPDs FOR ER (2026-09-08)
+The "missing counter / warped posters" in the reception were the DECIMATED
+map data (decimated_maps/BG, 889->669 prims for ERFF00's five models), not the
+renderer -- original and decimated IPDs hold the same instances. The RDP frame
+is fill/upload-bound, not triangle-bound, so decimation buys little for native
+areas. ER is now baked from `assets/USA/BG` (build/n64w; the decimated bake
+is kept at build/n64w_decimated) and the card's ER*.IPD are the originals.
+`WCHUNK_ARENA_BYTES` 60->80KB to hold the bigger original chunks (43/58 cells;
+the reception is 67.7KB), funded by retiring psx_vram.c's 64KB swizzle
+staging on N64 (identity swizzle, decode straight into the page). Rebake:
+`python n64_port/tools/mkworld.py --ipd-dir assets/USA/BG --tim-dir
+assets/USA/BG --out <dir> ER` (output lands in `<dir>/N64W`).
+
 ## Z-BUFFER MODES (2026-09-08)
 `zbuffer=2` (now default) gives the Z-buffer to the CHARACTER ONLY: the world
 stays painter's (never writes Z), Harry's parts depth-test against each other.
