@@ -36,6 +36,14 @@ Current patches (2026-09-05):
    `rsp.c` includes `rspq/rspq_internal.h` for the struct; `-Isrc` is on the
    libdragon build's include path (rdpq.c does the same).
 
+5. `include/rspq_constants.h` `RSPQ_DRAM_LOWPRI_BUFFER_SIZE` 0x200 -> 0x4000.
+   The title emits ~5000 rspq words/frame (native world+character), so the
+   512-word queue switched ~10x/frame and the RSP raced a buffer-end switch,
+   ran off the buffer into the uncleared gap, and parked on a stale zero
+   (crash reading pointer OUTSIDE both 2KB buffers). 16K words holds a whole
+   frame; with the per-frame `rspq_wait()` in GpuNv2a_FrameBegin the RSP never
+   reaches the buffer end mid-frame. Rebuild libdragon after changing it.
+
 4. `src/rspq/rspq.c` `rspq_try_heal` + calls in the `rspq_next_buffer` and
    `rspq_syncpoint_wait` wait loops (after 300ms, up to 4 per wait); `src/rsp.c`
    `__rsp_set_cur_ucode`. The hardware deadlock behind every "RSP crash pc=018"
