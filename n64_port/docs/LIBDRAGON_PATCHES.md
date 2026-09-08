@@ -36,6 +36,25 @@ Current patches (2026-09-05):
    `rsp.c` includes `rspq/rspq_internal.h` for the struct; `-Isrc` is on the
    libdragon build's include path (rdpq.c does the same).
 
+4. `src/rspq/rspq.c` `rspq_try_heal` + calls in the `rspq_next_buffer` and
+   `rspq_syncpoint_wait` wait loops (after 300ms, up to 4 per wait); `src/rsp.c`
+   `__rsp_set_cur_ucode`. The hardware deadlock behind every "RSP crash pc=018"
+   was the RSP parked on ONE zero command word in an otherwise intact queue
+   (a rdpq_set_tile header missing, its argument and all later commands
+   present). The heal snapshots IMEM/DMEM, runs the crash ucode to read gp,
+   computes the parked address (`rspq_dram_addr + gp`), NOOPs the hole and the
+   lost command's zero-top-byte argument words, puts the snapshot back and
+   restarts the ucode at `_start` with SIG_MORE set and `rspq_dram_addr` moved
+   to the (8-byte aligned) parked position -- the word before it, when the
+   position is 4 mod 8, is the previous command's already-executed tail and
+   is NOOPed too. Refuses (kind 2) when the position is outside the lowpri
+   buffers or the hole is followed by a word whose top byte is 0x01..0x0F (an
+   internal-command look-alike). The app's weak `ShN64_RspqHealed` logs each
+   event as `[RSPQ-HEAL]`; a `kind=1` means a lost wake-up rather than a hole.
+   This is a mitigation with instrumentation, not the fix: the writer of the
+   zero is still unknown (not the RDP -- scissor now clamped; not the RSP's
+   own DMAs; not an interrupt -- no rspq use outside the main loop).
+
 3. `src/t3d/t3dmath.c` in ../tiny3d (pinned c2cdbf2): `t3d_mat4_to_frustum`
    skips normalizing a plane when `len < 1e-6f` (off-centre projections make
    a zero-length plane -> NaN -> FPU trap). Rebuilt into n64_inst the same

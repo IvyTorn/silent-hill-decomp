@@ -361,6 +361,25 @@ void ShN64_RspCrashDetail(unsigned spStatus, int sigMore, int bufdoneLo, int buf
     ShLogN64_CrashCommit();
 }
 
+/* SH_PATCHed rspq self-heal report (LIBDRAGON_PATCHES.md #4). kind 0 = a zero
+ * command header was NOOPed and the RSP restarted (words = what the hole and
+ * its argument words held), 1 = the RSP was parked on a valid word (a lost
+ * wake-up) and was only restarted, 2 = refused (the parked position was not
+ * inside the queue, or the hole is followed by an ambiguous word) -- the 2 s
+ * watchdog then still fires. Every line is a sample of the writer we have
+ * not found; keep them. */
+void ShN64_RspqHealed(unsigned addr, const unsigned* words, int n, int kind)
+{
+    void SH_DebugLogFlush(void);
+    char buf[96];
+    int  i, len = 0;
+    buf[0] = 0;
+    for (i = 0; i < n && len < (int)sizeof(buf) - 10; i++)
+        len += snprintf(buf + len, sizeof(buf) - len, "%08x ", words[i]);
+    SH_DBG("[RSPQ-HEAL] kind=%d at=%08x hole=%s", kind, addr, buf);
+    SH_DebugLogFlush();
+}
+
 /* Crash-path commit. fflush alone pushes bytes to the FAT layer but leaves
  * the directory entry's SIZE stale, so everything since the last 1-second
  * fclose cycle -- always the [CRASH] lines themselves -- reads back as

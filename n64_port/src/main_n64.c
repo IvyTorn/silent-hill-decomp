@@ -98,16 +98,48 @@ static void Sh_InitGameData(void)
 
 /* --------------------------------------------------------------- main */
 
+static void N64_CrashBtFrame(void* arg, backtrace_frame_t* f)
+{
+    (void)arg;
+    SH_DBG("[CRASH]   %08lx %s+0x%lx (%s:%d)%s",
+           (unsigned long)f->addr, f->func ? f->func : "?",
+           (unsigned long)f->func_offset, f->source_file ? f->source_file : "?",
+           f->source_line, f->is_inline ? " inline" : "");
+}
+
 static void N64_CrashDump(exception_t* ex)
 {
-    SH_DBG("[CRASH] %s code=%d epc=%08lx cr=%08lx sr=%08lx",
+    void* bt[24];
+    int   n, i;
+
+    /* Everything addr2line needs in ONE line, first: an earlier dump's second
+     * line (the one with ra) never reached the card. epc=00000000 is a call
+     * through a NULL function pointer; ra names the caller. */
+    SH_DBG("[CRASH] %s code=%d epc=%08lx ra=%08lx sp=%08lx fp=%08lx cr=%08lx sr=%08lx a0=%08lx v0=%08lx s0=%08lx",
            ex->info ? ex->info : "?", (int)ex->code,
-           (unsigned long)ex->regs->epc, (unsigned long)ex->regs->cr,
-           (unsigned long)ex->regs->sr);
-    SH_DBG("[CRASH] ra=%08lx sp=%08lx a0=%08lx v0=%08lx s0=%08lx s8=%08lx",
-           (unsigned long)(uint32_t)ex->regs->ra, (unsigned long)(uint32_t)ex->regs->sp,
+           (unsigned long)ex->regs->epc, (unsigned long)(uint32_t)ex->regs->ra,
+           (unsigned long)(uint32_t)ex->regs->sp, (unsigned long)(uint32_t)ex->regs->fp,
+           (unsigned long)ex->regs->cr, (unsigned long)ex->regs->sr,
            (unsigned long)(uint32_t)ex->regs->a0, (unsigned long)(uint32_t)ex->regs->v0,
-           (unsigned long)(uint32_t)ex->regs->s0, (unsigned long)(uint32_t)ex->regs->fp);
+           (unsigned long)(uint32_t)ex->regs->s0);
+    SH_DebugLogFlush();
+
+    /* Walk the stack from inside the handler: libdragon's walker crosses its
+     * own exception frame into the interrupted context (the inspector does
+     * exactly this), so the frames name whoever made the bad call. Raw
+     * addresses first -- they need no ROM access -- then symbolised, which
+     * reads the ROM's symbol table and is best effort if the PI was busy. */
+    n = backtrace(bt, 24);
+    {
+        char line[220];
+        int  len = 0;
+        line[0] = 0;
+        for (i = 0; i < n && len < (int)sizeof(line) - 12; i++)
+            len += snprintf(line + len, sizeof(line) - len, "%08lx ", (unsigned long)(uintptr_t)bt[i]);
+        SH_DBG("[CRASH] bt: %s", line);
+    }
+    SH_DebugLogFlush();
+    backtrace_symbols_cb(bt, n, 0, N64_CrashBtFrame, NULL);
     SH_DebugLogFlush();
     {
         /* fflush is not enough on FAT (stale directory size); commit hard so
