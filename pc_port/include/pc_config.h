@@ -161,9 +161,9 @@ typedef struct {
     int   n64ClipScreen;    /* N64 only: 1 = clip triangles to the screen on the CPU before the RDP (default; the RDP walks off-screen scanlines the PSX GPU never rasterised), 0 = hand them over unclipped. Config key: clip_screen. */
     int   n64RdpProbe;      /* N64 only: 1 = measurement mode, cycles normal / no-fill / no-texture rendering every 64 frames so one [PROF] log splits the RDP's time. Flickers by design. Config key: rdp_probe; default 0. */
     int   n64CullBackfaces; /* N64 only: 0 = draw both faces as the PSX GPU did (default), 1 = reject backfacing triangles by screen-space winding, -1 = reject the opposite winding. Config key: cull_backfaces. */
-    int   n64ZBuffer;       /* N64 only: 1 = 150KB hardware Z-buffer: the world writes real depth and its opaque streams are batched by tile so each tile uploads once per frame; 0 = painter's-order no-Z path (default until the Z path is verified on hardware). Config key: zbuffer. */
+    int   n64ZBuffer;       /* N64 only: 150KB hardware Z-buffer. 2 = character only (default): Harry's parts occlude each other per pixel, the world stays painter's; 1 = world too (opaque streams batched by tile, semitrans Z-tested); 0 = no Z. Config key: zbuffer. */
     int   n64NativeChara;   /* N64 only: 1 = Harry's rigid parts drawn by the RSP from N64C/HERO.SHW (default), 0 = software-GTE per-part draw. Config key: native_chara. */
-    int   n64CharaCull;     /* N64 only: native-character backface cull. 1 = cull back (default), 2 = cull front, 0 = none. Config key: chara_cull. */
+    int   n64CharaCull;     /* N64 only: native-character backface cull. -1 = auto (default: none when the character has a Z-buffer, back otherwise), 1 = cull back, 2 = cull front, 0 = none. Config key: chara_cull. */
     int   n64WorldCull;     /* N64 only: native-world backface cull. 1 = cull the side the PSX mesh emitter rejects by nclip (default), 2 = the other side, 0 = none. Config key: world_cull. */
     int   n64WorldAa;       /* N64 only: RDP antialiasing for the native world. 0 = none (default; the PSX had none and the VI runs without the AA filter), 1 = standard, 2 = reduced. Config key: world_aa. */
     int   n64CharaDebug;    /* N64 only: 1 = draw native characters flat/untextured to read the raw silhouette. Config key: chara_debug. */

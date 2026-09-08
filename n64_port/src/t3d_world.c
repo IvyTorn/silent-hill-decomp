@@ -213,7 +213,8 @@ static int s_geomH, s_geomOfx, s_geomOfy;
  * WorldViewSet through the game's own view path; RunPass classifies each
  * group as foreground (nearer than this) or background against it. */
 static float s_playerViewZ;
-static int   s_zActive;   /* Z-buffer live this frame (gpu_rdp.c) -> world writes depth */
+static int   s_zActive;   /* Z-buffer live for the WORLD this frame (zbuffer=1) -> world writes depth */
+static int   s_zChara;    /* Z-buffer live for the character (zbuffer>=1): parts self-occlude per pixel */
 
 /* Deferred draw list: (cell, buf) recorded during OT build, drawn at the
  * GsDrawOt point. The accumulation window is bounded by FLUSH, not by
@@ -1316,8 +1317,10 @@ static void WorldFrameStart(void)
          * true depth and self-occludes by Z instead of painter's tile order.
          * Without it, the old no-Z path (t3d_frame_start turns Z ON, and with
          * no buffer that scribbles RDRAM -- so force it OFF). */
-        extern int GpuNv2a_ZBufActive(void);
-        s_zActive = GpuNv2a_ZBufActive();
+        extern int GpuNv2a_ZBufMode(void);
+        int zmode = GpuNv2a_ZBufMode();
+        s_zActive = (zmode == 1);   /* world tile-sorted through Z */
+        s_zChara  = (zmode >= 1);   /* character parts depth-tested against each other */
         rdpq_mode_zbuf(s_zActive, s_zActive);
     }
 
@@ -2013,20 +2016,29 @@ void ShT3d_CharaFlush(void)
             order[oj + 1] = key;
         }
         WorldFrameStart();
-        /* Cull backfaces for the character (WorldFrameStart left culling OFF
-         * for the flat, single-sided world). A closed character mesh drawn
-         * with no Z buffer paints its far faces over its near ones without
-         * this. Config chara_cull flips the winding if the model vanishes. */
+        /* The character gets the Z-buffer even when the world stays
+         * painter's (zbuffer=2): the PSX sorted his polygons into the OT one
+         * by one, so a holstered gun inside the trousers sorted behind them.
+         * Per-PART painter's order (below) cannot express that; per-pixel
+         * depth can. The Z image was cleared to far this frame and nothing
+         * before him wrote it, so he only ever tests against himself. */
+        if (s_zChara)
+            rdpq_mode_zbuf(true, true);
         {
             extern int GpuNv2a_CharaCull(void);
-            /* Backface cull (config chara_cull: 0 none, 1 back, 2 front). With
-             * the pool-resolved geometry each closed part is single-sided-correct
-             * under CULL_BACK; set chara_cull=2 if a build ever renders inside-out. */
+            /* Backface cull (config chara_cull: -1 auto, 0 none, 1 back, 2
+             * front). Without Z a closed mesh paints far faces over near ones,
+             * so cull BACK (mkchara reversed the winding for exactly that).
+             * With Z the depth test hides back faces anyway, and culling only
+             * risks holes wherever our screen-space winding disagrees with
+             * the PSX's nclip for a part -- so auto means none there. */
             int cull = GpuNv2a_CharaCull();
             int df = T3D_FLAG_SHADED | T3D_FLAG_TEXTURED;
+            if (cull < 0)
+                cull = s_zChara ? 0 : 1;
             if (cull == 1)      df |= T3D_FLAG_CULL_BACK;
             else if (cull == 2) df |= T3D_FLAG_CULL_FRONT;
-            if (s_zActive)      df |= T3D_FLAG_DEPTH;   /* Z-write: occludes / is occluded */
+            if (s_zChara)       df |= T3D_FLAG_DEPTH;   /* Z-write: occludes / is occluded */
             t3d_state_set_drawflags(df);
         }
         for (oi = 0; oi < nb; oi++)

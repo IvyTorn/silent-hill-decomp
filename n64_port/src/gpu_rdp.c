@@ -99,6 +99,12 @@ static int       s_zbufTried;
 static int ZBufOn(void) { return g_PcConfig.n64ZBuffer && s_zbuf.buffer != NULL; }
 /* Public: t3d_world.c enables Z for the world only when the buffer is live. */
 int GpuNv2a_ZBufActive(void) { return ZBufOn(); }
+/* 0 = no Z; 1 = world writes/tests depth (tile-sorted path) and so does the
+ * character; 2 = the character alone: his parts occlude each other by pixel
+ * (the PSX sorted his polygons into the OT one by one, which per-PART
+ * painter's order cannot reproduce -- the holstered gun showed through the
+ * trousers), the world stays painter's and never touches the Z image. */
+int GpuNv2a_ZBufMode(void) { return ZBufOn() ? g_PcConfig.n64ZBuffer : 0; }
 /* Public: t3d_world.c reads the native-character switch through here so it
  * needs no config include of its own. */
 int GpuNv2a_NativeCharaEnabled(void) { return g_PcConfig.n64NativeChara; }
@@ -248,6 +254,12 @@ void GpuNv2a_PsxModeInvalidate(void)
     s_modeDirty    = 1;
     s_appliedTex   = -1;
     s_appliedBlend = -2;
+    /* The native passes LOAD_TLUT their own palettes into the same TMEM
+     * bank this path memoises as "my palette is resident" (s_tlutDirty=0).
+     * Since the double-draw fix the PSX path draws only a few prims a frame
+     * (the global-PLM instances: wall posters, the map board), so nothing
+     * else re-dirtied it -- they drew with the world's last palette. */
+    s_tlutDirty    = 1;
     /* rdpq scissor was narrowed to the t3d viewport; restore full screen. */
     rdpq_set_scissor(0, 0, SCR_W, SCR_H);
 }
@@ -1085,31 +1097,20 @@ void GpuNv2a_FrameBegin(void)
         s_cnWaitFbTicks = get_ticks() - _t0;
     }
 
-    /* Lazy one-time Z-buffer alloc, gated by config (zbuffer=1). Done here
-     * rather than Init so a failed 150KB alloc on a 4MB machine just falls
-     * back to no-Z instead of wedging boot. */
+    /* Lazy one-time Z-buffer alloc, gated by config (zbuffer=1: world +
+     * character, zbuffer=2: character only). Done here rather than Init so
+     * a failed 150KB alloc on a 4MB machine just falls back to no-Z instead
+     * of wedging boot. */
     if (!s_zbufTried && g_PcConfig.n64ZBuffer)
     {
         s_zbufTried = 1;
         s_zbuf = surface_alloc(FMT_RGBA16, SCR_W, SCR_H);
-        SH_DBG("[GPU] z-buffer %s (%dKB) -> world tile-sorted, semitrans Z-tested",
+        SH_DBG("[GPU] z-buffer %s (%dKB) mode=%d (1 = world tile-sorted + character, 2 = character only)",
                s_zbuf.buffer ? "ON" : "alloc FAILED (no heap) -> painter's path",
-               (SCR_W * SCR_H * 2) / 1024);
+               (SCR_W * SCR_H * 2) / 1024, g_PcConfig.n64ZBuffer);
     }
 
     rdpq_attach(s_fb, ZBufOn() ? &s_zbuf : NULL);
-
-    /* Clear the depth buffer to far (0xFFFC, t3d's own clear value) every
-     * frame, else stale depth from the last frame Z-rejects this one. Done
-     * through rdpq (this TU has no t3d): retarget the colour image at the Z
-     * surface, fill, and hand it back to the framebuffer. */
-    if (ZBufOn())
-    {
-        rdpq_set_color_image(&s_zbuf);
-        rdpq_set_mode_fill(color_from_packed16(0xFFFC));
-        rdpq_fill_rectangle(0, 0, SCR_W, SCR_H);
-        rdpq_set_color_image(s_fb);
-    }
 
     /* The PSX draw-env isbg background -- the fog colour in-game. Taking it
      * from gpu_xbox.c rather than picking one here is what keeps a map's fog

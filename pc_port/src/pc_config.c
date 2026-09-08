@@ -85,14 +85,19 @@ s_PcConfig g_PcConfig = {
     .n64ClipScreen       = 1,    /* N64: CPU screen clipping before the RDP (escape hatch: clip_screen=0) */
     .n64RdpProbe         = 0,    /* N64: RDP measurement mode off */
     .n64CullBackfaces    = 0,    /* N64: PSX parity (no culling); cull_backfaces=1/-1 to try */
-    .n64ZBuffer          = 0,    /* N64: Z-buffer OFF until the tile-batched Z path is verified on
-                                  * hardware. The 150KB surface fits now that s_poolBoneCoords
-                                  * (205KB, dead on N64) was reclaimed; zbuffer=1 enables it. */
+    .n64ZBuffer          = 2,    /* N64: 2 = Z for the character only (his parts self-occlude per
+                                  * pixel like the PSX's per-polygon OT sort; the world stays
+                                  * painter's), 1 = world too (tile-batched, unverified on hw),
+                                  * 0 = off. The 150KB surface fits since s_poolBoneCoords
+                                  * (205KB, dead on N64) was reclaimed. */
     .n64NativeChara      = 1,    /* N64: Harry's 23 rigid parts drawn by the RSP from N64C/HERO.SHW;
                                   * native_chara=0 = software-GTE per-part draw as before */
-    .n64CharaCull        = 1,    /* N64 native chara backface cull: 1=back, 2=front, 0=none.
-                                  * A closed mesh w/o a Z buffer shows backfaces over fronts;
-                                  * cull them. Flip to 2 if the model vanishes. Key: chara_cull */
+    .n64CharaCull        = -1,   /* N64 native chara backface cull: -1 = auto (none with a Z-buffer,
+                                  * back without), 1=back, 2=front, 0=none. Without Z a closed
+                                  * mesh shows backfaces over fronts, so cull; with Z the depth
+                                  * test hides them and culling only risks holes where our
+                                  * screen-space winding disagrees with the PSX's nclip for a
+                                  * part (the hole in Harry's side). Key: chara_cull */
     .n64WorldCull        = 1,    /* N64 native world backface cull: 1 = the PSX mesh emitter's own
                                   * nclip rejection (every world quad is single-sided there), 2 =
                                   * other side, 0 = none. World SHW keeps PSX winding; t3d reads
@@ -806,7 +811,9 @@ void PcConfig_Load(const char* path)
         }
         else if (strcmp(key, "zbuffer") == 0)
         {
-            g_PcConfig.n64ZBuffer = (atoi(value) != 0);
+            g_PcConfig.n64ZBuffer = atoi(value);
+            if (g_PcConfig.n64ZBuffer < 0) g_PcConfig.n64ZBuffer = 0;
+            if (g_PcConfig.n64ZBuffer > 2) g_PcConfig.n64ZBuffer = 2;
         }
         else if (strcmp(key, "native_chara") == 0)
         {

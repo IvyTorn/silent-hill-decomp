@@ -383,3 +383,20 @@ default), the PSX itself had no AA, and gpu_rdp.c's `display_init` is
 nothing. FIX: `world_aa` (default 0 = AA_NONE, 1 = standard, 2 = reduced) applied
 in WorldFrameStart right after t3d_frame_start's reset. Fill-bound frames should
 move with this; it is a config toggle for a hardware A/B.
+MEASURED 2026-09-08 (build 08:51, reception, world_cull on): AA off took the
+RDP pipe from 44-50ms to 41-44ms and `cmd` (BUFBUSY) from ~31 to ~21ms; frame
+49-64ms. The remaining ~42ms of pipe is not explained by fill or uploads (tmem
+~7ms, PSX path 8-17 tris); next probe should partition it (rdp_probe=1 modes,
+or a run with the world alone vs Harry alone).
+
+## Z-BUFFER MODES (2026-09-08)
+`zbuffer=2` (now default) gives the Z-buffer to the CHARACTER ONLY: the world
+stays painter's (never writes Z), Harry's parts depth-test against each other.
+The PSX sorted his polygons into the OT one by one; per-part painter's order
+cannot express a holstered gun inside the trousers (it showed through). With
+Z the character no longer needs backface culling either -- `chara_cull=-1`
+(auto) means none when Z is active, back-cull without -- which also removes
+holes where our screen-space winding disagreed with the PSX's nclip for a part
+(the hole in his side). `zbuffer=1` = world + character (tile-batched Z path,
+unverified on hardware), `0` = off. Cost of mode 2: the 150KB surface and a
+Z clear per frame; the RMW is confined to his pixels.

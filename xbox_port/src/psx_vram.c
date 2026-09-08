@@ -104,10 +104,11 @@ typedef struct {
 /* 4 is the floor: the TITLE screen's working set (title art + font + menu)
  * needs 4 pages -- at 3 it re-decoded 6 pages EVERY frame (105ms, menus at
  * 6fps). In-game the native world keeps world tpages out of here. */
-#define PAGE_N      6                         /* SH: 4->6 -- the per-instance PLM
- * fallback (the counter fix) put shared-furniture tpages back into this
- * cache's working set: [PROF] showed dec=4/24.5ms EVERY in-game frame at
- * PAGE_N=4. +128KB, leaves ~100KB heap free in-game. */
+#define PAGE_N      4                         /* SH: back to 4. The 6 was for the
+ * per-instance PLM fallback that redrew shared furniture through this cache
+ * (dec=4/24.5ms every frame at 4); that path is gone -- the world is native
+ * and the PSX path draws ~8-17 prims a frame in-game -- and the 128KB funds
+ * the character Z-buffer (zbuffer=2) without starving the chunk slots. */
 #define PAL_N       32                        /* 20->32 with the PLM palettes */
 #else
 #define PAGE_N      64                        /* 64 * 64KB = 4MB of index pages */
