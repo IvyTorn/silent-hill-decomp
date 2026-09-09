@@ -1097,18 +1097,14 @@ void GpuNv2a_FrameBegin(void)
         s_cnWaitFbTicks = get_ticks() - _t0;
     }
 
-    /* Fully drain the RSP before building this frame's queue. rspq is a
-     * CONTINUOUS double buffer: the RSP runs behind the CPU across frame
-     * boundaries, and under the heavier native-world load it was seen reading
-     * PAST the CPU's write pointer into a stale word left in the ring by an
-     * earlier frame -- it parked in RSPQCmd_WaitNewInput on that zero while the
-     * CPU waited for a BUFDONE that never came (the "RSP crash pc=018/1c0"
-     * deadlock, reading=0x2ff4 ahead of cpuWrite=0x2ce0 in one 2KB buffer).
-     * Draining here bounds every frame's command stream to itself, so the RSP
-     * can never wander into a prior frame's tail. display_get() already blocked
-     * on a free framebuffer, so the RDP is nearly idle by now and this adds
-     * little. */
-    rspq_wait();
+    /* NOTE: a per-frame rspq_wait() drain used to sit here (to bound each
+     * frame's command stream). It was a band-aid on a wrong theory and it
+     * reached into libdragon's buffer machinery every frame; the RDP-overrun
+     * crashes only began AFTER it landed. Removed -- libdragon's own
+     * backpressure (the RSP blocks when the RDP dynamic buffer is full) keeps
+     * the two in step, and the enlarged rspq command buffer is the real fix
+     * for the original RSP run-off. display_get() above already paced us to a
+     * free framebuffer. */
 
     /* Lazy one-time Z-buffer alloc, gated by config (zbuffer=1: world +
      * character, zbuffer=2: character only). Done here rather than Init so
