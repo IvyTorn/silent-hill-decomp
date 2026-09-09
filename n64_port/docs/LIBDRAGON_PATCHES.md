@@ -36,6 +36,13 @@ Current patches (2026-09-05):
    `rsp.c` includes `rspq/rspq_internal.h` for the struct; `-Isrc` is on the
    libdragon build's include path (rdpq.c does the same).
 
+6. `include/rdpq_constants.h` `RDPQ_DYNAMIC_BUFFER_SIZE` 64KB -> 256KB. After
+   the rspq buffer bump (below) the failure moved one level down: the RDP
+   overran ITS 64KB dynamic buffer (crash rdpCrashed=1, dpCur 0x4700 past
+   dpEnd). ~250KB of RDP commands/frame (live-replay, ~1300 shaded+textured
+   tris). 256KB holds a frame; with the per-frame drain the RDP does not reach
+   the buffer end mid-frame. Rebuild libdragon after changing it.
+
 5. `include/rspq_constants.h` `RSPQ_DRAM_LOWPRI_BUFFER_SIZE` 0x200 -> 0x4000.
    The title emits ~5000 rspq words/frame (native world+character), so the
    512-word queue switched ~10x/frame and the RSP raced a buffer-end switch,
