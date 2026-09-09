@@ -155,6 +155,12 @@ static int       s_cPalCount;
 static WChunk    s_charChunk;
 static uint8_t   s_charArena[CHAR_ARENA_BYTES] __attribute__((aligned(16)));
 static int       s_charLoaded, s_charLoadTried;
+/* Per-part LOCAL geometric centroid (raw vert space, matches CharaBone's raw
+ * translation). The painter's sort keys on the part's mass, not its bone
+ * joint: a gun extends forward from a hand whose joint sits beside the torso,
+ * so a joint-Z key sorts it with the torso and it clips through -- exactly the
+ * PSX ordering-table's per-primitive depth is what this approximates. */
+static int16_t   s_charPartCent[32][3];
 static int       s_cnRunPassTris;   /* [T3DCB2] probe: tris t3d_tri_draw'd */
 
 /* Tile-bind dedup: the command stream re-emits OP_TILE for a tile it already
@@ -1909,6 +1915,35 @@ static int CharaLoad(const char* name)
     }
     fclose(f);
 
+    /* Per-part local centroid = average of the part's group-AABB centres
+     * (groupPos, raw vert space). Groups run buf0-opa, buf0-semi, buf1-opa ...
+     * so part i owns [bufs[i].opaGroupBase, bufs[i+1].opaGroupBase). Falls back
+     * to (0,0,0) = the joint if groupPos did not fit the arena. */
+    {
+        WChunk* c = &s_charChunk;
+        int i;
+        for (i = 0; i < c->instCount && i < 32; i++)
+        {
+            long sx = 0, sy = 0, sz = 0;
+            int g0 = 0, g1 = 0, g, n;
+            if (c->groupPos != NULL)
+            {
+                g0 = c->bufs[i].opaGroupBase;
+                g1 = (i + 1 < c->bufCount) ? c->bufs[i + 1].opaGroupBase : c->groupCount;
+            }
+            n = g1 - g0;
+            for (g = g0; g < g1; g++)
+            {
+                sx += c->groupPos[g * 6 + 0];
+                sy += c->groupPos[g * 6 + 1];
+                sz += c->groupPos[g * 6 + 2];
+            }
+            s_charPartCent[i][0] = (int16_t)(n > 0 ? sx / n : 0);
+            s_charPartCent[i][1] = (int16_t)(n > 0 ? sy / n : 0);
+            s_charPartCent[i][2] = (int16_t)(n > 0 ? sz / n : 0);
+        }
+    }
+
     /* A part the animation never writes collapses to a point far behind the
      * eye (PSX view -z is behind the camera after the GL flip), so a stale
      * pose can never show. */
@@ -2008,7 +2043,19 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
     c->viewRow[partIdx * 4 + 0] = (float)m9[6] / 4096.0f;
     c->viewRow[partIdx * 4 + 1] = (float)m9[7] / 4096.0f;
     c->viewRow[partIdx * 4 + 2] = (float)m9[8] / 4096.0f;
-    c->viewRow[partIdx * 4 + 3] = (float)t3[2];   /* raw, matches m.m[3][2]; used only for the part depth sort */
+    /* Sort key = the part's CENTROID view depth, not its joint (t3[2]).
+     * depth = centroid_local . viewRow2 + t3[2]. The gun's mass extends
+     * forward of the hand joint, so this sorts it in front of the torso the
+     * way the PSX ordering table did -- joint-Z sorted it with the torso and
+     * it clipped through. Centroid is (0,0,0) fallback => identical to before. */
+    {
+        const int16_t* cen = s_charPartCent[partIdx];
+        c->viewRow[partIdx * 4 + 3] =
+            (float)cen[0] * (float)m9[6] / 4096.0f +
+            (float)cen[1] * (float)m9[7] / 4096.0f +
+            (float)cen[2] * (float)m9[8] / 4096.0f +
+            (float)t3[2];
+    }
     s_charMask |= 1u << partIdx;
     return 1;
 }
