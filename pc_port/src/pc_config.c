@@ -85,11 +85,13 @@ s_PcConfig g_PcConfig = {
     .n64ClipScreen       = 1,    /* N64: CPU screen clipping before the RDP (escape hatch: clip_screen=0) */
     .n64RdpProbe         = 0,    /* N64: RDP measurement mode off */
     .n64CullBackfaces    = 0,    /* N64: PSX parity (no culling); cull_backfaces=1/-1 to try */
-    .n64ZBuffer          = 2,    /* N64: 2 = Z for the character (default) -- his parts self-occlude
-                                  * per pixel, so the gun no longer clips through him AND no backface
-                                  * cull is needed (chara_cull auto=none), which fixes the partly-
-                                  * invisible gun. Affordable again now the RDP buffer is back to the
-                                  * 64KB default. 1 = world too (tile-batched); 0 = no Z. Key: zbuffer. */
+    .n64ZBuffer          = 1,    /* N64: 1 = full Z (default) -- world AND character write/test depth,
+                                  * so the gun is occluded by walls and the world self-occludes; the
+                                  * world's opaque streams are batched by tile (each tile uploads ONCE,
+                                  * ~223->~89 uploads, which also relieves the slow-frame crash). The
+                                  * character is scaled to the world's /8 space (CharaBone) so their
+                                  * depths compare correctly. 2 = character-only Z; 0 = no Z. Same 150KB
+                                  * surface for 1 and 2. Key: zbuffer. */
     .n64NativeChara      = 1,    /* N64: Harry's 23 rigid parts drawn by the RSP from N64C/HERO.SHW;
                                   * native_chara=0 = software-GTE per-part draw as before */
     .n64CharaCull        = -1,   /* N64 native chara backface cull: -1 = auto (none with a Z-buffer,

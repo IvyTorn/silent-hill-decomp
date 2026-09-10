@@ -1998,22 +1998,27 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
 
     if (!s_charActive || partIdx < 0 || partIdx >= c->instCount)
         return 0;
+    /* Scale the WHOLE transform (rotation AND translation) by 1/8 so the
+     * character lands in the world's /8 view space. The world pre-divides its
+     * verts by 8 at bake; the character keeps RAW verts (dividing THEM by 8
+     * rounds his ~+-120 features to zero -> collapsed geometry), so the /8 goes
+     * into the matrix instead: view = (R/8)*vert_raw + T/8 = (R*vert_raw+T)/8.
+     * The 1/8 cancels in the perspective divide, so his SCREEN position is
+     * identical to before -- but his DEPTH now matches the world's, which is
+     * what lets the Z-buffer occlude him against walls (zbuffer=1). Verts stay
+     * raw = full precision (the RSP does the /8 at fixed-point). */
     memset(&m, 0, sizeof m);
     {
         extern int GpuNv2a_CharaXpose(void);
         int xpose = !GpuNv2a_CharaXpose();   /* default: transpose (matches the world) */
         for (r = 0; r < 3; r++)
             for (cc = 0; cc < 3; cc++)
-                if (xpose) m.m[cc][r] = (float)m9[r * 3 + cc] / 4096.0f;
-                else       m.m[r][cc] = (float)m9[r * 3 + cc] / 4096.0f;
+                if (xpose) m.m[cc][r] = (float)m9[r * 3 + cc] / 4096.0f / 8.0f;
+                else       m.m[r][cc] = (float)m9[r * 3 + cc] / 4096.0f / 8.0f;
     }
-    /* RAW translation (NOT /8): the character verts are loaded raw (see
-     * ShwLoadBody charMode) so the R*vert + T sum must be in the same raw
-     * scale. Perspective is scale-invariant, so this projects the same as the
-     * world's /8 but keeps the character's fine geometry from collapsing. */
-    m.m[3][0] = (float)t3[0];
-    m.m[3][1] = (float)t3[1];
-    m.m[3][2] = (float)t3[2];
+    m.m[3][0] = (float)t3[0] / 8.0f;
+    m.m[3][1] = (float)t3[1] / 8.0f;
+    m.m[3][2] = (float)t3[2] / 8.0f;
     m.m[3][3] = 1.0f;
     dst = c->mats + s_charPhase * c->instCount + partIdx;
     t3d_mat4_to_fixed(dst, &m);
