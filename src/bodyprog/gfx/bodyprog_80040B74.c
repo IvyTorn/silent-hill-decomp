@@ -36,6 +36,15 @@ static void ShT3d_N64ChunkLoadedHook(s_Chunk* chunk); /* defined near Ipd_ChunkD
 #define SH_N64_STOCK_PVS 0
 #endif
 
+#ifdef SH_N64_PORT
+/* A real s_IpdHeader lives in RDRAM (KSEG0 0x80000000..0x807FFFFF on an 8MB
+ * Expansion Pak). Used to reject a garbage chunk->ipdHdr before dereferencing
+ * it, when g_Map corruption leaves a slot pointing at nonsense. */
+#define IPDHDR_PLAUSIBLE(p) ((u32)(uintptr_t)(p) >= 0x80000000u && (u32)(uintptr_t)(p) < 0x80800000u)
+#else
+#define IPDHDR_PLAUSIBLE(p) (1)
+#endif
+
 /* Forward decl: called before its definition below; clang errors on the
  * conflicting implicit declaration otherwise (gcc only warns). */
 void IpdHeader_FixOffsets(s_IpdHeader* ipdHdr, s_LmHeader** lmHdrs, s32 lmHdrCount, s_ActiveChunkTextures* fullPageActiveTexs, s_ActiveChunkTextures* halfPageActiveTexs, e_FsFile fileIdx);
@@ -484,7 +493,15 @@ u32 IpdHeader_LoadStateGet(s_Chunk* chunk) // 0x80041B1C
     {
         return StaticModelLoadState_Invalid;
     }
-    else if (chunk->ipdHdr->isLoaded && Ipd_IsTextureLoaded(chunk->ipdHdr))
+    /* SH_N64_PORT: an empty/garbage chunk slot can report Loaded here after
+     * g_Map is corrupted (a wild write to activeChunkCount walks the draw loop
+     * off activeChunks[256] into chunkGrid, and a grid slot's bytes can look
+     * loaded); its ipdHdr is then not a real RDRAM header and dereferencing it
+     * faults. IPDHDR_PLAUSIBLE short-circuits so a non-plausible header falls
+     * through to Corrupted -- the chunk is simply not drawn -- instead of
+     * crashing. On PC/Xbox it is always 1 (no such corruption). */
+    else if (IPDHDR_PLAUSIBLE(chunk->ipdHdr) &&
+             chunk->ipdHdr->isLoaded && Ipd_IsTextureLoaded(chunk->ipdHdr))
     {
         return StaticModelLoadState_Loaded;
     }
@@ -2626,6 +2643,25 @@ void Ipd_ChunkCheckDraw(GsOT* ot, s32 arg1) // 0x80043A24
     }
 
     curChunk = &g_Map.activeChunks[0];
+#ifdef SH_N64_PORT
+    /* activeChunkCount can NEVER validly exceed the array size (PSX/N64 stream
+     * <=4-6, preload caps at PC_MAX_IPD_CHUNKS). A larger value is corruption
+     * of g_Map (seen on hardware: it walked the draw loop off activeChunks[256]
+     * into chunkGrid and crashed on a garbage ipdHdr). Clamp so the loop stays
+     * in-bounds, and log the bad value ONCE -- its magnitude/pattern is the
+     * only lead on the wild writer, still unidentified. */
+    if (g_Map.activeChunkCount < 0 || g_Map.activeChunkCount > PC_MAX_IPD_CHUNKS)
+    {
+        static int s_badCountLogged = 0;
+        if (!s_badCountLogged)
+        {
+            s_badCountLogged = 1;
+            SH_DBG("[IPDCNT] activeChunkCount CORRUPT = %d (0x%08x) -- clamped; g_Map=%p",
+                   (int)g_Map.activeChunkCount, (unsigned)g_Map.activeChunkCount, (void*)&g_Map);
+        }
+        g_Map.activeChunkCount = (g_Map.activeChunkCount < 0) ? 0 : PC_MAX_IPD_CHUNKS;
+    }
+#endif
 #ifdef SH_XBOX_PORT
     /* Probe [CHNK]: per-slot residency INCLUDING texture state — LoadStateGet
      * only reports Loaded(3) with textures resident, the one gate the old
