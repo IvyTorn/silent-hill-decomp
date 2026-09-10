@@ -11,7 +11,7 @@ re-apply after refreshing the checkout:
 Current patches (2026-09-05):
 
 1. `src/rspq/rspq.c` (4 sites) and `src/display.c` (1 site): every
-   gameplay-reachable `RSP_WAIT_LOOP(200)` raised to 2000ms. The 200ms
+   gameplay-reachable `RSP_WAIT_LOOP(200)` raised to 5000ms. The 200ms
    watchdog treats "RSP hasn't finished a buffer in 200ms" as a crash, but a
    fill-saturated frame on this title legitimately queues more RDP work than
    that (loading screens: ~150ms busy + 5ms upload spikes; room transitions
