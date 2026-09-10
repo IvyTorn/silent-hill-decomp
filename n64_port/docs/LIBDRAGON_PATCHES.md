@@ -17,8 +17,9 @@ Current patches (2026-09-05):
    that (loading screens: ~150ms busy + 5ms upload spikes; room transitions
    run `rspq_wait`). The watchdog was executing merely-slow frames: every
    hardware "RSP crash" dump traced to one of these waits, with the reporter
-   varying by which caller needed a buffer next. 2s still catches genuine
-   hangs.
+   varying by which caller needed a buffer next. Raised 200->2000->5000: every
+   dump showed the RSP ALIVE (halt=0) + RDP idle = a transient stall, and a
+   next-room chunk-stream frame exceeded 2s. 5s still catches genuine hangs.
 
 2. `src/rsp.c` `__rsp_crash`: calls the weak hooks `ShN64_RspCrashCommit`
    and `ShN64_RspCrashDetail` (both in `n64_port/src/sh_log_n64.c`) BEFORE
@@ -36,39 +37,28 @@ Current patches (2026-09-05):
    `rsp.c` includes `rspq/rspq_internal.h` for the struct; `-Isrc` is on the
    libdragon build's include path (rdpq.c does the same).
 
-6. `include/rdpq_constants.h` `RDPQ_DYNAMIC_BUFFER_SIZE` 64KB -> 256KB. After
-   the rspq buffer bump (below) the failure moved one level down: the RDP
-   overran ITS 64KB dynamic buffer (crash rdpCrashed=1, dpCur 0x4700 past
-   dpEnd). ~250KB of RDP commands/frame (live-replay, ~1300 shaded+textured
-   tris). 256KB holds a frame; with the per-frame drain the RDP does not reach
-   the buffer end mid-frame. Rebuild libdragon after changing it.
+6. `include/rdpq_constants.h` `RDPQ_DYNAMIC_BUFFER_SIZE` -- **REVERTED to the
+   64KB default (2026-09-09).** The 256/128KB bumps were chasing an RDP overrun
+   that was actually INDUCED by the app's per-frame `rspq_wait()` drain (item 5,
+   also removed). With clean libdragon backpressure the 64KB default is stable,
+   and reverting freed the heap to re-enable the character Z-buffer.
 
-5. `include/rspq_constants.h` `RSPQ_DRAM_LOWPRI_BUFFER_SIZE` 0x200 -> 0x4000.
-   The title emits ~5000 rspq words/frame (native world+character), so the
-   512-word queue switched ~10x/frame and the RSP raced a buffer-end switch,
-   ran off the buffer into the uncleared gap, and parked on a stale zero
-   (crash reading pointer OUTSIDE both 2KB buffers). 16K words holds a whole
-   frame; with the per-frame `rspq_wait()` in GpuNv2a_FrameBegin the RSP never
-   reaches the buffer end mid-frame. Rebuild libdragon after changing it.
+5. `include/rspq_constants.h` `RSPQ_DRAM_LOWPRI_BUFFER_SIZE` 0x200 -> 0x4000
+   (KEPT). The title emits ~5000 rspq words/frame, so the 512-word queue
+   switched ~10x/frame and the RSP raced a buffer-end switch, running off the
+   buffer into the uncleared gap. 16K words holds a whole frame. **The
+   companion per-frame `rspq_wait()` drain in GpuNv2a_FrameBegin was REMOVED
+   (2026-09-09)** -- it reached into libdragon's buffer machinery every frame
+   and INDUCED the RDP-overrun crashes; the enlarged queue alone + native
+   backpressure is the stable config. Do NOT re-add the drain.
 
-4. `src/rspq/rspq.c` `rspq_try_heal` + calls in the `rspq_next_buffer` and
-   `rspq_syncpoint_wait` wait loops (after 300ms, up to 4 per wait); `src/rsp.c`
-   `__rsp_set_cur_ucode`. The hardware deadlock behind every "RSP crash pc=018"
-   was the RSP parked on ONE zero command word in an otherwise intact queue
-   (a rdpq_set_tile header missing, its argument and all later commands
-   present). The heal snapshots IMEM/DMEM, runs the crash ucode to read gp,
-   computes the parked address (`rspq_dram_addr + gp`), NOOPs the hole and the
-   lost command's zero-top-byte argument words, puts the snapshot back and
-   restarts the ucode at `_start` with SIG_MORE set and `rspq_dram_addr` moved
-   to the (8-byte aligned) parked position -- the word before it, when the
-   position is 4 mod 8, is the previous command's already-executed tail and
-   is NOOPed too. Refuses (kind 2) when the position is outside the lowpri
-   buffers or the hole is followed by a word whose top byte is 0x01..0x0F (an
-   internal-command look-alike). The app's weak `ShN64_RspqHealed` logs each
-   event as `[RSPQ-HEAL]`; a `kind=1` means a lost wake-up rather than a hole.
-   This is a mitigation with instrumentation, not the fix: the writer of the
-   zero is still unknown (not the RDP -- scissor now clamped; not the RSP's
-   own DMAs; not an interrupt -- no rspq use outside the main loop).
+4. `src/rspq/rspq.c` `rspq_try_heal` -- **DISABLED via a `0 &&` gate on both
+   call sites (2026-09-09)**, kept in source for reference. It only ever
+   refused (kind=2), and was part of the band-aid stack that induced the RDP
+   crashes. `src/rsp.c` `__rsp_set_cur_ucode` remains (harmless). The heal
+   snapshotted IMEM/DMEM and NOOPed a lone zero command word; the "RSP crash"
+   it targeted turned out to be the induced buffer-switch race, gone once the
+   drain/heal were removed.
 
 3. `src/t3d/t3dmath.c` in ../tiny3d (pinned c2cdbf2): `t3d_mat4_to_frustum`
    skips normalizing a plane when `len < 1e-6f` (off-centre projections make
