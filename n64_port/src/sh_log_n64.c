@@ -283,9 +283,25 @@ void ShLogN64_EnableSdMirror(void)
     s_sdWanted = 1;
     /* Rotate the previous run's log aside before truncating: the N64 has no
      * iterative logging and a crash log is otherwise overwritten by the reboot
-     * that follows it. After a crash+reboot, .prev.log holds the crash run. */
-    remove("sd:/silenthill/silenthill.prev.log");
-    rename("sd:/silenthill/silenthill.log", "sd:/silenthill/silenthill.prev.log");
+     * that follows it. After a crash+reboot, .prev.log holds the crash run.
+     * rename() is a no-op on this SD/FAT layer (verified on hardware: no
+     * .prev.log ever appeared), so copy the bytes across by hand. */
+    {
+        FILE* src = fopen("sd:/silenthill/silenthill.log", "rb");
+        if (src != NULL)
+        {
+            FILE* dst = fopen("sd:/silenthill/silenthill.prev.log", "wb");
+            if (dst != NULL)
+            {
+                static char cp[4096];
+                size_t n;
+                while ((n = fread(cp, 1, sizeof cp, src)) > 0)
+                    fwrite(cp, 1, n, dst);
+                fclose(dst);
+            }
+            fclose(src);
+        }
+    }
     s_sdMirror = ShLogN64_SdOpen("w");
     if (s_sdMirror != NULL)
         SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log (prev run -> silenthill.prev.log)");
