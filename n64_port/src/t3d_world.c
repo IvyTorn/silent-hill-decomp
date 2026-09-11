@@ -75,7 +75,11 @@
  * static fixed-slot pool -- 83 small heap mallocs per chunk fragmented the
  * heap until the 48KB vertex block could not be placed at 136KB free. */
 #define TILE_SLOT_BYTES 2048
-#define TILE_SLOTS      96
+/* 128 slots (256KB): the police-station second room's chunk carries 122 unique
+ * tiles, so a 96-slot pool loaded only ~20 of them and re-uploaded the rest
+ * every frame (187 tile uploads/frame in [PROF], plus missing textures). Funded
+ * by the ~232KB of kanji tables reclaimed on the USA cart (pc_kanji.c). */
+#define TILE_SLOTS      128
 
 typedef struct
 {

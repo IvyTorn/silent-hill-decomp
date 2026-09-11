@@ -2,7 +2,19 @@
 
 #include <string.h>
 
+#ifdef SH_N64_PORT
+/* USA N64 cart: the JIS X 0208 kanji glyphs are drawn only under
+ * Region_JPN (GlyphBits, the sole reader of these two tables), which never
+ * occurs on this cart. Stub the ~232KB of bitmap+index tables to reclaim that
+ * RAM -- it funds the world tile pool, which the police-station second room
+ * oversubscribes (122 unique tiles vs a 96-slot pool -> upload thrash and
+ * missing textures). GlyphBits also early-returns on N64 so the stubs are
+ * never indexed. */
+static const unsigned short KANJI_FONT_IDX[1]   = { 0xFFFF };
+static const unsigned char  KANJI_FONT_BITS[32] = { 0 };
+#else
 #include "kanji_font.inc"
+#endif
 
 /* Atlas geometry. Cells are 12x16 pixels = 3 VRAM halfwords wide at 4bpp.
  * A cell never straddles a 64-halfword texture page: each page column holds
@@ -65,6 +77,9 @@ static const unsigned char* GlyphBits(unsigned short sjis)
     int          ku, ten;
     unsigned int g;
 
+#ifdef SH_N64_PORT
+    return 0;   /* kanji tables stubbed on the USA cart (see the include guard) */
+#endif
     if (!SjisToKuTen(sjis, &ku, &ten))
         return 0;
 
