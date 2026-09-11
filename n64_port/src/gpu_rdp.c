@@ -113,6 +113,7 @@ int GpuNv2a_WorldCull(void) { return g_PcConfig.n64WorldCull; }
 int GpuNv2a_WorldAa(void) { return g_PcConfig.n64WorldAa; }
 int GpuNv2a_CharaDebug(void) { return g_PcConfig.n64CharaDebug; }
 int GpuNv2a_CharaXpose(void) { return g_PcConfig.n64CharaXpose; }
+int GpuNv2a_MemWatch(void) { return g_PcConfig.n64MemWatch; }
 
 /* --------------------------------------------------------------- batch */
 

@@ -278,6 +278,8 @@ static void ComposeChunkViews(WChunk* c)
         data_cache_hit_writeback(dst, sizeof(T3DMat4FP) * c->instCount);
 }
 
+static void ShT3d_MemCheck(const char* where);
+
 void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
                         int plX, int plY, int plZ,
                         int h, int ofx, int ofy)
@@ -285,6 +287,11 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
     const int16_t* m = (const int16_t*)wsMatrix;
     int i;
     int firstOfFrame = 0;
+    /* OT-build time: everything in the game-logic phase (player physics, the
+     * collision ray-trace whose GTE call crashed, streaming) has already run
+     * this frame. If the tripwire fires HERE but was clean at the prior frame's
+     * render, the wild writer lives in that phase. */
+    ShT3d_MemCheck("viewset(post-logic)");
     /* First camera handoff after a flush = start of a new frame's world;
      * clear the draw list here rather than on FrameBegin (which the game's
      * mid-frame VSync fires between the OT build and the GsDrawOt flush). */
@@ -516,6 +523,60 @@ static int ChunkArenaValid(const WChunk* c)
         if (p[i] < base || p[i] >= end)
             return 0;
     return 1;
+}
+
+/* Wild-writer tripwire (config memwatch=1). Two hardware crashes -- the
+ * misaligned GTE store (gteRegs corrupt) and the RSP "read a zero word" halt
+ * (rspq DRAM pointer corrupt) -- are BOTH stray-pointer writes to memory the
+ * native renderer proves it never touches out of bounds. gteRegs and s_chunks
+ * are .bss neighbours, so validate s_chunks (the closest reliably-checkable
+ * victim) at each per-frame phase boundary: the FIRST phase that sees it
+ * corrupt names the subsystem that wrote it (e.g. collision runs before the
+ * OT-build WorldViewSet). Latches per episode so a persistent stomp logs once,
+ * then re-arms when it reads clean again. Zero cost when memwatch=0. */
+static void ShT3d_MemCheck(const char* where)
+{
+    static int s_tripped;
+    int i, bad = -1, freeBad = -1;
+
+    extern int GpuNv2a_MemWatch(void);
+    if (!GpuNv2a_MemWatch())
+        return;
+
+    for (i = 0; i < MAX_WCHUNKS; i++)
+    {
+        WChunk* c = &s_chunks[i];
+        if (c->inUse)
+        {
+            /* An in-use slot must resolve cleanly and carry a plausible cell. */
+            if (!ChunkArenaValid(c) || c->cellX < -128 || c->cellX > 127 ||
+                c->cellZ < -128 || c->cellZ > 127)
+            { bad = i; break; }
+        }
+        else
+        {
+            /* A free slot is memset(0) at ChunkFree: any live pointer/count in
+             * it means something wrote the header from outside the renderer. */
+            if (c->bufs != NULL || c->bufCount != 0 || c->instCount != 0 ||
+                c->cellX != 0 || c->cellZ != 0)
+            { freeBad = i; break; }
+        }
+    }
+
+    if (bad < 0 && freeBad < 0)
+    {
+        s_tripped = 0;   /* clean -- re-arm for the next distinct episode */
+        return;
+    }
+    if (!s_tripped)
+    {
+        int i2 = bad >= 0 ? bad : freeBad;
+        s_tripped = 1;
+        SH_DBG("[MEMWATCH] CORRUPT @%s slot=%d %s cell=%d,%d bufs=%p bc=%d ic=%d",
+               where, i2, bad >= 0 ? "inUse" : "free-stomped",
+               s_chunks[i2].cellX, s_chunks[i2].cellZ,
+               (void*)s_chunks[i2].bufs, s_chunks[i2].bufCount, s_chunks[i2].instCount);
+    }
 }
 
 static WChunk* ChunkFind(int cellX, int cellZ)
@@ -1358,6 +1419,7 @@ static void WorldFrameStart(void)
      * FIRST, then combiner/lights/drawflags, then draw. Setting lights or the
      * combiner before the viewport attach left them stale. */
     t3d_frame_start();
+    ShT3d_MemCheck("framestart(render)");   /* wild-writer tripwire, see ShT3d_MemCheck */
     s_lastBoundOk = 0;   /* TMEM was clobbered since the last flush pass */
     {
         /* Stage 1: with a real Z-buffer attached (gpu_rdp.c), the world writes

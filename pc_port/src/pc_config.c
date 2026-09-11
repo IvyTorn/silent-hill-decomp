@@ -845,6 +845,10 @@ void PcConfig_Load(const char* path)
         {
             g_PcConfig.n64RdpProbe = (atoi(value) != 0);
         }
+        else if (strcmp(key, "memwatch") == 0)
+        {
+            g_PcConfig.n64MemWatch = (atoi(value) != 0);
+        }
         else if (strcmp(key, "clip_screen") == 0)
         {
             g_PcConfig.n64ClipScreen = (atoi(value) != 0);

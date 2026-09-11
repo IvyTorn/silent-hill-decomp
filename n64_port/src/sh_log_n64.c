@@ -281,9 +281,14 @@ void ShLogN64_EnableSdMirror(void)
     if (s_sdMirror != NULL)
         return;
     s_sdWanted = 1;
+    /* Rotate the previous run's log aside before truncating: the N64 has no
+     * iterative logging and a crash log is otherwise overwritten by the reboot
+     * that follows it. After a crash+reboot, .prev.log holds the crash run. */
+    remove("sd:/silenthill/silenthill.prev.log");
+    rename("sd:/silenthill/silenthill.log", "sd:/silenthill/silenthill.prev.log");
     s_sdMirror = ShLogN64_SdOpen("w");
     if (s_sdMirror != NULL)
-        SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log");
+        SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log (prev run -> silenthill.prev.log)");
 }
 
 /* Called from the SH_PATCHed libdragon __rsp_crash BEFORE it touches the

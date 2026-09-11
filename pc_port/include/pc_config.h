@@ -160,6 +160,7 @@ typedef struct {
     int   n64AudioPumpBudgetMs; /* N64 only: max ms one audio pump may spend refilling the ring; 0 = unbounded. Config key: audio_pump_budget_ms; default 16. */
     int   n64ClipScreen;    /* N64 only: 1 = clip triangles to the screen on the CPU before the RDP (default; the RDP walks off-screen scanlines the PSX GPU never rasterised), 0 = hand them over unclipped. Config key: clip_screen. */
     int   n64RdpProbe;      /* N64 only: 1 = measurement mode, cycles normal / no-fill / no-texture rendering every 64 frames so one [PROF] log splits the RDP's time. Flickers by design. Config key: rdp_probe; default 0. */
+    int   n64MemWatch;      /* N64 only: 1 = validate the s_chunks/arena .bss region at per-frame phase boundaries and log [MEMWATCH] the frame + phase a wild writer first corrupts it (the crash class where gteRegs/rspq get stomped). Off by default. Config key: memwatch. */
     int   n64CullBackfaces; /* N64 only: 0 = draw both faces as the PSX GPU did (default), 1 = reject backfacing triangles by screen-space winding, -1 = reject the opposite winding. Config key: cull_backfaces. */
     int   n64ZBuffer;       /* N64 only: 150KB hardware Z-buffer. 2 = character only (default): Harry's parts occlude each other per pixel, the world stays painter's; 1 = world too (opaque streams batched by tile, semitrans Z-tested); 0 = no Z. Config key: zbuffer. */
     int   n64NativeChara;   /* N64 only: 1 = Harry's rigid parts drawn by the RSP from N64C/HERO.SHW (default), 0 = software-GTE per-part draw. Config key: native_chara. */
