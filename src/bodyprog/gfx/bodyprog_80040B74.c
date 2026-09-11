@@ -3189,6 +3189,20 @@ void ShT3d_ComposeInstanceView(const short* rot9, const int* trans3,
     outTrans3[2] = viewMat.t[2];
 }
 
+/* Diagnostic: the PSX item/billboard projection (Vw_WorldScreenMatrixAtPositionGet,
+ * GsWSMATRIX) of a world point in Q8, returning its VIEW-space coords. The
+ * native world composes the same point through VbWvsMatrix
+ * (ShT3d_ComposeInstanceView); these two must agree or PSX-path items (pickups,
+ * wall billboards) drift from the native world as the camera moves. */
+void ShT3d_WorldScreenViewGet(int px8, int py8, int pz8, int* outT)
+{
+    MATRIX m;
+    Vw_WorldScreenMatrixAtPositionGet(&m, Q8_TO_Q12(px8), Q8_TO_Q12(py8), Q8_TO_Q12(pz8));
+    outT[0] = m.t[0];
+    outT[1] = m.t[1];
+    outT[2] = m.t[2];
+}
+
 /* One-shot numeric GTE self-test, logged to the SD card on the first in-game
  * frame. The TMD item path (inventory carousel, world pickups, the wall map)
  * renders rotated ~90deg and stretched on hardware while characters are

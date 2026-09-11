@@ -333,6 +333,29 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
             pW[0] = plX; pW[1] = plY; pW[2] = plZ;
             ShT3d_ComposeInstanceView(idR, pW, dR, pT);
             s_playerViewZ = (float)pT[2] / 8.0f;
+            /* [PROJCHK] (memwatch=1): does the PSX item path (GsWSMATRIX) put a
+             * world point where the native world (VbWvsMatrix) does? nativeV vs
+             * psxV are the SAME point's view coords through each path -- a
+             * mismatch is the item drift. h/oX/oY/sX/sY/cX are the shared
+             * projection the native proj is built to match PutVert with. */
+            {
+                extern int GpuNv2a_MemWatch(void);
+                static int s_pc;
+                if (GpuNv2a_MemWatch() && (s_pc++ & 31) == 0)
+                {
+                    extern void ShT3d_WorldScreenViewGet(int, int, int, int*);
+                    extern void GpuXbox_GetViewTransform(float*, float*, float*, float*, int*);
+                    int   psxT[3];
+                    float oX, oY, sX, sY;
+                    int   cX;
+                    ShT3d_WorldScreenViewGet(plX, plY, plZ, psxT);
+                    GpuXbox_GetViewTransform(&oX, &oY, &sX, &sY, &cX);
+                    SH_DBG("[PROJCHK] nativeV=%d,%d,%d psxV=%d,%d,%d | h=%d oX=%d oY=%d sX=%d sY=%d cX=%d cam=%d,%d,%d",
+                           pT[0], pT[1], pT[2], psxT[0], psxT[1], psxT[2],
+                           s_geomH, (int)oX, (int)oY, (int)(sX * 100.0f), (int)(sY * 100.0f), cX,
+                           (int)s_camPos[0], (int)s_camPos[1], (int)s_camPos[2]);
+                }
+            }
         }
     }
 }
