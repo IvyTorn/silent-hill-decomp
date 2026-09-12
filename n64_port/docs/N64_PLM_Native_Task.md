@@ -22,6 +22,23 @@ path as the room, killing the whole PSX-vs-native mismatch class.
 - Native/PSX split: an instance draws native iff its modelHdr is inside the
   chunk's own `lmHdr->modelHdrs[0..modelCount)` (3518); else PSX fallthrough.
 
+## APPROACH PIVOT (2026-09-12): bake PLMs INTO the cell SHW via mkworld
+mkplm.py (standalone baker) works (P1 done: DR_GLB.PLM -> 30 models), but a
+SEPARATE PLM runtime store fights the ~151KB in-game free heap (PLM geometry
+~69KB + a tile pool would OOM; tiles would have to share the world pool -- lots
+of new, risky runtime code). MUCH simpler + safer: teach mkworld to RESOLVE
+is_global_plm instances against the area's GLB.PLM and bake their geometry into
+the cell SHW like a local model. Then the EXISTING native world renderer draws
+them -- tiles, deferred draw, Z, memory all reused. Only runtime change: the
+membership test at bodyprog_80040B74.c:3518 must ALSO skip isGlobalPlm instances
+(they are native now) so the PSX path does not double-draw them.
+- area->GLB map: Ipd_MapFileInfoSet(mapTag, plmIdx, ...) sets g_Map.globalLm's
+  file per map; the per-map callers in src/maps/* pass the FILE_BG_*_GLB_PLM.
+  mkworld needs prefix->GLB (extract from those callers, or pass --glb).
+- NOTE: ER (reception) has only 1 PLM, so this mainly helps the PLM-heavy rooms
+  (DR=153, RSR=534, SPR=259). The reception's ammo/poster drift is Track B
+  (pickups/items), a separate path.
+
 ## Plan (phases)
 **P1 - bake GLB.PLM to native (offline tool).** New `mkplm.py` (or a mode of
 mkworld): parse `BG/<AREA>_GLB.PLM` with sh1fmt.lm, bake every model with the
