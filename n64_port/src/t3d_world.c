@@ -84,13 +84,22 @@
 typedef struct
 {
     int16_t  sthIdx;    /* -1 = free */
-    int16_t  refs;
+    int16_t  refs;      /* character pool only (eager); world pool is LRU */
     uint8_t  fmt;       /* 0 = CI4, 1 = CI8 */
     uint8_t  pad;
     uint16_t w, h;
     uint32_t pixLen;
+    uint32_t lastUse;   /* world pool: frame this tile was last DRAWN (LRU) */
     void*    pix;       /* slot in s_tilePool, written back for RDP DMA */
 } WTile;
+
+/* World tiles are loaded LAZILY (on first draw) and evicted LRU, so the pool
+ * holds the working set -- the tiles actually drawn this frame -- instead of
+ * every resident chunk's full tile set. Two big adjacent rooms (ERFE00 122 +
+ * ERFF00 89 = 211 tiles) overran the 128-slot pool under the old eager
+ * per-chunk residency: the second room got only ~52 of its 122 tiles, so its
+ * wall groups tile-missed and drew NOTHING (the "missing walls"). */
+static uint32_t s_tileFrame;   /* ++ per world flush; the LRU clock */
 
 typedef struct
 {
@@ -320,6 +329,7 @@ void ShT3d_WorldViewSet(const void* wsMatrix, int camX, int camY, int camZ,
     if (firstOfFrame)
     {
         static const short idR[9] = { 4096, 0, 0, 0, 4096, 0, 0, 0, 4096 };
+        s_tileFrame++;   /* LRU clock: one tick per drawn frame (all passes share it) */
         s_matPhase ^= 1;
         for (i = 0; i < MAX_WCHUNKS; i++)
             if (s_chunks[i].inUse)
@@ -401,28 +411,45 @@ static int TileSlotFind(int sthIdx)
     return -1;
 }
 
+/* LAZY, LRU. Returns the slot holding sthIdx, loading it on demand and, when
+ * the pool is full, evicting the least-recently-DRAWN tile that was not needed
+ * THIS frame. A tile the current frame still needs is never evicted -- if the
+ * whole frame's working set exceeds the pool, the extra tile misses (drops)
+ * instead. Called from BindWorldTile at draw time; no chunk-level refcount. */
 static int TileAcquire(int sthIdx)
 {
     uint8_t meta[16];
-    int slot;
+    int slot, i;
     WTile* t;
 
     slot = TileSlotFind(sthIdx);
     if (slot >= 0)
     {
-        s_tiles[slot].refs++;
+        s_tiles[slot].lastUse = s_tileFrame;   /* touch for LRU */
         return slot;
     }
     if (s_sht == NULL || sthIdx >= s_shtTileCount)
         return -1;
 
-    for (slot = 0; slot < (int)(sizeof s_tiles / sizeof s_tiles[0]); slot++)
-        if (s_tiles[slot].sthIdx < 0)
-            break;
-    if (slot >= (int)(sizeof s_tiles / sizeof s_tiles[0]))
+    slot = -1;
+    for (i = 0; i < TILE_SLOTS; i++)
+        if (s_tiles[i].sthIdx < 0) { slot = i; break; }
+    if (slot < 0)
     {
-        SH_DBG("[T3DW] tile slots FULL acquiring %d", sthIdx);
-        return -1;
+        uint32_t oldest = s_tileFrame;   /* only tiles NOT drawn this frame */
+        for (i = 0; i < TILE_SLOTS; i++)
+            if (s_tiles[i].lastUse < oldest) { oldest = s_tiles[i].lastUse; slot = i; }
+        if (slot < 0)
+        {
+            static int s_full;
+            if ((s_full++ & 511) == 0)
+                SH_DBG("[T3DW] tile working set > %d (frame %u) -- doorway overlap",
+                       TILE_SLOTS, (unsigned)s_tileFrame);
+            return -1;
+        }
+        s_tileRam -= s_tiles[slot].pixLen;   /* evict the LRU tile */
+        s_tiles[slot].sthIdx = -1;
+        s_tiles[slot].pix    = NULL;
     }
 
     fseek(s_sht, 8 + sthIdx * 16, SEEK_SET);
@@ -452,23 +479,10 @@ static int TileAcquire(int sthIdx)
         t->pixLen = pixLen;
     }
     data_cache_hit_writeback(t->pix, t->pixLen);
-    t->sthIdx = sthIdx;
-    t->refs   = 1;
+    t->sthIdx  = sthIdx;
+    t->lastUse = s_tileFrame;
     s_tileRam += t->pixLen;
     return slot;
-}
-
-static void TileRelease(int sthIdx)
-{
-    int slot = TileSlotFind(sthIdx);
-    if (slot < 0)
-        return;
-    if (--s_tiles[slot].refs <= 0)
-    {
-        s_tileRam -= s_tiles[slot].pixLen;
-        s_tiles[slot].pix    = NULL;
-        s_tiles[slot].sthIdx = -1;
-    }
 }
 
 static int ShtOpen(const char* prefix)
@@ -628,12 +642,11 @@ static WChunk* ChunkFind(int cellX, int cellZ)
 
 static void ChunkFree(WChunk* c)
 {
-    int i;
     if (!c->inUse)
         return;
-    /* Everything lives in the slot's arena; only tile refs need releasing. */
-    for (i = 0; i < c->tileRefCount; i++)
-        TileRelease(c->tileRefs[i]);
+    /* Everything lives in the slot's arena. World tiles are LRU now (no per-
+     * chunk refcount) -- a freed chunk's tiles simply age out and get evicted
+     * when a later tile needs the slot, or are cleared wholesale on area reset. */
     memset(c, 0, sizeof *c);
 }
 
@@ -693,7 +706,7 @@ static int BindWorldTile(uint16_t tref, uint16_t palArg)
                    (unsigned)palArg, (unsigned)s_shtPalCount);
         return 0;
     }
-    slot = TileSlotFind(tref - 1);
+    slot = TileAcquire(tref - 1);   /* lazy: load-on-draw + LRU, marks lastUse */
     if (slot < 0)
     {
         s_cnTileMiss++;
@@ -1146,7 +1159,12 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
             c->rawTrans[i * 3 + 2] = (int32_t)rd32(ip + 28) + (charMode ? 0 : cellZ * 10240);
         }
 
-        /* Tile refs (arena-resident, carved above). */
+        /* Tile refs (arena-resident, carved above). RECORDED only -- world
+         * tiles are loaded LAZILY at draw time (BindWorldTile -> TileAcquire)
+         * and evicted LRU, so we no longer pre-load a chunk's whole tile set
+         * (that eager residency is what overran the pool with two big rooms).
+         * The list stays for the resident-count log; char tiles are eager in
+         * their own store. */
         c->tileRefCount = 0;
         fseek(f, refsOff, SEEK_SET);
         if (fread(tmp, 1, refCount * 2, f) != (size_t)(refCount * 2))
@@ -1154,7 +1172,7 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
         for (i = 0; i < refCount; i++)
         {
             uint16_t idx = rd16(tmp + i * 2);
-            if (!charMode && TileAcquire(idx) >= 0)   /* char tiles live in their own store */
+            if (!charMode && c->tileRefCount < refCount)
                 c->tileRefs[c->tileRefCount++] = idx;
         }
 
