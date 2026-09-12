@@ -46,6 +46,7 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sh1fmt.ipd import Ipd  # noqa: E402
+from sh1fmt.lm import Lm    # noqa: E402  (global-PLM resolution, --glb)
 from sh1fmt.tim import Tim  # noqa: E402
 
 PERIM = (0, 1, 3, 2)          # vi order -> quad perimeter
@@ -274,20 +275,34 @@ def bake_tiles(tiles, tims, stats):
 
 # ------------------------------------------------------------- phase 1
 
-def collect_cell(ipd, cellno, tim_get, pieces_by_key, untex, stats):
-    """Parse one cell into Pieces. Returns (instances, buffer_count)."""
+def collect_cell(ipd, cellno, tim_get, pieces_by_key, untex, stats, glb_lm=None,
+                 plm_names=None):
+    """Parse one cell into Pieces. Returns instances. A global-PLM instance
+    (shared wall/counter/prop) is resolved against the area's GLB.PLM (glb_lm)
+    and baked like a local model -- its NAME is recorded in plm_names (a set)
+    so the runtime knows which PLM instances are now native and skips them on
+    the PSX path (else they double-draw). An UNRESOLVED PLM stays on the PSX
+    path (not baked, not recorded), so it must NOT be skipped at runtime."""
     lm = ipd.lm
     instances = []
     for bi, buf in enumerate(ipd.model_buffers):
         for inst in buf.instances:
             info = ipd.model_infos[inst.model_info_idx]
             if info.is_global_plm:
-                stats["skip_plm"] += 1
-                continue
-            model = lm.model_by_name(info.name)
-            if model is None:
-                stats["skip_missing_model"] += 1
-                continue
+                model = glb_lm.model_by_name(info.name) if glb_lm is not None else None
+                if model is None:
+                    stats["skip_plm"] += 1
+                    continue
+                src_lm = glb_lm            # PLM materials live in the GLB, not the cell
+                if plm_names is not None:
+                    plm_names.add(info.name)
+                stats["plm_baked"] += 1
+            else:
+                model = lm.model_by_name(info.name)
+                if model is None:
+                    stats["skip_missing_model"] += 1
+                    continue
+                src_lm = lm
             inst_idx = len(instances)
             instances.append(inst)
             for mesh in model.meshes:
@@ -304,7 +319,7 @@ def collect_cell(ipd, cellno, tim_get, pieces_by_key, untex, stats):
                         poly.append((float(x), float(y), float(z), float(u), float(v)))
                     key = None
                     if prim.material_idx >= 0:
-                        mat = lm.materials[prim.material_idx]
+                        mat = src_lm.materials[prim.material_idx]
                         if tim_get(mat.name) is not None:
                             key = (mat.name, prim.clut // 64)
                         else:
@@ -535,15 +550,21 @@ def main():
     ap.add_argument("--ipd-dir", required=True)
     ap.add_argument("--tim-dir", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--glb", default=None,
+                    help="area *_GLB.PLM: resolve+bake global-PLM instances "
+                         "(shared walls/counter/props) natively into the cells")
     ap.add_argument("prefixes", nargs="+")
     a = ap.parse_args()
 
     outdir = os.path.join(a.out, "N64W")
     os.makedirs(outdir, exist_ok=True)
 
+    glb_lm = Lm.parse(open(a.glb, "rb").read()) if a.glb else None
+
     for prefix in a.prefixes:
         prefix = prefix.upper()
         stats = defaultdict(int)
+        plm_names = set()
         tims = {}
         missing = set()
 
@@ -564,7 +585,8 @@ def main():
         untex = []
         for ci, fn in enumerate(cells):
             ipd = Ipd.parse(open(os.path.join(a.ipd_dir, fn), "rb").read())
-            instances = collect_cell(ipd, ci, tim_get, pieces_by_key, untex, stats)
+            instances = collect_cell(ipd, ci, tim_get, pieces_by_key, untex, stats,
+                                     glb_lm=glb_lm, plm_names=plm_names)
             parsed.append((fn, ipd, instances))
 
         tiles, pal_table = assign_tiles(pieces_by_key, tims, stats)
@@ -595,6 +617,10 @@ def main():
               f"unique={len(payloads)} (dedup {stats['tile_dedup']}) "
               f"pals={len(pal_table)} "
               f"sht={len(sht)//1024}KB shwTotal={shw_total//1024}KB")
+        if glb_lm is not None:
+            print(f"    PLM: baked={stats['plm_baked']} unresolved={stats['skip_plm']} "
+                  f"(baked names: {sorted(plm_names)[:12]}"
+                  f"{' ...' if len(plm_names) > 12 else ''})")
         for k in ("skip_plm", "skip_missing_model", "degenerate", "missing_tim",
                   "bad_clut_row"):
             if stats[k]:
