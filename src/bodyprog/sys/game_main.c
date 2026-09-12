@@ -2059,6 +2059,9 @@ void MainLoop(void) // 0x80032EE0
         /* PsyCross requires explicit input polling — on PSX this happens
          * via hardware interrupt during VBlank. */
         PsyX_UpdateInput();
+#ifndef SH_N64_PORT
+        /* N64: the debug overlay and randomizer are added features, not base
+         * game -- kept off entirely on the cart (see the extras policy below). */
         DbgOverlay_Update();
 
         /* Randomizer: per-area monster placement, entry-door relock timer.
@@ -2067,6 +2070,7 @@ void MainLoop(void) // 0x80032EE0
             extern void Pc_Rando_Update(void);
             Pc_Rando_Update();
         }
+#endif
 #endif
         // Update input.
         Joy_ReadP1();
@@ -2110,6 +2114,18 @@ void MainLoop(void) // 0x80032EE0
             }
         }
 
+#ifdef SH_N64_PORT
+        /* N64 EXTRAS POLICY: quick save/load, alternate control/camera styles,
+         * the bound PC action keys (cycle weapons / quick heal / quick turn) and
+         * rear look are added features that ship "much later if at all". Keep
+         * them compiled out; just force the faithful Classic control+camera style
+         * once so gameplay uses the base scheme regardless of any stray config. */
+        {
+            extern void Xbox_ApplyControlStyle(int);
+            static int s_n64ClassicSet = 0;
+            if (!s_n64ClassicSet) { Xbox_ApplyControlStyle(0); s_n64ClassicSet = 1; }
+        }
+#else
         /* Quick Save (F6) / Quick Load (F8) — always on, not debug-gated. */
         {
             extern void Pc_QuickSaveLoadUpdate(void);
@@ -2135,21 +2151,24 @@ void MainLoop(void) // 0x80032EE0
             extern void Pc_RearLookUpdate(void);
             Pc_RearLookUpdate();
         }
+#endif
 
+#ifndef SH_N64_PORT
         /* Mouse cursor: drive free-cursor puzzles + the main menu from the mouse.
          * Runs after the controller is built and before the state update reads
-         * it, so puzzle-cursor injection lands this frame. */
+         * it, so puzzle-cursor injection lands this frame. (No mouse on N64.) */
         {
             extern void Pc_MouseCursor_FrameUpdate(void);
             Pc_MouseCursor_FrameUpdate();
         }
 
         /* Console `fmv`: once the fade-out it started lands, this blocks in
-         * FMV_Play and fades back in afterwards. */
+         * FMV_Play and fades back in afterwards. (Console is a PC extra.) */
         {
             extern void Pc_ConsoleFmvUpdate(void);
             Pc_ConsoleFmvUpdate();
         }
+#endif
 
 #endif
 
@@ -2213,11 +2232,14 @@ void MainLoop(void) // 0x80032EE0
 
         g_SysWork.bgmStatusFlags = BgmStatusFlag_None;
 
-#ifdef SH_XBOX_PORT
+#if defined(SH_XBOX_PORT) && !defined(SH_N64_PORT)
         /* Minimap: loads the area's paper-map TIM on the GAME side (the Fs queue
          * must not be touched from a draw path) and emits its own prims. Runs
          * after GsClearOt so the ordering table is live. Self-gated on
-         * g_PcConfig.minimap, so it costs nothing when off. */
+         * g_PcConfig.minimap, so it costs nothing when off.
+         * N64: excluded entirely -- it is an added feature, not base-game, and a
+         * corrupted g_PcConfig.minimap flag drove it into a crash (mm_start_read).
+         * Extras stay compiled OUT on N64 so no stray flag can resurrect them. */
         { extern void Pc_MinimapUpdate(void); Pc_MinimapUpdate(); }
 #endif
         PC_OT_SCAN("pre-GameStateUpdate");
