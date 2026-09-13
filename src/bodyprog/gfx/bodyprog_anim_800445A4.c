@@ -227,6 +227,30 @@ void Anim_BoneUpdate(s_AnmHeader* anmHdr, GsCOORDINATE2* boneCoords, s32 keyfram
         // Process bones marked as active.
         if (activeBoneIdxs & (1 << boneIdx))
         {
+#ifdef SH_N64_PORT
+            /* Reject invalid keyframe data: an active bone whose rotation
+             * keyframe decodes to an all-zero 3x3 is never a real pose -- even
+             * identity stores 128 (1.0 >> 5) on the diagonal, not 0. An all-
+             * zero rotation collapses the part onto the origin, which is the
+             * "limbs fold inward during the idle/fidget anim" the player sees:
+             * those limb bones are marked active but their keyframe slot reads
+             * a zero region. Skip the bone so it RETAINS its previous valid
+             * coord (what an un-animated bone does anyway) instead of caving to
+             * centre. A legitimately animated bone always has a non-zero
+             * rotation here, so this never suppresses real animation. */
+            {
+                s32 rIdx = curBindPose->rotationDataIdx;
+                if (rIdx >= 0)
+                {
+                    const s8* r0 = (const s8*)frame0RotData + (rIdx * 9);
+                    s32 z, nonZero = 0;
+                    for (z = 0; z < 9; z++)
+                        if (r0[z]) { nonZero = 1; break; }
+                    if (!nonZero)
+                        continue;
+                }
+            }
+#endif
             curBoneCoord->flg = false;
             scaleLog2      = anmHdr->scaleLog2;
 
