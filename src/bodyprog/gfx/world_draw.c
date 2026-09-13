@@ -1761,19 +1761,38 @@ void WorldGfx_HeldItemAttach(e_CharaId charaId, s32 arg1) // 0x8003DD80
     }
 }
 
+#ifdef SH_N64_PORT
+/* The D_800A9Exx bone-model-index lists below are s32 constants that
+ * Bone_ModelIdxGet walks as an s8[] byte stream (0xFE = BoneHierarchy_End,
+ * 0xFD = MultiModel). On big-endian N64 a word's bytes land in the opposite
+ * order, putting the terminator FIRST -> every list reads empty, so no
+ * hand/weapon mesh variant is ever selected and ALL of Harry's RHAND variants
+ * (and every armed NPC's) draw stacked at once (the "gun floats / grip fused
+ * to the hand" glass-castle bug). Byte-swapping each initializer so its
+ * IN-MEMORY byte order matches the little-endian authoring restores selection.
+ * Compile-time constant fold; identity on PC/PSX. */
+#define BONE_MDL_LIST(x) \
+    ((s32)((((u32)(x) & 0xFF000000u) >> 24) | \
+           (((u32)(x) & 0x00FF0000u) >>  8) | \
+           (((u32)(x) & 0x0000FF00u) <<  8) | \
+           (((u32)(x) & 0x000000FFu) << 24)))
+#else
+#define BONE_MDL_LIST(x) (x)
+#endif
+
 void func_8003DE60(s_Skeleton* skel, s32 arg1) // 0x8003DE60
 {
     s32 idx;
 
-    static s32 D_800A9ECC = 0xFE16FD13;
-    static s32 D_800A9ED0 = 0x0000FE13;
-    static s32 D_800A9ED4 = 0x0000FE14;
-    static s32 D_800A9ED8 = 0x0000FE15;
-    static s32 D_800A9EDC = 0x0000FE16;
-    static s32 D_800A9EE0 = 0x000000FE;
-    static s32 D_800A9EE4 = 0x00FE1211;
-    static s32 D_800A9EE8 = 0x0000FE11;
-    static s32 D_800A9EEC = 0x0000FE12;
+    static s32 D_800A9ECC = BONE_MDL_LIST(0xFE16FD13);
+    static s32 D_800A9ED0 = BONE_MDL_LIST(0x0000FE13);
+    static s32 D_800A9ED4 = BONE_MDL_LIST(0x0000FE14);
+    static s32 D_800A9ED8 = BONE_MDL_LIST(0x0000FE15);
+    static s32 D_800A9EDC = BONE_MDL_LIST(0x0000FE16);
+    static s32 D_800A9EE0 = BONE_MDL_LIST(0x000000FE);
+    static s32 D_800A9EE4 = BONE_MDL_LIST(0x00FE1211);
+    static s32 D_800A9EE8 = BONE_MDL_LIST(0x0000FE11);
+    static s32 D_800A9EEC = BONE_MDL_LIST(0x0000FE12);
 
     // Process first masked value.
     idx = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
@@ -1828,10 +1847,10 @@ void func_8003DF84(s_Skeleton* skel, s32 arg1) // 0x8003DF84
 {
     s32 idx;
 
-    static s32 D_800A9EF0 = 0x0000FE14;
-    static s32 D_800A9EF4 = 0x00FE1514;
-    static s32 D_800A9EF8 = 0x0000FE12;
-    static s32 D_800A9EFC = 0x00FE1312;
+    static s32 D_800A9EF0 = BONE_MDL_LIST(0x0000FE14);
+    static s32 D_800A9EF4 = BONE_MDL_LIST(0x00FE1514);
+    static s32 D_800A9EF8 = BONE_MDL_LIST(0x0000FE12);
+    static s32 D_800A9EFC = BONE_MDL_LIST(0x00FE1312);
 
     idx = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
     if (idx != 0)
@@ -1872,10 +1891,10 @@ void func_8003E08C(s_Skeleton* skel, s32 arg1) // 0x8003E08C
 {
     s32 maskedVal;
 
-    static s32 D_800A9F00 = 0x0000FE02;
-    static s32 D_800A9F04 = 0x0000FE03;
-    static s32 D_800A9F08 = 0x0000FE00;
-    static s32 D_800A9F0C = 0x00FE0100;
+    static s32 D_800A9F00 = BONE_MDL_LIST(0x0000FE02);
+    static s32 D_800A9F04 = BONE_MDL_LIST(0x0000FE03);
+    static s32 D_800A9F08 = BONE_MDL_LIST(0x0000FE00);
+    static s32 D_800A9F0C = BONE_MDL_LIST(0x00FE0100);
 
     maskedVal = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
     if (maskedVal != 0)
@@ -1916,10 +1935,10 @@ void func_8003E194(s_Skeleton* skel, s32 arg1) // 0x8003E194
 {
     s32 maskedVal;
 
-    static s32 D_800A9F10 = 0xFE03FD00;
-    static s32 D_800A9F14 = 0x0000FE00;
-    static s32 D_800A9F18 = 0x00FE0201;
-    static s32 D_800A9F1C = 0x0000FE03;
+    static s32 D_800A9F10 = BONE_MDL_LIST(0xFE03FD00);
+    static s32 D_800A9F14 = BONE_MDL_LIST(0x0000FE00);
+    static s32 D_800A9F18 = BONE_MDL_LIST(0x00FE0201);
+    static s32 D_800A9F1C = BONE_MDL_LIST(0x0000FE03);
 
     maskedVal = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
     if (maskedVal != 0)
@@ -1952,15 +1971,15 @@ void func_8003E238(s_Skeleton* skel, s32 arg1) // 0x8003E238
      * byte-walker run off the end into the neighbouring static (the invisible-
      * parasite / stacked-neck-variant bug). Byte-identical to two adjacent s32.
      * Matches the PC fix (0065c7a0f). */
-    static s32 D_800A9F20[2] = { 0x06050403, 0x000000FE };
-    static s32 D_800A9F28 = 0x0000FE03;
-    static s32 D_800A9F2C = 0x0000FE04;
-    static s32 D_800A9F30 = 0x00FE0504;
-    static s32 D_800A9F34 = 0x00FE0603;
-    static s32 D_800A9F38 = 0xFE020100;
-    static s32 D_800A9F3C = 0x0000FE00;
-    static s32 D_800A9F40 = 0x0000FE01;
-    static s32 D_800A9F44 = 0x00FE0201;
+    static s32 D_800A9F20[2] = { BONE_MDL_LIST(0x06050403), BONE_MDL_LIST(0x000000FE) };
+    static s32 D_800A9F28 = BONE_MDL_LIST(0x0000FE03);
+    static s32 D_800A9F2C = BONE_MDL_LIST(0x0000FE04);
+    static s32 D_800A9F30 = BONE_MDL_LIST(0x00FE0504);
+    static s32 D_800A9F34 = BONE_MDL_LIST(0x00FE0603);
+    static s32 D_800A9F38 = BONE_MDL_LIST(0xFE020100);
+    static s32 D_800A9F3C = BONE_MDL_LIST(0x0000FE00);
+    static s32 D_800A9F40 = BONE_MDL_LIST(0x0000FE01);
+    static s32 D_800A9F44 = BONE_MDL_LIST(0x00FE0201);
 
     maskedVal = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
     if (maskedVal != 0)
@@ -2014,8 +2033,8 @@ void func_8003E388(s_Skeleton* skel, s32 arg1) // 0x8003E388
 {
     s32 maskedVal;
 
-    static s32 D_800A9F48 = 0x0000FE05;
-    static s32 D_800A9F4C = 0x0000FE06;
+    static s32 D_800A9F48 = BONE_MDL_LIST(0x0000FE05);
+    static s32 D_800A9F4C = BONE_MDL_LIST(0x0000FE06);
 
     maskedVal = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
     if (maskedVal != 0)
@@ -2039,8 +2058,8 @@ void func_8003E414(s_Skeleton* skel, s32 arg1) // 0x8003E414
 {
     s32 maskedVal;
 
-    static s32 D_800A9F50 = 0xFE19FD11;
-    static s32 D_800A9F54 = 0xFE22FD1A;
+    static s32 D_800A9F50 = BONE_MDL_LIST(0xFE19FD11);
+    static s32 D_800A9F54 = BONE_MDL_LIST(0xFE22FD1A);
 
     maskedVal = arg1 & 0x3;
     if (maskedVal == 0)
@@ -2068,10 +2087,10 @@ void func_8003E4A0(s_Skeleton* skel, s32 arg1) // 0x8003E4A0
 
     /* 0x05040302 list continues + terminates (0xFE) in the next word — one array
      * so -O2 can't drop the terminator (Puppet Nurse back-parasite). See D_800A9F20. */
-    static s32 D_800A9F58[2] = { 0x05040302, 0x00FE0706 };
-    static s32 D_800A9F60 = 0x00FE0502;
-    static s32 D_800A9F64 = 0x00FE0603;
-    static s32 D_800A9F68 = 0x00FE0704;
+    static s32 D_800A9F58[2] = { BONE_MDL_LIST(0x05040302), BONE_MDL_LIST(0x00FE0706) };
+    static s32 D_800A9F60 = BONE_MDL_LIST(0x00FE0502);
+    static s32 D_800A9F64 = BONE_MDL_LIST(0x00FE0603);
+    static s32 D_800A9F68 = BONE_MDL_LIST(0x00FE0704);
 
     maskedVal = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
     if (maskedVal != 0)
@@ -2101,10 +2120,10 @@ void func_8003E544(s_Skeleton* skel, s32 arg1) // 0x8003E544
 
     /* 0x05040302 list continues + terminates (0xFE) in the next word — one array
      * so -O2 can't drop the terminator (Puppet Doctor back-parasite). See D_800A9F20. */
-    static s32 D_800A9F6C[2] = { 0x05040302, 0x00FE0706 };
-    static s32 D_800A9F74 = 0x00FE0502;
-    static s32 D_800A9F78 = 0x00FE0603;
-    static s32 D_800A9F7C = 0x00FE0704;
+    static s32 D_800A9F6C[2] = { BONE_MDL_LIST(0x05040302), BONE_MDL_LIST(0x00FE0706) };
+    static s32 D_800A9F74 = BONE_MDL_LIST(0x00FE0502);
+    static s32 D_800A9F78 = BONE_MDL_LIST(0x00FE0603);
+    static s32 D_800A9F7C = BONE_MDL_LIST(0x00FE0704);
 
     maskedVal = MODEL_BONE_MESH_VARIANT_IDX_GET(arg1);
     if (maskedVal == 0)
