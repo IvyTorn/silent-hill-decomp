@@ -26,6 +26,29 @@
 
 extern s_MapOverlayHdr g_MapOverlayHeader_map0_s00;
 
+/* RSP-park evidence, called across the include firewall from gpu_rdp.c's
+ * FrameBegin the moment the RSP is seen parked (~1 s in, long before the 5 s
+ * watchdog's [CRASH] hole dump): what the GAME was doing when a stray 32-bit
+ * zero landed in the command queue. Both parks logged so far had Harry
+ * standing still for seconds beforehand -- the idle-animation window -- so
+ * the field set is chosen to confirm or kill that: motion/pose state,
+ * animation, weapon and held item, map. Lives here (game side) because it
+ * needs g_SysWork. */
+void ShN64_ParkSnapshot(unsigned frame, unsigned ms)
+{
+    s_SubCharacter* p = &g_SysWork.playerWork.player;
+    SH_DBG("[RSPQ-PARK] f=%u +%ums map=%d pos=(%d,%d,%d) rotY=%d state=%d upper=%d anim=%d "
+           "weaponAtk=%d held=%d",
+           frame, ms, (int)g_SavegamePtr->mapIdx,
+           (int)p->position.vx, (int)p->position.vy, (int)p->position.vz,
+           (int)p->rotation.vy,
+           (int)g_SysWork.playerWork.extra.state,
+           (int)g_SysWork.playerWork.extra.upperBodyState,
+           (int)p->model.anim.status,
+           (int)g_SysWork.playerCombat.weaponAttack,
+           (int)g_WorldGfxWork.heldItem.itemId);
+}
+
 s_MapOverlayHdr* g_pMapOverlayHeader = &g_MapOverlayHeader_map0_s00;
 
 /* Same order as e_MapIdx / PC map_registry.c. */

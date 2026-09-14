@@ -1035,6 +1035,13 @@ void GpuNv2a_Init(void)
     SH_DBG("[GPU] rdp up: %dx%d 16bpp x2, no z (painter's order from the OT)", SCR_W, SCR_H);
 }
 
+/* RSP-park detector (evidence for the zero-command-header crash, see
+ * ShN64_RspCrashDetail). FrameEnd marks the end of each frame's command
+ * stream with a syncpoint; FrameBegin checks whether the RSP ever reached the
+ * previous one while it waits for a framebuffer. */
+static rspq_syncpoint_t   s_frameSp;
+static int                s_frameSpValid;
+
 void GpuNv2a_FrameBegin(void)
 {
     unsigned int clear;
@@ -1094,7 +1101,40 @@ void GpuNv2a_FrameBegin(void)
 
     {
         unsigned long long _t0 = get_ticks();
-        s_fb = display_get();
+        /* RSP-park detector. The recurring "RSP crash" is the rsp_queue ucode
+         * parked on a ZERO command header -- a stray 32-bit zero written into
+         * the rspq buffer by a writer not yet found -- and display_get() below
+         * then blocks on a framebuffer the RDP never releases until the 5 s
+         * watchdog fires; by then the game state around the write is gone.
+         * So poll for the framebuffer instead, and if LAST frame's end-of-
+         * stream syncpoint is still unreached after 1 s (a slow frame clears it
+         * well inside that; a parked RSP never does) take a game-state
+         * snapshot NOW, then fall through to the blocking display_get() so its
+         * watchdog still produces the [CRASH] hole dump. A wait that resolves
+         * after the snapshot is logged as such, so a merely slow frame is
+         * never mistaken for a park. */
+        extern void ShN64_ParkSnapshot(unsigned frame, unsigned ms) __attribute__((weak));
+        int parkLogged = 0;
+        s_fb = display_try_get();
+        while (s_fb == NULL)
+        {
+            unsigned ms = (unsigned)TICKS_TO_MS(get_ticks() - _t0);
+            if (!parkLogged && s_frameSpValid && ms >= 1000 && !rspq_syncpoint_check(s_frameSp))
+            {
+                parkLogged = 1;
+                SH_DBG("[RSPQ-PARK] RSP made no progress for %u ms (frame %u): last frame's syncpoint unreached",
+                       ms, (unsigned)g_Nv2aFrameCount);
+                if (ShN64_ParkSnapshot)
+                    ShN64_ParkSnapshot((unsigned)g_Nv2aFrameCount, ms);
+            }
+            if (ms >= 1500)
+                break;      /* hand the wait, and its watchdog, back to display_get */
+            s_fb = display_try_get();
+        }
+        if (s_fb == NULL)
+            s_fb = display_get();
+        else if (parkLogged)
+            SH_DBG("[RSPQ-PARK] resolved after the snapshot: a slow frame, not a park");
         s_cnWaitFbTicks = get_ticks() - _t0;
     }
 
@@ -1178,6 +1218,11 @@ void GpuNv2a_FrameEnd(void)
     }
     else
     {
+        /* Park detector: the last thing queued this frame. FrameBegin can then
+         * tell "RSP still working through a long frame" from "RSP parked on a
+         * zero header" by whether this point is ever reached. */
+        s_frameSp      = rspq_syncpoint_new();
+        s_frameSpValid = 1;
         rdpq_detach_show();
     }
     s_fb = NULL;
