@@ -446,8 +446,8 @@ void func_80045534(s_Skeleton* skel, GsOT* ot, s32 arg2, GsCOORDINATE2* boneCoor
 #ifdef SH_N64_PORT
                     /* Native character: hand the RSP this part's bone view
                      * matrix instead of running the software GTE over it. */
-                    extern int ShT3d_CharaBone(int, const short*, const int*);
-                    if (!ShT3d_CharaBone(curBone->bone.modelInfo.modelIdx,
+                    extern int ShT3d_CharaBone(int, int, const short*, const int*);
+                    if (!ShT3d_CharaBone(curBone->bone.modelInfo.modelIdx, (u8)curBone->bone.idx,
                                          (const short*)&viewMat.m[0][0], (const int*)viewMat.t))
 #endif
                     func_80057090(&curBone->bone.modelInfo, ot, arg2, &viewMat, &worldMat, arg5);
@@ -456,8 +456,8 @@ void func_80045534(s_Skeleton* skel, GsOT* ot, s32 arg2, GsCOORDINATE2* boneCoor
 #else
 #ifdef SH_N64_PORT
             {
-                extern int ShT3d_CharaBone(int, const short*, const int*);
-                if (!ShT3d_CharaBone(curBone->bone.modelInfo.modelIdx,
+                extern int ShT3d_CharaBone(int, int, const short*, const int*);
+                if (!ShT3d_CharaBone(curBone->bone.modelInfo.modelIdx, (u8)curBone->bone.idx,
                                      (const short*)&viewMat.m[0][0], (const int*)viewMat.t))
                     func_80057090(&curBone->bone.modelInfo, ot, arg2, &viewMat, &worldMat, arg5);
             }

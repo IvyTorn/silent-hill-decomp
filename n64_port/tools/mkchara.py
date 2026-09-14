@@ -108,6 +108,50 @@ def collect_parts(lm, tim_get, pieces_by_key, untex, stats):
     return instances
 
 
+def collect_weapons(paths, base_idx, tim_get, pieces_by_key, untex, instances, stats):
+    """Append each held-weapon PLM (ITEM/*.PLM: single model, material HERO) as an
+    EXTRA rigid part base_idx+k, its own buffer AND instance, verts owned by
+    itself. The runtime draws the equipped one with the right-hand bone's
+    matrix (ShT3d_CharaFlush) so the gun shares Harry's Z-buffer and matrix
+    path instead of the depth-less PSX OT it used to paint over his body from.
+    ORDER IS THE CONTRACT with t3d_world.c's slot table (knife, hammer, axe,
+    handgun, rifle, shotgun); the runtime derives the base as instCount-6."""
+    names = []
+    for k, path in enumerate(paths):
+        wlm = Lm.parse(open(path, "rb").read())
+        part_idx = base_idx + k
+        names.append(os.path.splitext(os.path.basename(path))[0].upper())
+        instances.append(_Inst())
+        for model in wlm.models:
+            for mesh in model.meshes:
+                for prim in mesh.prims:
+                    cor = prim_corner_order(prim)
+                    if len(cor) < 3:
+                        continue
+                    # A weapon PLM indexes its own mesh verts directly (voff 0,
+                    # one model). Never substitute (0,0,0) for an out-of-range
+                    # corner -- that is a spike; drop the prim instead.
+                    if any(prim.vi[c] >= len(mesh.verts) for c in cor):
+                        stats["weapon_bad_vi"] += 1
+                        continue
+                    poly = []
+                    for c in cor:
+                        x, y, z = mesh.verts[prim.vi[c]]
+                        u, v = prim.uv[c]
+                        poly.append((float(x), float(y), float(z), float(u), float(v), part_idx))
+                    key = None
+                    if prim.material_idx >= 0:
+                        mat = wlm.materials[prim.material_idx]
+                        if tim_get(mat.name) is not None:
+                            key = (mat.name, prim.clut // 64)
+                        else:
+                            stats["missing_tim"] += 1
+                    for tri in fan(poly):
+                        pc = Piece(0, part_idx, part_idx, prim.is_transparent, tri, key)
+                        (untex if key is None else pieces_by_key[key]).append(pc)
+    return names
+
+
 def _ckey(p):
     """Vertex identity for dedup: coord + uv + OWNER (two verts at the same place
     owned by different bones are DISTINCT -- different matrix)."""
@@ -220,6 +264,9 @@ def main():
     ap.add_argument("--ilm", required=True)
     ap.add_argument("--tim", required=True, help="the character's .TIM (its one material)")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--weapon", action="append", default=[],
+                    help="held-weapon ITEM/*.PLM appended as extra parts (repeatable; "
+                         "ORDER = runtime slot table: knife hammer axe handgun rifle shotgun)")
     a = ap.parse_args()
 
     name = os.path.splitext(os.path.basename(a.ilm))[0].upper()
@@ -235,6 +282,8 @@ def main():
     pieces_by_key = defaultdict(list)
     untex = []
     instances = collect_parts(lm, tim_get, pieces_by_key, untex, stats)
+    weapon_names = collect_weapons(a.weapon, len(instances), tim_get, pieces_by_key,
+                                   untex, instances, stats)
 
     tiles, pal_table = assign_tiles(pieces_by_key, tims, stats)
     payloads = bake_tiles(tiles, tims, stats)
@@ -242,7 +291,13 @@ def main():
 
     all_pieces = [pc for plist in pieces_by_key.values() for pc in plist] + untex
     stats["tris"] = len(all_pieces)
-    shw = encode_shw(_IpdShim(), len(instances), all_pieces, instances,
+    # Character SHWs carry cellX = -128 (the loader's "this is a character"
+    # check). cellZ is unused in char mode, so it carries the weapon count as
+    # -128 + N: an older 23-part bake reads N = 0 and the runtime keeps the
+    # PSX held-item path instead of mistaking body parts for weapons.
+    shim = _IpdShim()
+    shim.cell_z = -128 + len(weapon_names)
+    shw = encode_shw(shim, len(instances), all_pieces, instances,
                      buf_encoder=encode_buffer_cmds_chara)
 
     outdir = os.path.join(a.out, "N64C")
@@ -250,10 +305,11 @@ def main():
     open(os.path.join(outdir, name + ".SHW"), "wb").write(shw)
     open(os.path.join(outdir, name + ".SHT"), "wb").write(sht)
 
-    print(f"[{name}] parts={len(lm.models)} tris={stats['tris']} "
+    print(f"[{name}] parts={len(lm.models)} weapons={len(weapon_names)} "
+          f"(base={len(lm.models)}: {' '.join(weapon_names)}) tris={stats['tris']} "
           f"tiles={len(tiles)} uniqueTiles={len(payloads)} pals={len(pal_table)} "
-          f"sht={len(sht)//1024}KB shw={len(shw)//1024}KB")
-    for k in ("degenerate", "missing_tim", "unresolved"):
+          f"sht={len(sht)//1024}KB shw={len(shw)} bytes")
+    for k in ("degenerate", "missing_tim", "unresolved", "weapon_bad_vi"):
         if stats[k]:
             print(f"    {k}={stats[k]}")
 

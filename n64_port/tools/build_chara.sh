@@ -20,10 +20,26 @@ if [ ! -f "$CHARA/HERO.ILM" ]; then
     exit 1
 fi
 
+# Held weapons (ITEM/*.PLM, single model, textured from HERO.TIM) are baked INTO
+# HERO's SHW as extra parts so the equipped one draws natively with the right-
+# hand bone's matrix and Harry's Z-buffer (it used to be a depth-less PSX-OT
+# model painting over his body). THIS ORDER IS THE CONTRACT with the slot
+# table in n64_port/src/t3d_world.c (ShT3d_HeldItemNative): do not reorder.
+ITEM="${SH_ITEM_DIR:-/c/Claude/silenthill/disc_extract/ITEM}"
+WEAPONS=""
+for W in KNIFE HAMMER AXE HANDGUN RIFLE SHOTGUN; do
+    if [ -f "$ITEM/$W.PLM" ]; then
+        WEAPONS="$WEAPONS --weapon $ITEM/$W.PLM"
+    else
+        echo "ERROR: weapon PLM missing: $ITEM/$W.PLM (set SH_ITEM_DIR)" >&2
+        exit 1
+    fi
+done
+
 # name:ilm:tim  (add enemies here as mkchara gains coverage)
 for NAME in HERO; do
-    echo "=== mkchara $NAME (original ILM) ==="
-    python3 "$HERE/mkchara.py" --ilm "$CHARA/$NAME.ILM" --tim "$CHARA/$NAME.TIM" --out "$OUT"
+    echo "=== mkchara $NAME (original ILM + 6 weapons) ==="
+    python3 "$HERE/mkchara.py" --ilm "$CHARA/$NAME.ILM" --tim "$CHARA/$NAME.TIM" --out "$OUT" $WEAPONS
 done
 echo "=== chara assets in $OUT/N64C ==="
 ls -l "$OUT/N64C"

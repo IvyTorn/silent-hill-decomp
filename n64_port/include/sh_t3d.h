@@ -77,7 +77,8 @@ int ShT3d_WorldDrewThisFrame(void);
  * GsDrawOt(OT0). */
 int  ShT3d_CharaDrawBegin(int isHarry);
 void ShT3d_CharaDrawEnd(void);
-int  ShT3d_CharaBone(int partIdx, const short* m9, const int* t3);
+int  ShT3d_CharaBone(int partIdx, int boneIdx, const short* m9, const int* t3);
+int  ShT3d_HeldItemNative(int slot);
 void ShT3d_CharaFlush(void);
 
 #endif

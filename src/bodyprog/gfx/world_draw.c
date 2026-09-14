@@ -1075,6 +1075,33 @@ void WorldGfx_HeldItemDraw(void) // 0x8003D058
         return;
     }
 
+#ifdef SH_N64_PORT
+    /* The six HERO-textured weapons are baked into the native HERO.SHW and
+     * drawn by ShT3d_CharaFlush with the right-hand bone's matrix and Harry's
+     * Z-buffer. The PSX OT draw below has NO depth (pos[2]=0) and painted the
+     * gun over his body from any side; skip it when the native path takes the
+     * weapon. Slot order = mkchara --weapon order in build_chara.sh. The pipe
+     * (PIPE.TIM) and cutscene props stay on this PSX path. */
+    {
+        extern int ShT3d_HeldItemNative(int slot);
+        int slot;
+        switch (heldItem->itemId)
+        {
+            case InvItemId_KitchenKnife: slot = 0; break;
+            case InvItemId_Hammer:       slot = 1; break;
+            case InvItemId_Axe:          slot = 2; break;
+            case InvItemId_Handgun:      slot = 3; break;
+            case InvItemId_HuntingRifle: slot = 4; break;
+            case InvItemId_Shotgun:      slot = 5; break;
+            default:                     slot = -1; break;
+        }
+        if (ShT3d_HeldItemNative(slot))
+        {
+            return;
+        }
+    }
+#endif
+
     // Distinguish between left-handed and right-handed items.
     if (heldItem->itemId == InvItemId_CutscenePhone)
     {

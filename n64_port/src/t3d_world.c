@@ -156,8 +156,15 @@ static int     s_tileRam;
  * namespaces stay untouched across map changes; its parts live in a fixed
  * arena as a WChunk. Static .bss (~84KB) -- heap headroom is the constraint
  * on this machine, and these never move. */
-#define CTILE_SLOTS      22
-#define CHAR_ARENA_BYTES (40 * 1024)
+/* HERO.SHW with the six baked weapons needs 34 tiles (the guns/blades pull in
+ * HERO.TIM regions the body never touched); the loader DROPS tiles past the
+ * slot count, so 22 would silently untexture them. Static .bss (+28KB). */
+#define CTILE_SLOTS      36
+/* HERO.SHW with the six baked weapons is 37.4KB and the loader carves two
+ * matrix phases + viewRow + bufs on top; the old 40KB (sized for the 25KB
+ * body-only bake) would overflow and drop Harry to the PSX path. Static .bss,
+ * costs no heap. */
+#define CHAR_ARENA_BYTES (56 * 1024)
 static WTile     s_cTiles[CTILE_SLOTS];
 static uint8_t   s_cPool[CTILE_SLOTS][TILE_SLOT_BYTES] __attribute__((aligned(16)));
 static int       s_cTileCount;
@@ -191,6 +198,19 @@ static int       s_charDiagMode = -1;   /* auto-cycled: 0 textured, 1 flat solid
 static int       s_charPhase;       /* double-buffered part matrices */
 static uint32_t  s_charMask;        /* parts the animation wrote this frame */
 static T3DMat4FP s_charHidden;      /* collapses an unwritten part behind the eye */
+
+/* Held weapons: mkchara --weapon bakes the six HERO-textured ITEM PLMs into
+ * HERO.SHW as extra parts after the body (knife hammer axe handgun rifle
+ * shotgun -- the slot order, see build_chara.sh), each its own buffer AND
+ * instance. The equipped one is drawn by CharaFlush with the right-hand
+ * bone's matrix, so it rides Harry's Z-buffer instead of the depth-less PSX
+ * OT that used to paint the gun over his hip from any side. The count rides
+ * in the SHW header's cellZ byte (-128 + N) so an older bake reads 0. */
+#define CHAR_WEAPON_COUNT     6
+#define CHAR_RIGHT_HAND_BONE 10     /* HarryBone_RightHand: every 10RHAND* variant's bone */
+static int       s_charWeaponBase = -1;  /* first weapon part index, -1 = none baked */
+static int       s_charRHandPart  = -1;  /* the 10RHAND* part the bone loop wrote THIS frame */
+static int       s_charHeldWeapon = -1;  /* slot to draw natively this frame, -1 = none */
 
 static FILE*   s_sht;             /* area tile store, kept open */
 static char    s_shtPrefix[8];
@@ -2063,8 +2083,16 @@ static int CharaLoad(const char* name)
     }
     s_charChunk.inUse = 1;
     s_charLoaded = 1;
-    SH_DBG("[T3DC] %s resident: parts=%d groups=%d tiles=%d pals=%d",
-           name, instCount, s_charChunk.groupCount, s_cTileCount, s_cPalCount);
+    /* Weapon count rides in the header's cellZ byte (-128 + N, see mkchara);
+     * the weapons are the LAST N parts. An older bake reads N = 0. */
+    {
+        int weapons = (int)(int8_t)hdr[5] + 128;
+        s_charWeaponBase = (weapons == CHAR_WEAPON_COUNT && instCount > weapons)
+                               ? instCount - weapons : -1;
+    }
+    SH_DBG("[T3DC] %s resident: parts=%d groups=%d tiles=%d pals=%d weaponBase=%d",
+           name, instCount, s_charChunk.groupCount, s_cTileCount, s_cPalCount,
+           s_charWeaponBase);
     return 1;
 }
 
@@ -2083,6 +2111,8 @@ int ShT3d_CharaDrawBegin(int isHarry)
     s_charActive = 1;
     s_charPhase ^= 1;     /* the RSP may still replay last frame's half */
     s_charMask   = 0;
+    s_charRHandPart = -1; /* re-found by this frame's bone loop; s_charHeldWeapon was
+                           * already set by WorldGfx_HeldItemDraw earlier this frame */
     s_charDiagMode = 0;   /* always textured; config chara_debug forces flat */
     return 1;
 }
@@ -2096,7 +2126,7 @@ void ShT3d_CharaDrawEnd(void)
  * ViewMatrices of the bone coord: Q12 rotation m9 row-major, Q8 translation
  * t3) -- exactly what ComposeChunkViews derives for a world instance, so the
  * part lands where the PSX path would land it. */
-int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
+int ShT3d_CharaBone(int partIdx, int boneIdx, const short* m9, const int* t3)
 {
     WChunk*    c = &s_charChunk;
     T3DMat4    m;
@@ -2105,6 +2135,11 @@ int ShT3d_CharaBone(int partIdx, const short* m9, const int* t3)
 
     if (!s_charActive || partIdx < 0 || partIdx >= c->instCount)
         return 0;
+    /* Only the ACTIVE 10RHAND* variant reaches here (the hidden ones are
+     * skipped by the bone loop's field_0 gate), so this is the part whose
+     * matrix the held weapon must share. */
+    if (boneIdx == CHAR_RIGHT_HAND_BONE)
+        s_charRHandPart = partIdx;
     /* Scale the WHOLE transform (rotation AND translation) by 1/8 so the
      * character lands in the world's /8 view space. The world pre-divides its
      * verts by 8 at bake; the character keeps RAW verts (dividing THEM by 8
@@ -2194,6 +2229,31 @@ void ShT3d_CharaFlush(void)
         else
             memcpy(&mats[i], &s_charHidden, sizeof mats[i]);
     }
+    /* The equipped weapon (a baked extra part, see s_charWeaponBase) rides
+     * the ACTIVE right-hand variant's matrix -- the exact matrix
+     * WorldGfx_HeldItemDraw would have attached it with on the PSX path, so it
+     * lands in the hand by construction AND is Z-tested against the body.
+     * Its sort depth is recomputed from ITS OWN centroid (the barrel reaches
+     * forward of the grip) with the hand's rotation row and translation. */
+    if (s_charHeldWeapon >= 0 && s_charWeaponBase >= 0 && s_charRHandPart >= 0)
+    {
+        int wb = s_charWeaponBase + s_charHeldWeapon;
+        if (wb < c->instCount && wb < 32 && !(s_charMask & (1u << wb)))
+        {
+            const float*   rr = &c->viewRow[s_charRHandPart * 4];
+            const int16_t* ch = s_charPartCent[s_charRHandPart];
+            const int16_t* cw = s_charPartCent[wb];
+            float tz = rr[3] - ((float)ch[0] * rr[0] + (float)ch[1] * rr[1] + (float)ch[2] * rr[2]);
+            memcpy(&mats[wb], &mats[s_charRHandPart], sizeof mats[wb]);
+            c->viewRow[wb * 4 + 0] = rr[0];
+            c->viewRow[wb * 4 + 1] = rr[1];
+            c->viewRow[wb * 4 + 2] = rr[2];
+            c->viewRow[wb * 4 + 3] = (float)cw[0] * rr[0] + (float)cw[1] * rr[1] +
+                                     (float)cw[2] * rr[2] + tz;
+            s_charMask |= 1u << wb;
+            drawn++;
+        }
+    }
     data_cache_hit_writeback(mats, sizeof(T3DMat4FP) * c->instCount);
 
     {
@@ -2276,6 +2336,27 @@ void ShT3d_CharaFlush(void)
         GpuNv2a_PsxModeInvalidate();
     }
     if ((s_census++ & 127) == 0)
-        SH_DBG("[T3DC] native chara: parts=%d/%d groups=%d", drawn, c->instCount, c->groupCount);
+        SH_DBG("[T3DC] native chara: parts=%d/%d groups=%d weapon=%d", drawn, c->instCount,
+               c->groupCount, s_charHeldWeapon);
     s_charMask = 0;
+    s_charHeldWeapon = -1;   /* re-armed by next frame's WorldGfx_HeldItemDraw */
+}
+
+/* Called from WorldGfx_HeldItemDraw (N64) BEFORE its PSX per-prim draw with the
+ * slot of the equipped HERO-textured weapon (mkchara --weapon order: knife
+ * hammer axe handgun rifle shotgun), -1 for anything else (pipe, cutscene
+ * props). Returns 1 when the native character will draw it this frame, so the
+ * caller skips the depth-less PSX draw and the weapon is not painted twice.
+ * Runs before ShT3d_CharaDrawBegin in the same frame, so it gates on the
+ * resident asset rather than s_charActive; the first frame after a fresh
+ * CharaLoad falls back to PSX once. */
+int ShT3d_HeldItemNative(int slot)
+{
+    extern int GpuNv2a_NativeCharaEnabled(void);
+    s_charHeldWeapon = -1;
+    if (slot < 0 || slot >= CHAR_WEAPON_COUNT || s_charWeaponBase < 0 ||
+        !s_charLoaded || !GpuNv2a_NativeCharaEnabled() || !ShT3d_Ready())
+        return 0;
+    s_charHeldWeapon = slot;
+    return 1;
 }
