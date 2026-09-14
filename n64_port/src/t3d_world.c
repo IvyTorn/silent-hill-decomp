@@ -2245,6 +2245,17 @@ void ShT3d_CharaFlush(void)
         {
             const T3DVertPacked* bverts;
             b = order[oi];
+            /* Skip parts the animation did NOT write this frame (not in the
+             * mask). Their matrix is s_charHidden (collapsed behind the eye),
+             * but a part's prims can reference SEAM verts owned by a DIFFERENT,
+             * visible bone (e.g. the hidden empty-hand 10RHAND welds to the
+             * visible forearm 09RZEN): those seam verts stay put while the
+             * part's own verts collapse, stretching a triangle across the whole
+             * screen (the "spike from his hand"). A huge/degenerate tri also
+             * risks overrunning the RDP command buffer -> the RSP crash. Drawing
+             * a hidden part is pointless anyway (it is collapsed), so skip it. */
+            if (!(s_charMask & (1u << b)))
+                continue;
             bverts = c->verts + c->bufs[b].vbase / 2;
             if (c->bufs[b].opaWords > 1)
                 RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
