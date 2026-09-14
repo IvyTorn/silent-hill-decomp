@@ -335,6 +335,68 @@ def collect_cell(ipd, cellno, tim_get, pieces_by_key, untex, stats, glb_lm=None,
     return instances
 
 
+class _ObjInst:
+    """Placeholder instance for an un-instanced LM model baked as a world OBJECT:
+    the runtime overwrites its matrix every frame with the object's own view
+    matrix (ShT3d_WorldObjectDraw), so what is baked here is never used."""
+    __slots__ = ("rot", "trans")
+    def __init__(self):
+        self.rot = [[4096, 0, 0], [0, 4096, 0], [0, 0, 4096]]
+        self.trans = [0, 0, 0]
+
+
+def collect_objects(ipd, cellno, base_buf, instances, tim_get, pieces_by_key,
+                    untex, stats):
+    """Bake the cell's UN-instanced local LM models -- the *_HID / *_HIDE item
+    pickups (SHOTGUN_, ITEM_HID, KEY_HIDE, MAP_HIDE...) that game logic places
+    at runtime as world objects, which collect_cell never sees because no IPD
+    instance references them -- as extra buffers base_buf+k, each with a
+    placeholder instance. Drawn natively they share the world's Z-buffer, so
+    an ammo box sits ON the counter instead of being painted over everything
+    by the depth-less PSX OT. Returns the 8-char names in buffer order; main()
+    writes them into the OBJ1 trailer the runtime finds them by. Measured on
+    the reception cells: at most one or two such models, <= 68 tris each."""
+    lm = ipd.lm
+    inst_names = set()
+    for buf in ipd.model_buffers:
+        for inst in buf.instances:
+            info = ipd.model_infos[inst.model_info_idx]
+            if not info.is_global_plm:
+                inst_names.add(info.name)
+    names = []
+    for model in lm.models:
+        if model.name in inst_names:
+            continue
+        buf_idx  = base_buf + len(names)
+        inst_idx = len(instances)
+        instances.append(_ObjInst())
+        names.append(model.name)
+        for mesh in model.meshes:
+            for prim in mesh.prims:
+                corners = prim_corner_order(prim)
+                if len(corners) < 3:
+                    stats["degenerate"] += 1
+                    continue
+                poly = []
+                for c in corners:
+                    vi = prim.vi[c]
+                    x, y, z = mesh.verts[vi] if vi < len(mesh.verts) else (0, 0, 0)
+                    u, v = prim.uv[c]
+                    poly.append((float(x), float(y), float(z), float(u), float(v)))
+                key = None
+                if prim.material_idx >= 0:
+                    mat = lm.materials[prim.material_idx]
+                    if tim_get(mat.name) is not None:
+                        key = (mat.name, prim.clut // 64)
+                    else:
+                        stats["missing_tim"] += 1
+                for tri in fan(poly):
+                    pc = Piece(cellno, buf_idx, inst_idx, prim.is_transparent, tri, key)
+                    (untex if key is None else pieces_by_key[key]).append(pc)
+        stats["objects_baked"] += 1
+    return names
+
+
 def prim_corner_order(prim):
     seen, out = set(), []
     for c in PERIM:
@@ -587,7 +649,9 @@ def main():
             ipd = Ipd.parse(open(os.path.join(a.ipd_dir, fn), "rb").read())
             instances = collect_cell(ipd, ci, tim_get, pieces_by_key, untex, stats,
                                      glb_lm=glb_lm, plm_names=plm_names)
-            parsed.append((fn, ipd, instances))
+            obj_names = collect_objects(ipd, ci, len(ipd.model_buffers), instances,
+                                        tim_get, pieces_by_key, untex, stats)
+            parsed.append((fn, ipd, instances, obj_names))
 
         tiles, pal_table = assign_tiles(pieces_by_key, tims, stats)
         payloads = bake_tiles(tiles, tims, stats)
@@ -605,9 +669,21 @@ def main():
             stats["tris"] += 1
 
         shw_total = 0
-        for ci, (fn, ipd, instances) in enumerate(parsed):
-            shw = encode_shw(ipd, len(ipd.model_buffers), per_cell.get(ci, []),
-                             instances)
+        for ci, (fn, ipd, instances, obj_names) in enumerate(parsed):
+            shw = encode_shw(ipd, len(ipd.model_buffers) + len(obj_names),
+                             per_cell.get(ci, []), instances)
+            if obj_names:
+                # OBJ1 trailer: the LAST len(obj_names) buffers/instances are
+                # world objects; their 8-char names follow the SHW body and the
+                # 12-byte trailer (magic, count, pad, namesOff) closes the file.
+                # A trailer instead of a header field keeps SHW1 byte-identical
+                # for the loader; an old file simply has no trailer.
+                names_off = len(shw)
+                blob = bytearray()
+                for nm in obj_names:
+                    raw = nm.encode("ascii", "replace")[:8]
+                    blob += raw + b"\x00" * (8 - len(raw))
+                shw = shw + bytes(blob) + struct.pack(">4sHHI", b"OBJ1", len(obj_names), 0, names_off)
             name = os.path.splitext(fn)[0].upper() + ".SHW"
             open(os.path.join(outdir, name), "wb").write(shw)
             shw_total += len(shw)

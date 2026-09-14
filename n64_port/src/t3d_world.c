@@ -62,7 +62,12 @@
  * fragments the rest, which first starved these allocations and then crashed
  * libdragon mid-block-recording (rspq_next_buffer memsets an unchecked
  * malloc). The arena caps what a cell may need; bigger cells stay PSX. */
-#define WCHUNK_ARENA_BYTES (80 * 1024)  /* 60K held 45/58 DECIMATED ER cells
+/* 84K (was 80K): with its baked pickup object (SHOTGUN_) the reception cell
+ * ERFE00 needs 80,688 B of hard carve; at 80K only 1.2K remained and its 191
+ * group AABBs (2.3K, soft) no longer fit -> "background-only", losing the
+ * foreground pass that occludes Harry behind the counter. Funded by trimming
+ * the over-provisioned character arena (56K -> 48K for a 42K need). */
+#define WCHUNK_ARENA_BYTES (84 * 1024)  /* 60K held 45/58 DECIMATED ER cells
                                          * but only 28 of the ORIGINAL bake
                                          * (the reception itself is 67.7K +
                                          * group centroids); 80K holds 43,
@@ -113,12 +118,20 @@ typedef struct
     uint16_t pad;
 } WBuf;
 
+/* Un-instanced LM models baked as world OBJECTS (mkworld OBJ1 trailer): the
+ * *_HID item pickups game logic places at runtime. Measured <= 2 per cell. */
+#define WOBJ_PER_CHUNK 8
+
 typedef struct
 {
     int            cellX, cellZ;
     int            inUse;
     int            bufCount;
     int            instCount;
+    /* World objects: the LAST objCount buffers/instances, found by name at
+     * draw time (ShT3d_WorldObjectDraw). 0 when the SHW has no trailer. */
+    int            objCount, objBufBase, objInstBase;
+    char           objNames[WOBJ_PER_CHUNK][8];
     WBuf*          bufs;       /* -> own arena slot */
     T3DVertPacked* verts;      /* -> own arena slot, cache-written-back */
     T3DMat4FP*     mats;       /* -> arena: 2 x instCount, composed PER FRAME
@@ -160,11 +173,13 @@ static int     s_tileRam;
  * HERO.TIM regions the body never touched); the loader DROPS tiles past the
  * slot count, so 22 would silently untexture them. Static .bss (+28KB). */
 #define CTILE_SLOTS      36
-/* HERO.SHW with the six baked weapons is 37.4KB and the loader carves two
- * matrix phases + viewRow + bufs on top; the old 40KB (sized for the 25KB
- * body-only bake) would overflow and drop Harry to the PSX path. Static .bss,
- * costs no heap. */
-#define CHAR_ARENA_BYTES (56 * 1024)
+/* HERO.SHW with the six baked weapons is 37.4KB; the loader's hard carve
+ * (verts + 2 matrix phases + viewRow + bufs + cmds) measures 41,488 B, plus
+ * ~1.5K of soft group AABBs -> ~42K. The old 40K (sized for the 25K body-only
+ * bake) would overflow and drop Harry to the PSX path; 48K leaves 6K. Static
+ * .bss, costs no heap -- the 8K trimmed from an earlier 56K funds the world
+ * chunk arena's 84K. */
+#define CHAR_ARENA_BYTES (48 * 1024)
 static WTile     s_cTiles[CTILE_SLOTS];
 static uint8_t   s_cPool[CTILE_SLOTS][TILE_SLOT_BYTES] __attribute__((aligned(16)));
 static int       s_cTileCount;
@@ -1053,6 +1068,29 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         c->bufCount = 0;
         ChunkFree(c);
         return;
+    }
+    /* Optional OBJ1 trailer (mkworld collect_objects): the LAST objCount
+     * buffers/instances are the cell's un-instanced LM models -- the *_HID
+     * item pickups game logic places at runtime -- with an 8-char name each.
+     * A file without the trailer (older bake) simply has no objects and those
+     * pickups stay on the PSX path. */
+    {
+        uint8_t tr[12];
+        c->objCount = 0;
+        if (fseek(f, -12, SEEK_END) == 0 && fread(tr, 1, 12, f) == 12 &&
+            rd32(tr) == 0x4F424A31u /* 'OBJ1' */)
+        {
+            int      n        = rd16(tr + 4);
+            uint32_t namesOff = rd32(tr + 8);
+            if (n > 0 && n <= WOBJ_PER_CHUNK && n <= bufCount && n <= instCount &&
+                fseek(f, (long)namesOff, SEEK_SET) == 0 &&
+                fread(c->objNames, 1, 8 * n, f) == (size_t)(8 * n))
+            {
+                c->objCount    = n;
+                c->objBufBase  = bufCount - n;
+                c->objInstBase = instCount - n;
+            }
+        }
     }
     /* First composition immediately (this frame's WorldViewSet has
      * already run); every later frame recomposes in WorldViewSet. */
@@ -2370,4 +2408,133 @@ int ShT3d_HeldItemNative(int slot)
         return 0;
     s_charHeldWeapon = slot;
     return 1;
+}
+
+/* ---------------------------------------------------------- world objects */
+/* The cell's un-instanced LM models (mkworld OBJ1 trailer: the *_HID item
+ * pickups game logic places at runtime) are baked as extra buffers with a
+ * placeholder instance each. Gfx_WorldObjectDraw offers every object's NAME
+ * and view matrix here; a match in its own chunk is recorded and drawn by
+ * ShT3d_WorldObjectsFlush with the world's Z-buffer, so an ammo box sits ON
+ * the counter and is occluded like any wall -- instead of being painted over
+ * everything by the depth-less PSX OT (the "pickups float / shift with the
+ * camera"). Anything unmatched stays on the PSX path. */
+#define WOBJ_MAX 29     /* WORLD_OBJECT_COUNT_MAX */
+typedef struct { WChunk* c; int buf, inst; short m9[9]; int t3[3]; } WObjRec;
+static WObjRec s_wobj[WOBJ_MAX];
+static int     s_wobjCount;
+
+/* 8-char LM names, NUL- or space-padded on either side. */
+static int NameEq8(const char* a, const char* b)
+{
+    int i;
+    for (i = 0; i < 8; i++)
+    {
+        char x = (a[i] == ' ') ? 0 : a[i];
+        char y = (b[i] == ' ') ? 0 : b[i];
+        if (x != y)
+            return 0;
+        if (x == 0)
+            return 1;
+    }
+    return 1;
+}
+
+int ShT3d_WorldObjectDraw(const char* name8, int cellX, int cellZ, const short* m9, const int* t3)
+{
+    int pass, i, k;
+    if (!s_haveView || !ShT3d_Ready() || s_wobjCount >= WOBJ_MAX)
+        return 0;
+    /* Own chunk first (a name like ITEM_HID repeats across cells); any
+     * resident chunk as a fallback so a cell-coordinate mismatch degrades to
+     * "first match" rather than back to the PSX path. */
+    for (pass = 0; pass < 2; pass++)
+        for (i = 0; i < MAX_WCHUNKS; i++)
+        {
+            WChunk* c = &s_chunks[i];
+            if (!c->inUse || c->objCount == 0)
+                continue;
+            if (pass == 0 && (c->cellX != cellX || c->cellZ != cellZ))
+                continue;
+            for (k = 0; k < c->objCount; k++)
+                if (NameEq8(c->objNames[k], name8))
+                {
+                    WObjRec* r = &s_wobj[s_wobjCount++];
+                    r->c    = c;
+                    r->buf  = c->objBufBase + k;
+                    r->inst = c->objInstBase + k;
+                    memcpy(r->m9, m9, sizeof r->m9);
+                    memcpy(r->t3, t3, sizeof r->t3);
+                    return 1;
+                }
+        }
+    return 0;
+}
+
+/* Drawn right after the character (game_main), Z-tested against the
+ * background world and before the foreground pass. */
+void ShT3d_WorldObjectsFlush(void)
+{
+    int i, r, cc, drawn = 0;
+    static int s_census;
+
+    if (s_wobjCount == 0)
+        return;
+    if (!s_haveView || !ShT3d_Ready())
+    {
+        s_wobjCount = 0;
+        return;
+    }
+    WorldFrameStart();      /* world lights, cull, Z mode and draw flags */
+    for (i = 0; i < s_wobjCount; i++)
+    {
+        WObjRec*   o    = &s_wobj[i];
+        WChunk*    c    = o->c;
+        T3DMat4FP* mats = c->mats + s_matPhase * c->instCount;
+        T3DMat4    m;
+        const T3DVertPacked* bverts;
+
+        if (!c->inUse || o->buf >= c->bufCount || o->inst >= c->instCount)
+            continue;
+        /* ComposeChunkViews' convention: world verts are /8, so the rotation
+         * stays Q12 and only the translation scales. The placeholder matrix
+         * that compose wrote this frame is overwritten here, before use. */
+        memset(&m, 0, sizeof m);
+        for (r = 0; r < 3; r++)
+            for (cc = 0; cc < 3; cc++)
+                m.m[cc][r] = (float)o->m9[r * 3 + cc] / 4096.0f;
+        m.m[3][0] = (float)o->t3[0] / 8.0f;
+        m.m[3][1] = (float)o->t3[1] / 8.0f;
+        m.m[3][2] = (float)o->t3[2] / 8.0f;
+        m.m[3][3] = 1.0f;
+        t3d_mat4_to_fixed(&mats[o->inst], &m);
+        data_cache_hit_writeback(&mats[o->inst], sizeof mats[o->inst]);
+        c->viewRow[o->inst * 4 + 0] = (float)o->m9[6] / 4096.0f;
+        c->viewRow[o->inst * 4 + 1] = (float)o->m9[7] / 4096.0f;
+        c->viewRow[o->inst * 4 + 2] = (float)o->m9[8] / 4096.0f;
+        c->viewRow[o->inst * 4 + 3] = (float)o->t3[2] / 8.0f;
+
+        bverts = c->verts + c->bufs[o->buf].vbase / 2;
+        if (c->bufs[o->buf].opaWords > 1)
+            RunPass(c->cmds + c->bufs[o->buf].opaOff, c->bufs[o->buf].opaWords, bverts,
+                    mats, NULL, c->viewRow, 0, 0, 0, BindWorldTile, 1);
+        if (c->bufs[o->buf].semiWords > 1)
+        {
+            rdpq_mode_zbuf(true, false);
+            RunPass(c->cmds + c->bufs[o->buf].semiOff, c->bufs[o->buf].semiWords, bverts,
+                    mats, NULL, c->viewRow, 0, 0, 1, BindWorldTile, 1);
+            rdpq_mode_zbuf(s_zActive, s_zActive);
+        }
+        drawn++;
+    }
+    /* Same fence as CharaFlush: the PSX walk's next mode change is auto-
+     * synced only against rdpq's own prims, never our t3d triangles. */
+    rdpq_sync_pipe();
+    {
+        extern void GpuNv2a_PsxModeInvalidate(void);
+        GpuNv2a_PsxModeInvalidate();
+    }
+    if ((s_census++ & 127) == 0)
+        SH_DBG("[T3DWO] native world objects: %d/%d drawn", drawn, s_wobjCount);
+    s_wobjCount = 0;
 }

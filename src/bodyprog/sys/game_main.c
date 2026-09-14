@@ -3439,6 +3439,10 @@ void MainLoop(void) // 0x80032EE0
          * occludes him. OT0 effects meant to sit IN FRONT of Harry now draw
          * behind him -- a depth refinement for later; visibility first. */
         { extern void ShT3d_CharaFlush(void); ShT3d_CharaFlush(); }
+        /* Native world objects (the *_HID item pickups) composite with the
+         * character: Z-tested against the background world, ahead of the
+         * foreground pass, in place of their depth-less OT0 prims. */
+        { extern void ShT3d_WorldObjectsFlush(void); ShT3d_WorldObjectsFlush(); }
         /* Foreground native world: instances NEARER the camera than the player,
          * drawn after the character OT (OT0) and before the 2D UI (OT2). A
          * pillar or counter the player walks behind now occludes him -- the

@@ -79,6 +79,10 @@ int  ShT3d_CharaDrawBegin(int isHarry);
 void ShT3d_CharaDrawEnd(void);
 int  ShT3d_CharaBone(int partIdx, int boneIdx, const short* m9, const int* t3);
 int  ShT3d_HeldItemNative(int slot);
+/* World objects (un-instanced LM pickups baked by mkworld): offer name +
+ * view matrix; 1 = native will draw it this frame (skip the PSX draw). */
+int  ShT3d_WorldObjectDraw(const char* name8, int cellX, int cellZ, const short* m9, const int* t3);
+void ShT3d_WorldObjectsFlush(void);
 void ShT3d_CharaFlush(void);
 
 #endif

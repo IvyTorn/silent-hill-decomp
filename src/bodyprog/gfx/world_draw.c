@@ -738,6 +738,33 @@ void Gfx_WorldObjectDraw(s_WorldObject* obj) // 0x8003CBA4
     Math_RotMatrixZxyNeg(&rot, &coord.coord);
     Vw_CoordToWorldAndViewMatrices(&coord, &mats[1], &mats[0]);
 
+#ifdef SH_N64_PORT
+    /* Native world objects: mkworld bakes each cell's UN-instanced LM models
+     * (the *_HID pickups game logic places at runtime) as name-keyed extra
+     * buffers; ShT3d_WorldObjectDraw draws a match with THIS view matrix and
+     * the world Z-buffer, so an ammo box sits ON the counter instead of being
+     * painted over it by the depth-less PSX OT (the "pickups float / shift
+     * with the camera"). Keyed to the object's own chunk (lmIdx 3..6) so a
+     * name shared by two resident cells resolves to the right one; the global
+     * pool (lmIdx 2) and anything unmatched stay on the PSX path below. */
+    {
+        extern int ShT3d_WorldObjectDraw(const char*, int, int, const short*, const int*);
+        extern s_MapTerrain g_Map;
+        if (obj->model != NULL)
+        {
+            s8 lm = obj->model->metadata.lmIdx;
+            if (lm >= 3 && lm < 7 &&
+                ShT3d_WorldObjectDraw(obj->model->metadata.name.str,
+                                      g_Map.activeChunks[lm - 3].cellX,
+                                      g_Map.activeChunks[lm - 3].cellZ,
+                                      (const short*)&mats[0].m[0][0], (const int*)mats[0].t))
+            {
+                return;
+            }
+        }
+    }
+#endif
+
     func_8003CC7C(obj->model, &mats[0], &mats[1]);
 }
 
