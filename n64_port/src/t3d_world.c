@@ -1543,7 +1543,18 @@ static void WorldFrameStart(void)
          * native counter -- collision was never wrong, the picture was).
          * gofx/gofy are the game's geometry offset DELTA (0,0 in-game). */
         {
-            float nearP = 4.0f, farP = 50000.0f;
+            /* nearP sets the Z-buffer's resolution: 16-bit hyperbolic depth
+             * resolves dz ~= z^2 / (65536 * nearP). The reception's wall
+             * decals (posters, framed maps, signs) sit 12..63 Q8 = 1.5..8 t3d
+             * units in front of their wall (measured over ERFE00/ERFF00;
+             * the exact-coplanar hits are a wall's own tessellation, not
+             * decals). At the ~1450-unit camera distance nearP=4 resolved
+             * only ~8 t3d units, so every decal under 64 Q8 Z-fought its
+             * wall (the flicker). 32 resolves ~1 t3d unit = 8 Q8, separating
+             * the whole band, and only clips geometry closer than ~6.6 cm
+             * to the camera, which SH1's fixed cameras never are. Depth rows
+             * only -- screen X/Y come from h/ofx and do not move. */
+            float nearP = 32.0f, farP = 50000.0f;
             float oX, oY, sX, sY;
             int   cX;
             T3DMat4 proj;
