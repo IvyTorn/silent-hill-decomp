@@ -9928,7 +9928,7 @@ void func_8007D090(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINATE2* 
 
                 // Apply flex rotation to torso and arms.
                 func_80044F14(&coords[HarryBone_Torso], Q12_ANGLE(0.0f), g_Player_FlexRotationX >> 1, g_Player_FlexRotationY);
-#if defined(SH_PC_PORT) && !defined(SH_N64_PORT)
+#ifdef SH_PC_PORT
                 /* COMPOSE the upper-arm elevation onto the animated arm pose rather
                  * than OVERWRITING it. Math_RotMatrixZ replaces the bone's whole
                  * local rotation with a pure Z-rotation; on PSX the upper-arm's
@@ -9940,12 +9940,13 @@ void func_8007D090(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINATE2* 
                  * reduces to it when rotX=rotY=0) but MulMatrix-composes it,
                  * preserving the anim's gun-forward pose and adding the elevation.
                  *
-                 * N64 is EXCLUDED: it plays the ORIGINAL PSX ANM data (byte-swapped,
-                 * not reformatted), where the overwrite is the faithful behaviour.
-                 * Composing there double-applies the aim elevation -- the aim anim
-                 * raises the arm AND flex elevates it again -- so the raised handgun
-                 * landed in the wrong place while the lowered gun (flex -> 0) was
-                 * correct. */
+                 * N64 INCLUDED (2026-09-14): it was briefly excluded on the theory
+                 * that its byte-swapped ORIGINAL ANM data keeps the upper arm at
+                 * ~identity -- one hardware run T-posed Harry every frame, the exact
+                 * failure described above, so the N64 data carries the pose on the
+                 * upper arm too and must compose. The "raised handgun in the wrong
+                 * place" that motivated the exclusion was the separate depth-less
+                 * PSX-path held-item draw, since replaced by the native weapon. */
                 func_80044F14(&coords[HarryBone_LeftUpperArm],  g_Player_FlexRotationX >> 1, Q12_ANGLE(0.0f), Q12_ANGLE(0.0f));
                 func_80044F14(&coords[HarryBone_RightUpperArm], g_Player_FlexRotationX >> 1, Q12_ANGLE(0.0f), Q12_ANGLE(0.0f));
 #else
@@ -10037,11 +10038,11 @@ void func_8007D090(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINATE2* 
 
             // Apply flex rotation to torso and arms.
             func_80044F14(&coords[HarryBone_Torso], Q12_ANGLE(0.0f), g_Player_FlexRotationX >> 1, g_Player_FlexRotationY);
-#if defined(SH_PC_PORT) && !defined(SH_N64_PORT)
+#ifdef SH_PC_PORT
             /* Compose (not overwrite) the upper-arm rotation -- see the Combat case
              * above. Here flex decays to 0 in the None state, so this is a no-op on
-             * the arms while walking; overwriting would T-pose them every frame.
-             * N64 excluded (original ANM data): see the Combat case. */
+             * the arms while walking; overwriting would T-pose them every frame
+             * (confirmed on N64 hardware 2026-09-14 when it was briefly excluded). */
             func_80044F14(&coords[HarryBone_LeftUpperArm],  g_Player_FlexRotationX >> 1, Q12_ANGLE(0.0f), Q12_ANGLE(0.0f));
             func_80044F14(&coords[HarryBone_RightUpperArm], g_Player_FlexRotationX >> 1, Q12_ANGLE(0.0f), Q12_ANGLE(0.0f));
 #else

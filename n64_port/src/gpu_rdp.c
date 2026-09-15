@@ -1115,10 +1115,20 @@ void GpuNv2a_FrameBegin(void)
          * never mistaken for a park. */
         extern void ShN64_ParkSnapshot(unsigned frame, unsigned ms) __attribute__((weak));
         int parkLogged = 0;
+        /* 32-bit COUNT register, NOT get_ticks(): the 64-bit get_ticks() is a
+         * software extension that is not interrupt-safe -- a timer interrupt
+         * between its read and its `last` update makes the caller see a false
+         * wrap and PERMANENTLY adds 2^32 to the shared tick base. Polled
+         * thousands of times per frame from this loop it did exactly that
+         * (every [RSPQ-PARK] read "+91.6 s" = 2^32/46875), which both faked
+         * the parks and skewed every 64-bit tick consumer for the rest of the
+         * run. TICKS_SINCE is the documented idiom for short intervals:
+         * register-only, wrap-safe below ~45 s. */
+        uint32_t t0_32 = TICKS_READ();
         s_fb = display_try_get();
         while (s_fb == NULL)
         {
-            unsigned ms = (unsigned)TICKS_TO_MS(get_ticks() - _t0);
+            unsigned ms = (unsigned)(TICKS_SINCE(t0_32) / (TICKS_PER_SECOND / 1000));
             if (!parkLogged && s_frameSpValid && ms >= 1000 && !rspq_syncpoint_check(s_frameSp))
             {
                 parkLogged = 1;
