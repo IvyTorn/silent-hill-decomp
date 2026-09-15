@@ -3053,10 +3053,20 @@ void MainLoop(void) // 0x80032EE0
                 g_SysWork.sysState == SysState_Gameplay &&
                 !g_PcPickupItemActive)
             {
+#ifndef SH_N64_PORT
+                /* PC framing correction only. On N64 the world is drawn
+                 * natively (t3d_world.c) against the ORIGINAL (0,0) geometry
+                 * offset, while item pickups, wall billboards and enemies still
+                 * go through the GTE: shifting the GTE centre here moved every
+                 * one of them ~20 PSX units against the native world whenever a
+                 * fixed-angle camera zone was active -- the "ammo sits above or
+                 * below the counter depending on the camera" / posters changing
+                 * position. Base game = no shift. */
                 if (g_PsxFixedCamActive && !g_PsxCutsceneActive && !g_DebugThirdPersonCam)
                 {
                     ofy = (s32)g_PsxWorldVShift;
                 }
+#endif
                 s_heldWorldOfy = ofy;
             }
             else if (g_GameWork.gameState == GameState_InGame &&
