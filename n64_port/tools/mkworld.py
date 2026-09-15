@@ -397,6 +397,49 @@ def collect_objects(ipd, cellno, base_buf, instances, tim_get, pieces_by_key,
     return names
 
 
+class _ItemShim:
+    """Header identity of the objects-only item pseudo-cell: cellX = cellZ = -127
+    (a real cell is never -127; the runtime keys lmIdx-2 objects to it)."""
+    cell_x = -127
+    cell_z = -127
+
+
+def collect_item_models(lm, cellno, tim_get, pieces_by_key, untex, instances, stats):
+    """Bake EVERY model of the shared item LM (BG/BG_ITEM.PLM: AIDKIT_N, AMPULE_N,
+    BULLET_N, DRINK_NE, PAD_NEAR, SHELL_NE, SHOT_NEA -- 69 tris) as its own buffer
+    + placeholder instance, so the global-pool (lmIdx 2) world objects -- the
+    ammo box on the counter -- draw natively with Z like the cell-local pickups.
+    Their tiles join the AREA's SHT (same tile pass), so one bake per area."""
+    names = []
+    for k, model in enumerate(lm.models):
+        instances.append(_ObjInst())
+        names.append(model.name)
+        for mesh in model.meshes:
+            for prim in mesh.prims:
+                corners = prim_corner_order(prim)
+                if len(corners) < 3:
+                    stats["degenerate"] += 1
+                    continue
+                poly = []
+                for c in corners:
+                    vi = prim.vi[c]
+                    x, y, z = mesh.verts[vi] if vi < len(mesh.verts) else (0, 0, 0)
+                    u, v = prim.uv[c]
+                    poly.append((float(x), float(y), float(z), float(u), float(v)))
+                key = None
+                if prim.material_idx >= 0:
+                    mat = lm.materials[prim.material_idx]
+                    if tim_get(mat.name) is not None:
+                        key = (mat.name, prim.clut // 64)
+                    else:
+                        stats["missing_tim"] += 1
+                for tri in fan(poly):
+                    pc = Piece(cellno, k, k, prim.is_transparent, tri, key)
+                    (untex if key is None else pieces_by_key[key]).append(pc)
+        stats["items_baked"] += 1
+    return names
+
+
 def prim_corner_order(prim):
     seen, out = set(), []
     for c in PERIM:
@@ -610,7 +653,13 @@ def encode_sht(payloads, pal_table):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ipd-dir", required=True)
-    ap.add_argument("--tim-dir", required=True)
+    ap.add_argument("--tim-dir", required=True, action="append",
+                    help="texture dir(s), searched in order (repeatable: the shared "
+                         "item models texture from TIM/BG_ETC.TIM, not the area dir)")
+    ap.add_argument("--items", default=None,
+                    help="BG/BG_ITEM.PLM: bake the shared item-pickup models (ammo, health, "
+                         "shells...) as an objects-only <PREFIX>ITEM.SHW pseudo-cell so "
+                         "global-pool (lmIdx 2) world objects draw natively with Z")
     ap.add_argument("--out", required=True)
     ap.add_argument("--glb", default=None,
                     help="area *_GLB.PLM: resolve+bake global-PLM instances "
@@ -632,11 +681,13 @@ def main():
 
         def tim_get(name):
             if name not in tims:
-                path = os.path.join(a.tim_dir, name + ".TIM")
-                if os.path.exists(path):
-                    tims[name] = Tim.parse(open(path, "rb").read())
-                else:
-                    tims[name] = None
+                tims[name] = None
+                for d in a.tim_dir:
+                    path = os.path.join(d, name + ".TIM")
+                    if os.path.exists(path):
+                        tims[name] = Tim.parse(open(path, "rb").read())
+                        break
+                if tims[name] is None:
                     missing.add(name)
             return tims[name]
 
@@ -651,7 +702,17 @@ def main():
                                      glb_lm=glb_lm, plm_names=plm_names)
             obj_names = collect_objects(ipd, ci, len(ipd.model_buffers), instances,
                                         tim_get, pieces_by_key, untex, stats)
-            parsed.append((fn, ipd, instances, obj_names))
+            parsed.append((fn, ipd, len(ipd.model_buffers) + len(obj_names),
+                           instances, obj_names))
+
+        # Shared item-pickup models as an objects-only pseudo-cell (its own
+        # SHW, tiles in this area's SHT). Written as <PREFIX>ITEM.SHW.
+        if a.items:
+            item_lm  = Lm.parse(open(a.items, "rb").read())
+            item_ins = []
+            item_nms = collect_item_models(item_lm, len(cells), tim_get, pieces_by_key,
+                                           untex, item_ins, stats)
+            parsed.append((prefix + "ITEM", _ItemShim(), len(item_nms), item_ins, item_nms))
 
         tiles, pal_table = assign_tiles(pieces_by_key, tims, stats)
         payloads = bake_tiles(tiles, tims, stats)
@@ -669,9 +730,8 @@ def main():
             stats["tris"] += 1
 
         shw_total = 0
-        for ci, (fn, ipd, instances, obj_names) in enumerate(parsed):
-            shw = encode_shw(ipd, len(ipd.model_buffers) + len(obj_names),
-                             per_cell.get(ci, []), instances)
+        for ci, (fn, ipd, buffer_count, instances, obj_names) in enumerate(parsed):
+            shw = encode_shw(ipd, buffer_count, per_cell.get(ci, []), instances)
             if obj_names:
                 # OBJ1 trailer: the LAST len(obj_names) buffers/instances are
                 # world objects; their 8-char names follow the SHW body and the

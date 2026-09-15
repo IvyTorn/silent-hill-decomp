@@ -520,6 +520,18 @@ static int TileAcquire(int sthIdx)
     return slot;
 }
 
+/* The shared item-pickup models (BG/BG_ITEM.PLM: ammo box, shells, health
+ * drink, first-aid kit, ampoule, notepad) are what the game's global-pool
+ * world objects (lmIdx 2) draw. mkworld --items bakes them as an objects-
+ * only <PREFIX>ITEM.SHW pseudo-cell (tiles in the area SHT) with header cell
+ * -127,-127; it lives here, always resident for the area, in its own small
+ * arena outside the s_chunks slots -- ShT3d_WorldObjectDraw searches it too.
+ * Need (ShwLoadBody formula) for the 7 models / 69 tris is ~4K. */
+#define WOBJ_ITEM_CELL (-127)
+static WChunk  s_itemChunk;
+static uint8_t s_itemArena[8 * 1024] __attribute__((aligned(16)));
+static void    ItemChunkLoad(const char* prefix);
+
 static int ShtOpen(const char* prefix)
 {
     uint8_t hdr[8];
@@ -570,10 +582,36 @@ static int ShtOpen(const char* prefix)
         }
     }
     SH_DBG("[T3DW] %s.SHT open: %d tiles, %d palettes", prefix, s_shtTileCount, s_shtPalCount);
+    ItemChunkLoad(prefix);   /* the area's shared item-pickup models, if baked */
     return 1;
 }
 
 /* ------------------------------------------------------------- chunks */
+
+/* Optional OBJ1 trailer (mkworld collect_objects / collect_item_models): the
+ * LAST objCount buffers/instances are name-keyed world objects -- the *_HID
+ * item pickups a cell's game logic places at runtime, or every model of the
+ * item pseudo-cell -- 8-char names at namesOff, 12-byte trailer at EOF. A
+ * file without it (older bake) has no objects; those pickups stay PSX. */
+static void ChunkReadObjTrailer(WChunk* c, FILE* f, int bufCount, int instCount)
+{
+    uint8_t tr[12];
+    c->objCount = 0;
+    if (fseek(f, -12, SEEK_END) == 0 && fread(tr, 1, 12, f) == 12 &&
+        rd32(tr) == 0x4F424A31u /* 'OBJ1' */)
+    {
+        int      n        = rd16(tr + 4);
+        uint32_t namesOff = rd32(tr + 8);
+        if (n > 0 && n <= WOBJ_PER_CHUNK && n <= bufCount && n <= instCount &&
+            fseek(f, (long)namesOff, SEEK_SET) == 0 &&
+            fread(c->objNames, 1, 8 * n, f) == (size_t)(8 * n))
+        {
+            c->objCount    = n;
+            c->objBufBase  = bufCount - n;
+            c->objInstBase = instCount - n;
+        }
+    }
+}
 
 /* A resident chunk's arena pointers must all land inside THIS slot's 80KB
  * arena. s_chunkArena ends exactly where s_chunks begins in .bss, so an
@@ -1069,29 +1107,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         ChunkFree(c);
         return;
     }
-    /* Optional OBJ1 trailer (mkworld collect_objects): the LAST objCount
-     * buffers/instances are the cell's un-instanced LM models -- the *_HID
-     * item pickups game logic places at runtime -- with an 8-char name each.
-     * A file without the trailer (older bake) simply has no objects and those
-     * pickups stay on the PSX path. */
-    {
-        uint8_t tr[12];
-        c->objCount = 0;
-        if (fseek(f, -12, SEEK_END) == 0 && fread(tr, 1, 12, f) == 12 &&
-            rd32(tr) == 0x4F424A31u /* 'OBJ1' */)
-        {
-            int      n        = rd16(tr + 4);
-            uint32_t namesOff = rd32(tr + 8);
-            if (n > 0 && n <= WOBJ_PER_CHUNK && n <= bufCount && n <= instCount &&
-                fseek(f, (long)namesOff, SEEK_SET) == 0 &&
-                fread(c->objNames, 1, 8 * n, f) == (size_t)(8 * n))
-            {
-                c->objCount    = n;
-                c->objBufBase  = bufCount - n;
-                c->objInstBase = instCount - n;
-            }
-        }
-    }
+    ChunkReadObjTrailer(c, f, bufCount, instCount);
     /* First composition immediately (this frame's WorldViewSet has
      * already run); every later frame recomposes in WorldViewSet. */
     ComposeChunkViews(c);
@@ -1487,6 +1503,7 @@ void ShT3d_WorldReset(void)
     rspq_wait();
     for (i = 0; i < MAX_WCHUNKS; i++)
         ChunkFree(&s_chunks[i]);
+    ChunkFree(&s_itemChunk);     /* the area's item pseudo-cell goes with its SHT */
     for (i = 0; i < (int)(sizeof s_tiles / sizeof s_tiles[0]); i++)
         if (s_tiles[i].sthIdx >= 0)
         {
@@ -1504,6 +1521,49 @@ void ShT3d_WorldReset(void)
     free(s_palWords);   s_palWords = NULL;
     if (s_pals) { free_uncached(s_pals); s_pals = NULL; }
     s_shtPrefix[0] = 0;
+}
+
+/* Load the area's item pseudo-cell (<PREFIX>ITEM.SHW, see s_itemChunk) into
+ * its own arena. Called from ShtOpen once the area SHT is open (its tiles live
+ * there); freed with the area in ShT3d_WorldReset. Absence is normal for an
+ * area baked without --items: global-pool pickups then stay on the PSX path. */
+static void ItemChunkLoad(const char* prefix)
+{
+    uint8_t  hdr[0x14];
+    char     name[24];
+    FILE*    f;
+    int      bufCount, instCount, refCount;
+    uint32_t instOff, refsOff;
+
+    ChunkFree(&s_itemChunk);
+    snprintf(name, sizeof name, "%sITEM.SHW", prefix);
+    f = WOpen(name);
+    if (f == NULL)
+        return;
+    if (fread(hdr, 1, sizeof hdr, f) != sizeof hdr || rd32(hdr) != SHW_MAGIC)
+    {
+        SH_DBG("[T3DWO] %s: bad header", name);
+        fclose(f);
+        return;
+    }
+    bufCount  = rd16(hdr + 6);
+    instCount = rd16(hdr + 8);
+    refCount  = rd16(hdr + 10);
+    instOff   = rd32(hdr + 0xC);
+    refsOff   = rd32(hdr + 0x10);
+    memset(&s_itemChunk, 0, sizeof s_itemChunk);
+    s_itemChunk.cellX = s_itemChunk.cellZ = WOBJ_ITEM_CELL;
+    if (!ShwLoadBody(&s_itemChunk, s_itemArena, (int)sizeof s_itemArena, f, name,
+                     bufCount, instCount, refCount, instOff, refsOff, 0, 0, 0))
+    {
+        fclose(f);
+        memset(&s_itemChunk, 0, sizeof s_itemChunk);
+        return;
+    }
+    ChunkReadObjTrailer(&s_itemChunk, f, bufCount, instCount);
+    fclose(f);
+    s_itemChunk.inUse = 1;
+    SH_DBG("[T3DWO] %s resident: %d item models (objects=%d)", name, bufCount, s_itemChunk.objCount);
 }
 
 /* ------------------------------------------------------------- drawing */
@@ -2449,9 +2509,11 @@ int ShT3d_WorldObjectDraw(const char* name8, int cellX, int cellZ, const short* 
      * resident chunk as a fallback so a cell-coordinate mismatch degrades to
      * "first match" rather than back to the PSX path. */
     for (pass = 0; pass < 2; pass++)
-        for (i = 0; i < MAX_WCHUNKS; i++)
+        for (i = 0; i <= MAX_WCHUNKS; i++)
         {
-            WChunk* c = &s_chunks[i];
+            /* slot MAX_WCHUNKS = the area's item pseudo-cell (lmIdx-2 objects
+             * arrive keyed to its -127,-127 sentinel cell) */
+            WChunk* c = (i < MAX_WCHUNKS) ? &s_chunks[i] : &s_itemChunk;
             if (!c->inUse || c->objCount == 0)
                 continue;
             if (pass == 0 && (c->cellX != cellX || c->cellZ != cellZ))

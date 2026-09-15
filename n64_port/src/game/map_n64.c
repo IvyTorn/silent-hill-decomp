@@ -97,9 +97,18 @@ static void MapN64_Open(int id)
     s_mapHeaders[id] = (s_MapOverlayHdr*)hdr;
 }
 
+/* "Linked" means LOADABLE on this port. The Xbox-era transition guards
+ * (game_sys_states.c / events_main.c) call this to refuse a
+ * SysState_LoadOverlay whose target is not ALREADY resident -- correct on a
+ * build where only map0_s00 is linked and nothing can be brought in, but on
+ * N64 MapRegistry_Load -> MapN64_Open swaps the single resident DSO on demand
+ * and all 42 ship in the ROM, so answering "resident?" here killed every
+ * inter-map door (the police station's front door did nothing). A load that
+ * actually fails is still refused inside MapRegistry_Load before the header is
+ * switched. */
 int MapXbox_OverlayIsLinked(int mapIdx)
 {
-    return mapIdx >= 0 && mapIdx < MAP_N64_COUNT && s_mapHeaders[mapIdx] != NULL;
+    return mapIdx >= 0 && mapIdx < MAP_N64_COUNT;
 }
 
 /* Rate-limited: the blocking event is typically TriggerType_None and re-fires

@@ -752,12 +752,24 @@ void Gfx_WorldObjectDraw(s_WorldObject* obj) // 0x8003CBA4
         extern s_MapTerrain g_Map;
         if (obj->model != NULL)
         {
-            s8 lm = obj->model->metadata.lmIdx;
-            if (lm >= 3 && lm < 7 &&
-                ShT3d_WorldObjectDraw(obj->model->metadata.name.str,
-                                      g_Map.activeChunks[lm - 3].cellX,
-                                      g_Map.activeChunks[lm - 3].cellZ,
-                                      (const short*)&mats[0].m[0][0], (const int*)mats[0].t))
+            s8  lm = obj->model->metadata.lmIdx;
+            int cx = 0, cz = 0, ok = 0;
+            if (lm >= 3 && lm < 7)
+            {
+                /* cell-local *_HID pickup: its own chunk */
+                cx = g_Map.activeChunks[lm - 3].cellX;
+                cz = g_Map.activeChunks[lm - 3].cellZ;
+                ok = 1;
+            }
+            else if (lm == 2)
+            {
+                /* global-pool item (BG_ITEM.PLM: ammo box, shells, health...):
+                 * the area's item pseudo-cell, keyed by its -127 sentinel */
+                cx = cz = -127;
+                ok = 1;
+            }
+            if (ok && ShT3d_WorldObjectDraw(obj->model->metadata.name.str, cx, cz,
+                                            (const short*)&mats[0].m[0][0], (const int*)mats[0].t))
             {
                 return;
             }
