@@ -380,6 +380,13 @@ const char* Pc_FlashlightModeLabel(int mode)
     return s_names[(mode >= 0 && mode <= 3) ? mode : 0];
 }
 
+/* N64 native-world decal pass Z mode (key decal_mode): 0 = standard compare
+ * after the opaque batch (default), 1 = ZMODE_DECAL. A file-static with an
+ * accessor rather than a g_PcConfig field so no header changes (every
+ * overlay rebuilds on a pc_config.h touch). */
+static int s_n64DecalMode = 0;
+int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
+
 void PcConfig_Load(const char* path)
 {
     if (path) {
@@ -832,6 +839,10 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "world_aa") == 0)
         {
             g_PcConfig.n64WorldAa = atoi(value);
+        }
+        else if (strcmp(key, "decal_mode") == 0)
+        {
+            s_n64DecalMode = atoi(value);
         }
         else if (strcmp(key, "chara_debug") == 0)
         {

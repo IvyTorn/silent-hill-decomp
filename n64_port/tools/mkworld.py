@@ -72,14 +72,18 @@ def op(word_op, arg):
 
 class Piece:
     """One triangle (post-split) with float (x,y,z,u,v) corners.
-    key = (timName, clutRow) or None; tile/pal filled by assign_tiles."""
-    __slots__ = ("cell", "buf", "inst", "semi", "verts", "key", "tile", "pal")
+    key = (timName, clutRow) or None; tile/pal filled by assign_tiles.
+    decal (tag_decals): opaque piece lying on a larger parallel surface of
+    another instance -> its own command stream, drawn after the opaque batch."""
+    __slots__ = ("cell", "buf", "inst", "semi", "verts", "key", "tile", "pal",
+                 "decal")
 
-    def __init__(self, cell, buf, inst, semi, verts, key):
+    def __init__(self, cell, buf, inst, semi, verts, key, decal=False):
         self.cell, self.buf, self.inst = cell, buf, inst
         self.semi, self.verts, self.key = semi, verts, key
         self.tile = None
         self.pal = 0
+        self.decal = decal
 
     def box(self):
         us = [p[3] for p in self.verts]
@@ -229,7 +233,7 @@ def assign_tiles(pieces_by_key, tims, stats):
                 if len(part) >= 3:
                     for tri in fan(part):
                         work.append(Piece(pc.cell, pc.buf, pc.inst, pc.semi,
-                                          tri, pc.key))
+                                          tri, pc.key, pc.decal))
         plist[:] = ready
     return tiles, pal_table
 
@@ -271,6 +275,113 @@ def bake_tiles(tiles, tims, stats):
             stats["tile_dedup"] += 1
         tile.final = final
     return payloads
+
+
+# ------------------------------------------------------------- decals
+
+def _v3(inst, p):
+    r, t = inst.rot, inst.trans
+    x, y, z = p[0], p[1], p[2]
+    return ((r[0][0] * x + r[0][1] * y + r[0][2] * z) / 4096.0 + t[0],
+            (r[1][0] * x + r[1][1] * y + r[1][2] * z) / 4096.0 + t[1],
+            (r[2][0] * x + r[2][1] * y + r[2][2] * z) / 4096.0 + t[2])
+
+
+def _sub(a, b):
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0])
+
+
+DECAL_MAX_Q8 = 64      # measured: real decals sit 0..63 Q8 in front of their wall
+DECAL_AREA_RATIO = 3   # the backing surface must be clearly larger
+
+
+def tag_decals(pieces, instances):
+    """Flag opaque pieces that lie ON a >=3x larger parallel triangle of a
+    DIFFERENT instance, within DECAL_MAX_Q8 of its plane and inside its
+    in-plane extent: wall posters, maps, signs, picture frames. The RDP's
+    opaque Z compare passes anything within its per-pixel dz tolerance, so a
+    wall drawn after a poster it sits 1..8 t3d units in front of repaints it
+    whenever the wall is oblique enough; tile-sorted batching makes that
+    order arbitrary per frame -> flicker. Emitting these pieces as a third
+    stream drawn after the whole opaque batch fixes the order for good.
+    Same-instance pairs are a wall's own tessellation, never decals.
+    Returns the number of pieces tagged."""
+    import math
+    planes = []
+    for pc in pieces:
+        if pc.semi or pc.inst >= len(instances):
+            continue
+        inst = instances[pc.inst]
+        a, b, c = (_v3(inst, pc.verts[0]), _v3(inst, pc.verts[1]),
+                   _v3(inst, pc.verts[2]))
+        n = _cross(_sub(b, a), _sub(c, a))
+        L = math.sqrt(_dot(n, n))
+        if L < 1e-6:
+            continue
+        n = (n[0] / L, n[1] / L, n[2] / L)
+        if n[0] < 0 or (n[0] == 0 and (n[1] < 0 or (n[1] == 0 and n[2] < 0))):
+            n = (-n[0], -n[1], -n[2])
+        cen = ((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3,
+               (a[2] + b[2] + c[2]) / 3)
+        planes.append((n, L / 2, cen, (a, b, c), pc))
+
+    # Bucket by (quantised normal, plane offset // DECAL_MAX_Q8) so only
+    # near-coplanar pairs are ever compared; a candidate scans its own and the
+    # two neighbouring offset buckets.
+    buckets = defaultdict(list)
+    for p in planes:
+        n = p[0]
+        d = _dot(n, p[2])
+        key = (round(n[0], 2), round(n[1], 2), round(n[2], 2))
+        buckets[(key, int(math.floor(d / DECAL_MAX_Q8)))].append(p)
+    for plist in buckets.values():
+        plist.sort(key=lambda p: -p[1])
+
+    tagged = 0
+    for (nkey, db), plist in buckets.items():
+        cands = []
+        for nb in (db - 1, db, db + 1):
+            cands += buckets.get((nkey, nb), [])
+        cands.sort(key=lambda p: -p[1])
+        for small in plist:
+            n, area, cen, tri, pc = small
+            for big in cands:
+                if big[1] < area * DECAL_AREA_RATIO:
+                    break             # sorted by area: nothing larger remains
+                if big[4].inst == pc.inst:
+                    continue
+                bn, _, _, btri, _ = big
+                dist = abs(_dot(bn, _sub(cen, btri[0])))
+                if dist > DECAL_MAX_Q8:
+                    continue
+                u = _sub(btri[1], btri[0])
+                Lu = math.sqrt(_dot(u, u))
+                if Lu < 1e-6:
+                    continue
+                u = (u[0] / Lu, u[1] / Lu, u[2] / Lu)
+                v = _cross(bn, u)
+
+                def proj(q):
+                    d = _sub(q, btri[0])
+                    return _dot(d, u), _dot(d, v)
+                bu = [proj(q)[0] for q in btri]
+                bv = [proj(q)[1] for q in btri]
+                su, sv = proj(cen)
+                if (min(bu) - 1 <= su <= max(bu) + 1 and
+                        min(bv) - 1 <= sv <= max(bv) + 1):
+                    pc.decal = True
+                    tagged += 1
+                    break
+    return tagged
 
 
 # ------------------------------------------------------------- phase 1
@@ -539,8 +650,12 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
       0x04 s8 cellX, s8 cellZ, u16 bufferCount
       0x08 u16 instanceCount, u16 tileRefCount
       0x0C u32 instancesOff, u32 tileRefsOff
-      0x14 bufferCount * { u16 vertCount; u16 opaWords; u16 semiWords; u16 pad;
-                           u32 vertOff; u32 opaOff; u32 semiOff; }   (20 B)
+      0x14 bufferCount * { u16 vertCount; u16 opaWords; u16 semiWords;
+                           u16 decalWords; u32 vertOff; u32 opaOff;
+                           u32 semiOff; }   (20 B)
+                 The decal stream (tag_decals) follows the opaque words
+                 directly at opaOff + 2*opaWords; 0 words = none. Old files
+                 carry 0 there (the former pad), so the loader sees no decals.
       tileRefs:  u16 final tile indices this cell uses (for load/refcount)
       instances: { s16 rot[9]; s16 pad; s32 t[3]; }  (32 B: 18+2+12, IPD
                   verbatim, t[0]/t[2] cell-relative Q8, t[1] absolute Q8)
@@ -549,10 +664,10 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
       cmds:      u16 words
     """
     # group pieces per buffer/pass, sort by (tile, pal, inst) for minimal state
-    per_buf = defaultdict(lambda: ([], []))   # buf -> (opa, semi)
+    per_buf = defaultdict(lambda: ([], [], []))   # buf -> (opa, semi, decal)
     tile_refs = set()
     for pc in cell_pieces:
-        per_buf[pc.buf][1 if pc.semi else 0].append(pc)
+        per_buf[pc.buf][2 if pc.decal else 1 if pc.semi else 0].append(pc)
         if pc.tile is not None:
             tile_refs.add(pc.tile.final)
 
@@ -561,18 +676,20 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
 
     buffers = []
     for bi in range(buffer_count):
-        opa, semi = per_buf.get(bi, ([], []))
+        opa, semi, dec = per_buf.get(bi, ([], [], []))
         opa.sort(key=sort_key)
         semi.sort(key=sort_key)
+        dec.sort(key=sort_key)
         verts = []
         enc = buf_encoder or encode_buffer_cmds
         c_opa = enc(opa, verts)
         c_semi = enc(semi, verts)
+        c_dec = enc(dec, verts) if dec else []
         # The runtime concatenates buffers into one T3DVertPacked array and
         # rebases per buffer, so every buffer must hold an EVEN vert count.
         if len(verts) & 1:
             verts.append(verts[-1] if verts else (0, 0, 0, 0, 0, 0, 0, 0, 0))
-        buffers.append((c_opa, c_semi, verts))
+        buffers.append((c_opa, c_semi, c_dec, verts))
 
     refs = sorted(tile_refs)
     base = 0x14 + 20 * len(buffers)   # entries are ">4H3I" = 20 bytes
@@ -596,17 +713,18 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
     instances_off = blob(bytes(inst_data))
 
     table = bytearray()
-    for c_opa, c_semi, verts in buffers:
+    for c_opa, c_semi, c_dec, verts in buffers:
         vdata = bytearray()
         for (x, y, z, r, g, b, a, s, t) in verts:
             vdata += struct.pack(">3h4B2hH", x, y, z, r, g, b, a,
                                  int(round(s * 32)), int(round(t * 32)), 0)
         vo = blob(bytes(vdata))
-        oo = blob(struct.pack(">%dH" % len(c_opa), *c_opa))
+        oo = blob(struct.pack(">%dH" % (len(c_opa) + len(c_dec)), *(c_opa + c_dec)))
         so = blob(struct.pack(">%dH" % len(c_semi), *c_semi))
-        assert len(verts) <= 0xFFFF and len(c_opa) <= 0xFFFF and len(c_semi) <= 0xFFFF
-        table += struct.pack(">4H3I", len(verts), len(c_opa), len(c_semi), 0,
-                             vo, oo, so)
+        assert (len(verts) <= 0xFFFF and len(c_opa) <= 0xFFFF and
+                len(c_semi) <= 0xFFFF and len(c_dec) <= 0xFFFF)
+        table += struct.pack(">4H3I", len(verts), len(c_opa), len(c_semi),
+                             len(c_dec), vo, oo, so)
 
     out = bytearray(struct.pack(">4sbbHHH2I", b"SHW1", ipd.cell_x, ipd.cell_z,
                                 len(buffers), len(instances), len(refs),
@@ -698,8 +816,15 @@ def main():
         untex = []
         for ci, fn in enumerate(cells):
             ipd = Ipd.parse(open(os.path.join(a.ipd_dir, fn), "rb").read())
+            before = {k: len(v) for k, v in pieces_by_key.items()}
+            untex_before = len(untex)
             instances = collect_cell(ipd, ci, tim_get, pieces_by_key, untex, stats,
                                      glb_lm=glb_lm, plm_names=plm_names)
+            # Decal tagging sees only this cell's placed geometry: objects
+            # (below) get placeholder instances, so they must not take part.
+            cell_pcs = [pc for k, v in pieces_by_key.items()
+                        for pc in v[before.get(k, 0):]] + untex[untex_before:]
+            stats["decal"] += tag_decals(cell_pcs, instances)
             obj_names = collect_objects(ipd, ci, len(ipd.model_buffers), instances,
                                         tim_get, pieces_by_key, untex, stats)
             parsed.append((fn, ipd, len(ipd.model_buffers) + len(obj_names),
@@ -749,6 +874,7 @@ def main():
             shw_total += len(shw)
 
         print(f"[{prefix}] cells={len(parsed)} tris={stats['tris']} "
+              f"decals={stats['decal']} "
               f"splitClipped={stats['split']} tiles={len(tiles)} "
               f"unique={len(payloads)} (dedup {stats['tile_dedup']}) "
               f"pals={len(pal_table)} "

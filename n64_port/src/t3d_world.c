@@ -110,12 +110,17 @@ typedef struct
 {
     /* Byte offsets into the chunk's arena cmd region; 0 words = empty. */
     uint32_t opaOff, semiOff;
-    uint16_t opaWords, semiWords;
+    /* mkworld-tagged decals (posters/maps/signs lying 0..64 Q8 on a larger
+     * parallel surface of another instance). Opaque, but drawn AFTER the
+     * whole opaque batch: the RDP opaque Z compare passes anything within its
+     * per-pixel dz tolerance, so an oblique wall drawn after its poster
+     * repaints it -- and the tile-sorted batch order made that arbitrary. */
+    uint32_t decalOff;
+    uint16_t opaWords, semiWords, decalWords;
     uint16_t vbase;      /* first vert (pair-aligned) of this buffer */
     /* First OP_VERTS-group index of each stream in the chunk's groupPos
      * array; RunPass counts groups upward from here as it replays. */
     uint16_t opaGroupBase, semiGroupBase;
-    uint16_t pad;
 } WBuf;
 
 /* Un-instanced LM models baked as world OBJECTS (mkworld OBJ1 trailer): the
@@ -1177,8 +1182,10 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
             {
                 int ow = rd16(table + i * 20 + 2);
                 int sw = rd16(table + i * 20 + 4);
+                int dw = rd16(table + i * 20 + 6);
                 if (ow > 1) cmdBytes += (ow * 2 + 3) & ~3;
                 if (sw > 1) cmdBytes += (sw * 2 + 3) & ~3;
+                if (dw > 1) cmdBytes += (dw * 2 + 3) & ~3;
             }
             need = ((vertBytes + 15) & ~15) + ((matBytes + 15) & ~15)
                  + ((rawRBytes + 15) & ~15) + ((rawTBytes + 15) & ~15)
@@ -1327,6 +1334,7 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                 int vcount    = rd16(bt);
                 int opaWords  = rd16(bt + 2);
                 int semiWords = rd16(bt + 4);
+                int decWords  = rd16(bt + 6);
                 uint32_t opaOff  = rd32(bt + 0x0C);
                 uint32_t semiOff = rd32(bt + 0x10);
                 c->bufs[i].vbase = (uint16_t)vbase;
@@ -1338,6 +1346,16 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                     c->bufs[i].opaOff   = cmdCur;
                     c->bufs[i].opaWords = (uint16_t)opaWords;
                     cmdCur += (opaWords * 2 + 3) & ~3;
+                }
+                if (decWords > 1)
+                {
+                    /* The decal stream sits right behind the opaque words. */
+                    fseek(f, opaOff + (uint32_t)opaWords * 2, SEEK_SET);
+                    if (fread(c->cmds + cmdCur, 1, decWords * 2, f) != (size_t)(decWords * 2))
+                        goto fail;
+                    c->bufs[i].decalOff   = cmdCur;
+                    c->bufs[i].decalWords = (uint16_t)decWords;
+                    cmdCur += (decWords * 2 + 3) & ~3;
                 }
                 if (semiWords > 1)
                 {
@@ -1910,6 +1928,32 @@ static void WorldFlushPass(int wantFg)
                 first = 0;
                 s_cnBlocks++;
             }
+            /* Decals after every opaque surface they could sit on. decal_mode
+             * 0 (default) keeps the standard compare: a decal is strictly in
+             * front of its wall, so it passes, and nothing later repaints it.
+             * 1 = ZMODE_DECAL for A/B on hardware -- it needs |z - zbuf| <= dz,
+             * which a decal several units in front of a face-on wall FAILS. */
+            {
+                extern int PcConfig_N64DecalMode(void);
+                int dm = PcConfig_N64DecalMode();
+                if (dm == 1)
+                    rdpq_mode_zmode(ZMODE_DECAL);
+                for (i = 0; i < s_drawCount; i++)
+                {
+                    WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
+                    int b = s_drawList[i].buf;
+                    if (c == NULL || b >= c->bufCount || c->bufs[b].decalWords <= 1)
+                        continue;
+                    RunPass(c->cmds + c->bufs[b].decalOff, c->bufs[b].decalWords,
+                            c->verts + c->bufs[b].vbase / 2,
+                            c->mats + s_matPhase * c->instCount, NULL, c->viewRow,
+                            0, 0, 0, BindWorldTile, first);
+                    first = 0;
+                    s_cnBlocks++;
+                }
+                if (dm == 1)
+                    rdpq_mode_zmode(ZMODE_STANDARD);
+            }
         }
         else
         {
@@ -1946,6 +1990,15 @@ static void WorldFlushPass(int wantFg)
                 RunPass(c->cmds + c->bufs[b].opaOff, c->bufs[b].opaWords, bverts,
                         c->mats + s_matPhase * c->instCount, c->groupPos,
                         c->viewRow, c->bufs[b].opaGroupBase, wantFg, 0, BindWorldTile, 1);
+                s_cnBlocks++;
+            }
+            /* No Z: decals are plain opaque geometry, background pass only
+             * (groupPos NULL + wantFg -> RunPass skips them in the fg call). */
+            if (c->bufs[b].decalWords > 1)
+            {
+                RunPass(c->cmds + c->bufs[b].decalOff, c->bufs[b].decalWords, bverts,
+                        c->mats + s_matPhase * c->instCount, NULL,
+                        c->viewRow, 0, wantFg, 0, BindWorldTile, 1);
                 s_cnBlocks++;
             }
             if (c->bufs[b].semiWords > 1)
