@@ -761,10 +761,15 @@ void Gfx_WorldObjectDraw(s_WorldObject* obj) // 0x8003CBA4
                 cz = g_Map.activeChunks[lm - 3].cellZ;
                 ok = 1;
             }
-            else if (lm == 2)
+            else if (lm == 1 || lm == 2)
             {
-                /* global-pool item (BG_ITEM.PLM: ammo box, shells, health...):
-                 * the area's item pseudo-cell, keyed by its -127 sentinel */
+                /* Shared item model (BG_ITEM.PLM: ammo box, shells, health...):
+                 * the area's item pseudo-cell, keyed by its -127 sentinel. The
+                 * hardware log shows these resolve with lmIdx 1 ('BULLET_N',
+                 * 'SHOT_NEA', 'PAD_NEAR' all lmIdx=1), not the 2 the header
+                 * comment suggests -- routing only 2 left the ammo box on the
+                 * depth-less PSX path. 2 (the area GLB pool) is offered too; an
+                 * unmatched name just falls through to the PSX draw below. */
                 cx = cz = -127;
                 ok = 1;
             }

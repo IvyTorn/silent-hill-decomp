@@ -1651,8 +1651,12 @@ static void WorldFrameStart(void)
              * wall (the flicker). 32 resolves ~1 t3d unit = 8 Q8, separating
              * the whole band, and only clips geometry closer than ~6.6 cm
              * to the camera, which SH1's fixed cameras never are. Depth rows
-             * only -- screen X/Y come from h/ofx and do not move. */
-            float nearP = 32.0f, farP = 50000.0f;
+             * only -- screen X/Y come from h/ofx and do not move.
+             * 32 -> 64 (2026-09-16): the lobby still flickered; 57 of its decals
+             * sit at ~13 Q8, right at 32's ~8 Q8 resolution -- marginal, so Z
+             * interpolation rounding still flipped them. 64 resolves ~4 Q8 (the
+             * whole >=10 Q8 band cleanly) and clips only inside ~13 cm. */
+            float nearP = 64.0f, farP = 50000.0f;
             float oX, oY, sX, sY;
             int   cX;
             T3DMat4 proj;
