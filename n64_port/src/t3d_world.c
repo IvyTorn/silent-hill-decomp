@@ -1656,7 +1656,15 @@ static void WorldFrameStart(void)
              * sit at ~13 Q8, right at 32's ~8 Q8 resolution -- marginal, so Z
              * interpolation rounding still flipped them. 64 resolves ~4 Q8 (the
              * whole >=10 Q8 band cleanly) and clips only inside ~13 cm. */
-            float nearP = 64.0f, farP = 50000.0f;
+            /* BACK TO 4 (2026-09-16). 32 and 64 were a scale error: Harry is
+             * ~54 t3d units tall (1.7 m), so 64 units is ~2 m -- the floor at
+             * the screen edges and Harry's near limbs were being NEAR-CLIPPED
+             * ("culling on the edges", "see through him everywhere"). At the
+             * real scale near=4 already resolves ~1 Q8 at room distances, so
+             * the 12..63 Q8 decal offsets were never a precision problem: the
+             * poster flicker is the RDP's dz compare tolerance, fixed with a
+             * DECAL-mode pass (OP_DECAL stream), not the near plane. */
+            float nearP = 4.0f, farP = 50000.0f;
             float oX, oY, sX, sY;
             int   cX;
             T3DMat4 proj;
