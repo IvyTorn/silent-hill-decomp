@@ -1039,8 +1039,15 @@ void GpuNv2a_Init(void)
  * ShN64_RspCrashDetail). FrameEnd marks the end of each frame's command
  * stream with a syncpoint; FrameBegin checks whether the RSP ever reached the
  * previous one while it waits for a framebuffer. */
-static rspq_syncpoint_t   s_frameSp;
+static rspq_syncpoint_t   s_frameSp, s_frameSpEnd;
 static int                s_frameSpValid;
+
+/* Raw SP/DP status for the park snapshot; the crash-time dump in __rsp_crash
+ * does not always reach the card (the latest one left a single line). */
+#define SH_SP_STATUS  (*(volatile uint32_t*)0xA4040010)
+#define SH_DP_END     (*(volatile uint32_t*)0xA4100004)
+#define SH_DP_CURRENT (*(volatile uint32_t*)0xA4100008)
+#define SH_DP_STATUS  (*(volatile uint32_t*)0xA410000C)
 
 void GpuNv2a_FrameBegin(void)
 {
@@ -1125,20 +1132,37 @@ void GpuNv2a_FrameBegin(void)
          * run. TICKS_SINCE is the documented idiom for short intervals:
          * register-only, wrap-safe below ~45 s. */
         uint32_t t0_32 = TICKS_READ();
+        uint32_t dpCur0 = 0;
         s_fb = display_try_get();
         while (s_fb == NULL)
         {
             unsigned ms = (unsigned)(TICKS_SINCE(t0_32) / (TICKS_PER_SECOND / 1000));
-            if (!parkLogged && s_frameSpValid && ms >= 1000 && !rspq_syncpoint_check(s_frameSp))
+            /* Any 1 s wait is abnormal (a frame is <100 ms). Which marker the
+             * RSP reached splits the classes: neither = parked mid-stream
+             * (zero header); first only = parked in the detach tail; both =
+             * the RSP is done and the RDP never finished (pipe hang). */
+            if (!parkLogged && s_frameSpValid && ms >= 1000)
             {
+                int sp1 = rspq_syncpoint_check(s_frameSp);
+                int sp2 = rspq_syncpoint_check(s_frameSpEnd);
                 parkLogged = 1;
-                SH_DBG("[RSPQ-PARK] RSP made no progress for %u ms (frame %u): last frame's syncpoint unreached",
-                       ms, (unsigned)g_Nv2aFrameCount);
+                dpCur0     = SH_DP_CURRENT;
+                SH_DBG("[RSPQ-PARK] no framebuffer for %u ms (frame %u): frameSp %s, endSp %s | sp=%08lx dp=%08lx dpCur=%08lx dpEnd=%08lx",
+                       ms, (unsigned)g_Nv2aFrameCount,
+                       sp1 ? "reached" : "UNREACHED", sp2 ? "reached" : "UNREACHED",
+                       (unsigned long)SH_SP_STATUS, (unsigned long)SH_DP_STATUS,
+                       (unsigned long)dpCur0, (unsigned long)SH_DP_END);
                 if (ShN64_ParkSnapshot)
                     ShN64_ParkSnapshot((unsigned)g_Nv2aFrameCount, ms);
             }
             if (ms >= 1500)
+            {
+                /* libdragon's own RDP-hang test: did DP_CURRENT move since? */
+                SH_DBG("[RSPQ-PARK] +%u ms: dpCur=%08lx (%s), handing off to display_get",
+                       ms, (unsigned long)SH_DP_CURRENT,
+                       SH_DP_CURRENT == dpCur0 ? "STUCK" : "moving");
                 break;      /* hand the wait, and its watchdog, back to display_get */
+            }
             s_fb = display_try_get();
         }
         if (s_fb == NULL)
@@ -1234,6 +1258,11 @@ void GpuNv2a_FrameEnd(void)
         s_frameSp      = rspq_syncpoint_new();
         s_frameSpValid = 1;
         rdpq_detach_show();
+        /* Second marker AFTER the detach: reached = the RSP consumed the whole
+         * stream including the swap, so a framebuffer that still never frees
+         * is the RDP's (hung pipe), not a parked RSP. The 2026-09-16 crash
+         * logged no [RSPQ-PARK] at all because the first marker WAS reached. */
+        s_frameSpEnd   = rspq_syncpoint_new();
     }
     s_fb = NULL;
 
