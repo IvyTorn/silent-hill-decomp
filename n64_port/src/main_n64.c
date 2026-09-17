@@ -170,6 +170,53 @@ static void Sh_InitGameData(void)
     D_800ED230[1] = PSX_ADDR(0x00180600);
 }
 
+/* ------------------------------------------------------ cpu watchdog */
+
+/* Emulator-only (no SD card): if no frame has begun for 3 s, backtrace the
+ * code the timer interrupt landed in and print it on ISViewer -- a CPU-side
+ * hang otherwise leaves a black screen and a log that just stops. debugf,
+ * not SH_DBG: the stuck code may be holding the stdio lock. Addresses are
+ * symbolised offline with addr2line on sh.elf. */
+extern int  g_Nv2aFrameCount;
+extern void* interrupt_exception_frame;
+extern int  __backtrace_from(void** buffer, int size, uint32_t* pc, uint32_t* sp,
+                             uint32_t* fp, uint32_t* exception_ra);
+static int      s_cwLastFrame = -1;
+static unsigned s_cwStill;
+
+static void CpuWatchdogTick(int ovfl)
+{
+    (void)ovfl;
+    if (g_Nv2aFrameCount != s_cwLastFrame)
+    {
+        s_cwLastFrame = g_Nv2aFrameCount;
+        s_cwStill     = 0;
+        return;
+    }
+    s_cwStill++;
+    if (s_cwStill != 3 && s_cwStill != 12 && interrupt_exception_frame != NULL)
+        return;
+    if (interrupt_exception_frame == NULL)
+        return;
+    {
+        reg_block_t* r = (reg_block_t*)((uint8_t*)interrupt_exception_frame + 32);
+        void* bt[16];
+        int   n, i;
+        n = __backtrace_from(bt, 16,
+                             (uint32_t*)(uintptr_t)(uint32_t)r->epc,
+                             (uint32_t*)(uintptr_t)(uint32_t)r->sp,
+                             (uint32_t*)(uintptr_t)(uint32_t)r->fp,
+                             (uint32_t*)(uintptr_t)(uint32_t)r->ra);
+        debugf("[CPUWD] no frame for %us (frame %d): epc=%08lx ra=%08lx sp=%08lx a0=%08lx a1=%08lx v0=%08lx s0=%08lx frames=%d\n",
+               s_cwStill, g_Nv2aFrameCount, (unsigned long)(uint32_t)r->epc,
+               (unsigned long)(uint32_t)r->ra, (unsigned long)(uint32_t)r->sp,
+               (unsigned long)(uint32_t)r->a0, (unsigned long)(uint32_t)r->a1,
+               (unsigned long)(uint32_t)r->v0, (unsigned long)(uint32_t)r->s0, n);
+        for (i = 0; i < n; i++)
+            debugf("[CPUWD]   #%d %08lx\n", i, (unsigned long)(uintptr_t)bt[i]);
+    }
+}
+
 /* --------------------------------------------------------------- main */
 
 static void N64_CrashBtFrame(void* arg, backtrace_frame_t* f)
@@ -281,13 +328,11 @@ int main(void)
      * and a user who has not extracted anything just pays a handful of fopen
      * misses per file load. The cfg (allow_loose_files=0) can turn it off. */
     g_PcConfig.allowLooseFiles = 1;
-    PcConfig_Load("sd:/silenthill/silenthill.cfg");
+    /* No SD card = the emulator: its config rides in the diag ROM
+     * (n64_port/emu/silenthill.cfg, staged by build_n64.sh), which is how a
+     * smoke run picks its start map. */
+    PcConfig_Load(Cd_N64SdPresent() ? "sd:/silenthill/silenthill.cfg" : "rom:/silenthill.cfg");
     XboxConfig_ApplyOverrides();
-    /* Emulator smoke runs (no SD card = never a console) start New Game on
-     * the exterior behind the police-station door: it exercises a DSO load,
-     * four active cells in the world chunk pool, and fog, with no human. */
-    if (!Cd_N64SdPresent())
-        strcpy(g_PcConfig.mapName, "map2_s02");
 
     /* PSX kernel events + memory card. NOT optional and not obvious: it is what
      * resolves the save location, and without it mcard_xbox.c reports no card,
@@ -314,7 +359,11 @@ int main(void)
     {
         extern void MapDso_SelfTest(void);
         if (!Cd_N64SdPresent())
+        {
             MapDso_SelfTest();
+            timer_init();
+            new_timer(TIMER_TICKS(1000000), TF_CONTINUOUS, CpuWatchdogTick);
+        }
     }
 
     Xbox_MemReport("before MainLoop");

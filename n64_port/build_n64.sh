@@ -162,9 +162,18 @@ if [ -f "$SCRIPT_DIR/build/diag_disc.shpak" ] && [ -d "$SCRIPT_DIR/filesystem/ma
     rm -rf "$SCRIPT_DIR/build/diagfs"
     mkdir -p "$SCRIPT_DIR/build/diagfs"
     cp "$SCRIPT_DIR/build/diag_disc.shpak" "$SCRIPT_DIR/build/diagfs/disc.shpak"
+    # Emulator config (start map etc.): read as rom:/silenthill.cfg when no
+    # SD card is mounted. Consoles never look at it.
+    if [ -f "$SCRIPT_DIR/emu/silenthill.cfg" ]; then
+        cp "$SCRIPT_DIR/emu/silenthill.cfg" "$SCRIPT_DIR/build/diagfs/silenthill.cfg"
+    fi
     cp -r "$SCRIPT_DIR/filesystem/maps" "$SCRIPT_DIR/build/diagfs/maps"
     # Native world assets (mkworld.py output), when staged: the emulator has
     # no SD card, so rom:/N64W is the only way t3d_world.c finds them there.
+    # Native Harry too, or the emulator draws him on the PSX path.
+    if [ -d "$SCRIPT_DIR/build/chara/N64C" ]; then
+        cp -r "$SCRIPT_DIR/build/chara/N64C" "$SCRIPT_DIR/build/diagfs/N64C"
+    fi
     if [ -d "$SCRIPT_DIR/build/n64w" ]; then
         cp -r "$SCRIPT_DIR/build/n64w" "$SCRIPT_DIR/build/diagfs/N64W"
         # THR (the town, ~20MB) would push this ROM past ares's 64MB ISViewer
