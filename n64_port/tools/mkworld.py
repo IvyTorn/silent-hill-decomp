@@ -73,8 +73,8 @@ def op(word_op, arg):
 class Piece:
     """One triangle (post-split) with float (x,y,z,u,v) corners.
     key = (timName, clutRow) or None; tile/pal filled by assign_tiles.
-    decal (tag_decals): opaque piece lying on a larger parallel surface of
-    another instance -> its own command stream, drawn after the opaque batch."""
+    decal (tag_decals): opaque piece lying on another opaque surface's
+    visible side -> its own command stream, drawn after the opaque batch."""
     __slots__ = ("cell", "buf", "inst", "semi", "verts", "key", "tile", "pal",
                  "decal")
 
@@ -301,20 +301,34 @@ def _cross(a, b):
 
 
 DECAL_MAX_Q8 = 64      # measured: real decals sit 0..63 Q8 in front of their wall
-DECAL_AREA_RATIO = 3   # the backing surface must be clearly larger
+DECAL_NUDGE_Q8 = 4     # coplanar overlays are moved this far toward the viewer
+
+
+def _in_tri(p, t, n):
+    """Strict: p (on or near t's plane) projects inside triangle t."""
+    for u, v in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+        if _dot(_cross(_sub(v, u), _sub(p, u)), n) < 0:
+            return False
+    return True
 
 
 def tag_decals(pieces, instances):
-    """Flag opaque pieces that lie ON a >=3x larger parallel triangle of a
-    DIFFERENT instance, within DECAL_MAX_Q8 of its plane and inside its
-    in-plane extent: wall posters, maps, signs, picture frames. The RDP's
-    opaque Z compare passes anything within its per-pixel dz tolerance, so a
-    wall drawn after a poster it sits 1..8 t3d units in front of repaints it
-    whenever the wall is oblique enough; tile-sorted batching makes that
-    order arbitrary per frame -> flicker. Emitting these pieces as a third
-    stream drawn after the whole opaque batch fixes the order for good.
-    Same-instance pairs are a wall's own tessellation, never decals.
-    Returns the number of pieces tagged."""
+    """Flag opaque pieces lying ON another opaque surface: wall posters, maps,
+    signs, frames, papers. They go to a third command stream drawn after the
+    whole opaque batch, because the RDP's opaque Z compare passes anything
+    within its per-pixel dz tolerance: a wall drawn after its poster repaints
+    it at oblique angles, and the tile-sorted batch fixes that order
+    arbitrarily.
+
+    Rule (measured on ER, see project_n64_decal_zfight_nearplane): S is a
+    decal over B when both face the same way, S's centroid projects strictly
+    inside B, and S sits on B's VISIBLE side -- the NEGATIVE winding-normal
+    side in this data -- by 0.5..64 Q8; or is exactly coplanar with a
+    different texture and a smaller area. Same instance counts: most posters
+    are part of their wall's model. Opposite-facing pairs are the two sides
+    of thin panels, and same-texture coplanar pairs are a quad's own halves.
+    Coplanar decals are nudged DECAL_NUDGE_Q8 toward the viewer so the
+    compare cannot tie. Returns the number of pieces tagged."""
     import math
     planes = []
     for pc in pieces:
@@ -328,59 +342,53 @@ def tag_decals(pieces, instances):
         if L < 1e-6:
             continue
         n = (n[0] / L, n[1] / L, n[2] / L)
-        if n[0] < 0 or (n[0] == 0 and (n[1] < 0 or (n[1] == 0 and n[2] < 0))):
-            n = (-n[0], -n[1], -n[2])
         cen = ((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3,
                (a[2] + b[2] + c[2]) / 3)
         planes.append((n, L / 2, cen, (a, b, c), pc))
 
-    # Bucket by (quantised normal, plane offset // DECAL_MAX_Q8) so only
-    # near-coplanar pairs are ever compared; a candidate scans its own and the
-    # two neighbouring offset buckets.
+    # Bucket by sign-folded normal and plane offset so only near-coplanar
+    # pairs meet; a piece scans its own and both neighbouring offset buckets.
     buckets = defaultdict(list)
     for p in planes:
         n = p[0]
-        d = _dot(n, p[2])
-        key = (round(n[0], 2), round(n[1], 2), round(n[2], 2))
+        sgn = 1 if n > (0.0, 0.0, 0.0) else -1
+        key = (round(n[0] * sgn, 2), round(n[1] * sgn, 2), round(n[2] * sgn, 2))
+        d = _dot(n, p[2]) * sgn
         buckets[(key, int(math.floor(d / DECAL_MAX_Q8)))].append(p)
-    for plist in buckets.values():
-        plist.sort(key=lambda p: -p[1])
 
     tagged = 0
     for (nkey, db), plist in buckets.items():
         cands = []
         for nb in (db - 1, db, db + 1):
             cands += buckets.get((nkey, nb), [])
-        cands.sort(key=lambda p: -p[1])
         for small in plist:
-            n, area, cen, tri, pc = small
+            nS, aS, cS, _, pS = small
             for big in cands:
-                if big[1] < area * DECAL_AREA_RATIO:
-                    break             # sorted by area: nothing larger remains
-                if big[4].inst == pc.inst:
+                if big is small:
                     continue
-                bn, _, _, btri, _ = big
-                dist = abs(_dot(bn, _sub(cen, btri[0])))
-                if dist > DECAL_MAX_Q8:
+                nB, aB, _, tB, pB = big
+                if _dot(nS, nB) < 0.999:
                     continue
-                u = _sub(btri[1], btri[0])
-                Lu = math.sqrt(_dot(u, u))
-                if Lu < 1e-6:
+                d = _dot(nB, _sub(cS, tB[0]))
+                if d > 0.5 or d < -DECAL_MAX_Q8:
                     continue
-                u = (u[0] / Lu, u[1] / Lu, u[2] / Lu)
-                v = _cross(bn, u)
-
-                def proj(q):
-                    d = _sub(q, btri[0])
-                    return _dot(d, u), _dot(d, v)
-                bu = [proj(q)[0] for q in btri]
-                bv = [proj(q)[1] for q in btri]
-                su, sv = proj(cen)
-                if (min(bu) - 1 <= su <= max(bu) + 1 and
-                        min(bv) - 1 <= sv <= max(bv) + 1):
-                    pc.decal = True
-                    tagged += 1
-                    break
+                coplanar = d > -0.5
+                if coplanar and (aB <= aS or pS.key == pB.key):
+                    continue
+                if not _in_tri(cS, tB, nB):
+                    continue
+                pS.decal = True
+                tagged += 1
+                if coplanar:
+                    r = instances[pS.inst].rot
+                    w = (-nB[0] * DECAL_NUDGE_Q8, -nB[1] * DECAL_NUDGE_Q8,
+                         -nB[2] * DECAL_NUDGE_Q8)
+                    # world -> model: the rows are orthonormal Q12, so R^T
+                    loc = tuple((r[0][k] * w[0] + r[1][k] * w[1] + r[2][k] * w[2]) / 4096.0
+                                for k in range(3))
+                    pS.verts = [(v[0] + loc[0], v[1] + loc[1], v[2] + loc[2]) + tuple(v[3:])
+                                for v in pS.verts]
+                break
     return tagged
 
 

@@ -53,9 +53,9 @@
  * to isolate geometry-projects from texture problems. 0 = real textured path. */
 #define SH_T3DW_FLAT 0
 
-/* Four cells around the player go native, the rest stay on the PSX fallback;
- * grows once the strip-IPD funding lands. */
-#define MAX_WCHUNKS   3
+/* Exteriors keep FOUR cells active (MapFlag_FourActiveChunks); interiors 1-2.
+ * A cell the pool cannot place stays on the PSX fallback. */
+#define MAX_WCHUNKS   4
 
 /* Chunk data (verts + matrices + tile refs) lives in a FIXED per-slot arena,
  * not the heap: at map time the game runs the heap down to double digits and
@@ -155,12 +155,31 @@ typedef struct
     int            groupCount;
     uint16_t*      tileRefs;   /* -> own arena slot, after mats */
     uint8_t*       cmds;       /* -> own arena slot: all passes' streams */
+    uint8_t*       arena;      /* this chunk's block (pool or fixed arena) */
+    uint32_t       arenaBytes; /* block size; pool chunks shrink to what they used */
     int            tileRefCount;
     int            triCount;   /* all passes, all buffers: the chunk's fill upper bound */
 } WChunk;
 
 static WChunk  s_chunks[MAX_WCHUNKS];
-static uint8_t s_chunkArena[MAX_WCHUNKS][WCHUNK_ARENA_BYTES] __attribute__((aligned(16)));
+
+/* World chunk memory: a best-fit pool over two fixed regions -- the old
+ * 3 x 84K .bss slots merged into one block, plus the tail of the dead PSX
+ * BODYPROG window (dso_n64.c, ~259K). Fixed 84K slots held only 4/32 SPR
+ * and 23/128 THR cells (median 123-147K); the pool places whole cells
+ * wherever a gap fits. Blocks are derived from the live chunks, so there is
+ * no free list to corrupt. */
+#define WPOOL_BSS_BYTES (3 * WCHUNK_ARENA_BYTES)
+static uint8_t s_wpoolBss[WPOOL_BSS_BYTES] __attribute__((aligned(16)));
+typedef struct { uint8_t* base; uint32_t bytes; } WRegion;
+static WRegion s_wreg[2];
+static int     s_wregCount;
+
+/* Cells the pool could not place, retried when a chunk is evicted. */
+#define WPENDING_MAX 8
+typedef struct { char base[16]; int cellX, cellZ; } WPending;
+static WPending s_wpending[WPENDING_MAX];
+static int      s_wpendingCount;
 static WTile   s_tiles[TILE_SLOTS];
 static uint8_t s_tilePool[TILE_SLOTS][TILE_SLOT_BYTES] __attribute__((aligned(16)));
 static int     s_tileRam;
@@ -312,11 +331,13 @@ static void ComposeChunkViews(WChunk* c)
         ShT3d_ComposeInstanceView((const short*)(c->rawRot + i * 9),
                                   (const int*)(c->rawTrans + i * 3), vR, vT);
         memset(&m, 0, sizeof m);
+        /* Verts are raw Q8: the matrix carries the whole 1/8 (rotation and
+         * translation), keeping view space in the small /8 fixed-point-safe
+         * range at full vertex precision. viewRow stays unscaled: it is
+         * applied to group bounds already in /8 space. */
         for (r = 0; r < 3; r++)
             for (cc = 0; cc < 3; cc++)
-                m.m[cc][r] = (float)vR[r * 3 + cc] / 4096.0f;
-        /* Verts are local/8, so the view translation converts the same way;
-         * the whole pipe stays in the small /8 fixed-point-safe range. */
+                m.m[cc][r] = (float)vR[r * 3 + cc] / 4096.0f / 8.0f;
         m.m[3][0] = (float)vT[0] / 8.0f;
         m.m[3][1] = (float)vT[1] / 8.0f;
         m.m[3][2] = (float)vT[2] / 8.0f;
@@ -618,20 +639,27 @@ static void ChunkReadObjTrailer(WChunk* c, FILE* f, int bufCount, int instCount)
     }
 }
 
-/* A resident chunk's arena pointers must all land inside THIS slot's 80KB
- * arena. s_chunkArena ends exactly where s_chunks begins in .bss, so an
- * overrun in the last slot rewrites a chunk header (seen: bufs=0x3c, a NULL
- * deref in WorldFlushPass reading c->bufs[b]). Validate before every use so a
- * corrupt chunk is dropped for the frame instead of crashing, and log it once
- * so the next hardware run names which cell/slot overran. */
+/* A resident chunk's arena pointers must all land inside its own pool block,
+ * and the block inside a pool region. A fixed-slot arena that ended where
+ * s_chunks began once let an overrun rewrite a chunk header (seen: bufs=0x3c,
+ * a NULL deref in WorldFlushPass reading c->bufs[b]). Validate before every
+ * use so a corrupt chunk is dropped for the frame instead of crashing, and
+ * log it once so the next hardware run names which cell overran. */
 static int ChunkArenaValid(const WChunk* c)
 {
-    const uint8_t* base = s_chunkArena[(int)(c - s_chunks)];
-    const uint8_t* end  = base + WCHUNK_ARENA_BYTES;
+    const uint8_t* base;
+    const uint8_t* end;
     const uint8_t* p[4];
-    int i;
+    int i, inRegion = 0;
     if (c < s_chunks || c >= s_chunks + MAX_WCHUNKS)
         return 0;                       /* not a world slot (character chunk) */
+    base = c->arena;
+    end  = base + c->arenaBytes;
+    for (i = 0; i < s_wregCount; i++)
+        if (base >= s_wreg[i].base && end <= s_wreg[i].base + s_wreg[i].bytes)
+            inRegion = 1;
+    if (base == NULL || !inRegion)
+        return 0;
     if (c->bufCount <= 0 || c->bufCount > 64 || c->instCount < 0 || c->instCount > 256)
         return 0;
     p[0] = (const uint8_t*)c->bufs;
@@ -695,6 +723,119 @@ static void ShT3d_MemCheck(const char* where)
                where, i2, bad >= 0 ? "inUse" : "free-stomped",
                s_chunks[i2].cellX, s_chunks[i2].cellZ,
                (void*)s_chunks[i2].bufs, s_chunks[i2].bufCount, s_chunks[i2].instCount);
+    }
+}
+
+static void WPoolInit(void)
+{
+    extern int ShN64_PsxWindowTail(uint8_t** base, uint32_t* bytes);
+    uint8_t* b;
+    uint32_t n;
+    if (s_wregCount != 0)
+        return;
+    s_wreg[0].base  = s_wpoolBss;
+    s_wreg[0].bytes = sizeof s_wpoolBss;
+    s_wregCount     = 1;
+    if (ShN64_PsxWindowTail(&b, &n) && n >= 32 * 1024)
+    {
+        s_wreg[1].base  = b;
+        s_wreg[1].bytes = n & ~(uint32_t)15;
+        s_wregCount     = 2;
+    }
+    SH_DBG("[T3DW] chunk pool: bss %uK + PSX window %uK",
+           (unsigned)(s_wreg[0].bytes / 1024),
+           (unsigned)(s_wregCount > 1 ? s_wreg[1].bytes / 1024 : 0));
+}
+
+/* Walk each region's gaps between live chunks in address order; best fit for
+ * `need` (0 = only report the largest gap through *largest). */
+static uint8_t* WPoolScan(uint32_t need, uint32_t* gapOut, uint32_t* largest)
+{
+    uint8_t* best = NULL;
+    uint32_t bestSize = 0xFFFFFFFFu;
+    int r;
+    for (r = 0; r < s_wregCount; r++)
+    {
+        const uint8_t* rEnd = s_wreg[r].base + s_wreg[r].bytes;
+        uint8_t*       cur  = s_wreg[r].base;
+        for (;;)
+        {
+            const WChunk* nx = NULL;
+            uint32_t gap;
+            int i;
+            for (i = 0; i < MAX_WCHUNKS; i++)
+            {
+                const WChunk* c = &s_chunks[i];
+                if (!c->inUse || c->arena == NULL || c->arena < cur || c->arena >= rEnd)
+                    continue;
+                if (nx == NULL || c->arena < nx->arena)
+                    nx = c;
+            }
+            gap = (uint32_t)((nx ? (const uint8_t*)nx->arena : rEnd) - cur);
+            if (largest && gap > *largest)
+                *largest = gap;
+            if (need && gap >= need && gap < bestSize)
+            {
+                best     = cur;
+                bestSize = gap;
+            }
+            if (nx == NULL)
+                break;
+            cur = (uint8_t*)(((uintptr_t)(nx->arena + nx->arenaBytes) + 15u) & ~(uintptr_t)15u);
+        }
+    }
+    if (gapOut)
+        *gapOut = best ? bestSize : 0;
+    return best;
+}
+
+static uint8_t* WPoolAlloc(uint32_t need, uint32_t* gap)
+{
+    return WPoolScan(need, gap, NULL);
+}
+
+static uint32_t WPoolLargestGap(void)
+{
+    uint32_t l = 0;
+    WPoolScan(0, NULL, &l);
+    return l;
+}
+
+static void WPendingDrop(int cellX, int cellZ)
+{
+    int i;
+    for (i = 0; i < s_wpendingCount; i++)
+        if (s_wpending[i].cellX == cellX && s_wpending[i].cellZ == cellZ)
+        {
+            s_wpending[i] = s_wpending[--s_wpendingCount];
+            i--;
+        }
+}
+
+static void WPendingAdd(const char* base, int cellX, int cellZ)
+{
+    WPendingDrop(cellX, cellZ);
+    if (s_wpendingCount >= WPENDING_MAX)
+        return;
+    snprintf(s_wpending[s_wpendingCount].base, sizeof s_wpending[0].base, "%s", base);
+    s_wpending[s_wpendingCount].cellX = cellX;
+    s_wpending[s_wpendingCount].cellZ = cellZ;
+    s_wpendingCount++;
+}
+
+/* A cell the game still has loaded but the pool could not place: try again
+ * now that an eviction freed space. Loads are synchronous file reads, the
+ * same cost the game's own IPD-loaded hook already pays. */
+static void WPendingRetry(void)
+{
+    WPending list[WPENDING_MAX];
+    int n = s_wpendingCount, i;
+    memcpy(list, s_wpending, sizeof list);
+    for (i = 0; i < n; i++)
+    {
+        char ipd[24];
+        snprintf(ipd, sizeof ipd, "%s.IPD", list[i].base);
+        ShT3d_WorldChunkLoaded(ipd, list[i].cellX, list[i].cellZ);
     }
 }
 
@@ -1094,8 +1235,9 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         }
     if (c == NULL)
     {
+        WPendingAdd(base, cellX, cellZ);
         if (WFailLog())
-            SH_DBG("[T3DW] %s: chunk slots full", base);
+            SH_DBG("[T3DW] %s: chunk slots full -- retried on evict", base);
         fclose(f);
         return;
     }
@@ -1103,7 +1245,8 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     c->cellX = cellX;
     c->cellZ = cellZ;
 
-    if (!ShwLoadBody(c, s_chunkArena[(int)(c - s_chunks)], WCHUNK_ARENA_BYTES, f, base,
+    WPoolInit();
+    if (!ShwLoadBody(c, NULL, 0, f, base,
                      bufCount, instCount, refCount, instOff, refsOff, cellX, cellZ, 0))
     {
         fclose(f);
@@ -1118,10 +1261,18 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     ComposeChunkViews(c);
     fclose(f);
     c->inUse = 1;
-    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tris=%d tiles=%d/%d miss=%d tileRam=%dK",
+    WPendingDrop(cellX, cellZ);
+    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tris=%d tiles=%d/%d miss=%d tileRam=%dK pool=%uK@r%d largestGap=%uK",
            base, bufCount, instCount, c->groupCount, c->triCount, c->tileRefCount, refCount,
-           s_cnTileMiss, s_tileRam / 1024);
+           s_cnTileMiss, s_tileRam / 1024, (unsigned)(c->arenaBytes / 1024),
+           (c->arena >= s_wreg[0].base && c->arena < s_wreg[0].base + s_wreg[0].bytes) ? 0 : 1,
+           (unsigned)(WPoolLargestGap() / 1024));
 }
+
+/* ShwLoadBody's staging: the buffer table (<= 64 x 20 B) and the instance/
+ * vertex read window (<= 256 x 32 B, verts go through it 64 x 16 B at a time). */
+static uint8_t s_loadTable[64 * 20];
+static uint8_t s_loadTmp[256 * 32];
 
 /* The SHW parser proper, shared by world chunks (charMode 0: cell-folded
  * instance translations, tiles ref-counted into the area pool) and native
@@ -1148,7 +1299,12 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
         int      total = 0;
         int      maxWords = 0;
 
-        table = malloc(bufCount * 20);
+        /* Fixed scratch, not malloc: at an exterior the heap runs to single
+         * digits and a failed 4K staging malloc dropped whole cells to the
+         * PSX path. The loader is never re-entered mid-load. */
+        if (bufCount > 64 || instCount > 256)
+            goto fail;
+        table = s_loadTable;
         if (table == NULL)
             goto fail;
         fseek(f, 0x14, SEEK_SET);
@@ -1192,6 +1348,27 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                  + ((rowBytes + 15) & ~15)
                  + ((refBytes + 15) & ~15) + ((bufBytes + 15) & ~15)
                  + ((cmdBytes + 15) & ~15);
+            if (arena == NULL)
+            {
+                /* Pool chunk: ask for ~6% over the hard need so the soft
+                 * group AABBs (~3% measured) usually land too. */
+                uint32_t gap = 0;
+                arena = WPoolAlloc((uint32_t)need + (uint32_t)need / 16, &gap);
+                if (arena == NULL)
+                    arena = WPoolAlloc((uint32_t)need, &gap);
+                if (arena == NULL)
+                {
+                    WPendingAdd(base, cellX, cellZ);
+                    if (WFailLog())
+                        SH_DBG("[T3DW] %s: %dKB, no pool gap (largest %uKB) -- PSX fallback, retried on evict",
+                               base, need / 1024, (unsigned)(WPoolLargestGap() / 1024));
+                    goto fail;
+                }
+                arenaBytes = (int)gap;
+                a = arena;
+            }
+            c->arena      = arena;
+            c->arenaBytes = (uint32_t)arenaBytes;
             if (need > arenaBytes)
             {
                 if (WFailLog())
@@ -1223,9 +1400,7 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
          * from these through the game's own view path (ComposeChunkViews),
          * which is what makes the native world land exactly where the
          * per-prim path would land it. */
-        tmp = malloc(instCount * 32 > 4096 ? (size_t)instCount * 32 : 4096);
-        if (tmp == NULL)
-            goto fail;
+        tmp = s_loadTmp;
         fseek(f, instOff, SEEK_SET);
         if (fread(tmp, 1, instCount * 32, f) != (size_t)(instCount * 32))
             goto fail;
@@ -1247,6 +1422,8 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
          * The list stays for the resident-count log; char tiles are eager in
          * their own store. */
         c->tileRefCount = 0;
+        if (refCount * 2 > (int)sizeof s_loadTmp)
+            goto fail;
         fseek(f, refsOff, SEEK_SET);
         if (fread(tmp, 1, refCount * 2, f) != (size_t)(refCount * 2))
             goto fail;
@@ -1285,29 +1462,17 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                         if (cr > 255) cr = 255;
                         if (cg > 255) cg = 255;
                         if (cb > 255) cb = 255;
-                        /* Q8 world (D*256) -> world/8 t3d units (D*32): >>3.
-                         * Matches the instance translation (tx/8) and the eye
-                         * (camPos/8); keeps every coordinate small enough that
-                         * t3d's fixed-point transform does not overflow. */
-                        /* World verts are Q8 (D*256) -> /8 = D*32 to fit t3d's
-                         * fixed-point range. CHARACTER verts are small bone-
-                         * local values (~+-120 raw); /8 rounds their fine
-                         * features to zero -> degenerate triangles / "missing
-                         * pieces". Perspective projection is scale-invariant,
-                         * so raw renders identically but keeps full precision.
-                         * The bone translation stays raw to match (CharaBone). */
-                        if (charMode)
-                        {
-                            pos[0] = (int16_t)rd16(v + 0);
-                            pos[1] = (int16_t)rd16(v + 2);
-                            pos[2] = (int16_t)rd16(v + 4);
-                        }
-                        else
-                        {
-                            pos[0] = (int16_t)((int16_t)rd16(v + 0) / 8);
-                            pos[1] = (int16_t)((int16_t)rd16(v + 2) / 8);
-                            pos[2] = (int16_t)((int16_t)rd16(v + 4) / 8);
-                        }
+                        /* RAW Q8 for world and character alike; the 1/8 to
+                         * t3d units lives in the instance matrix (rotation
+                         * /4096/8, translation /8), where the RSP applies it
+                         * in fixed point. Dividing the verts here truncated
+                         * every coordinate to 8 Q8 (a 16 Q8 dead band at 0),
+                         * which snapped posters 12..63 Q8 in front of a wall
+                         * onto or through the wall's own snapped plane: the
+                         * poster z-fighting that no draw order could fix. */
+                        pos[0] = (int16_t)rd16(v + 0);
+                        pos[1] = (int16_t)rd16(v + 2);
+                        pos[2] = (int16_t)rd16(v + 4);
                         rgba = ((uint32_t)cr << 24) | ((uint32_t)cg << 16) |
                                ((uint32_t)cb << 8) | (uint32_t)v[9];
                         if (vi & 1) { vp[vi / 2].rgbaB = rgba; vp[vi / 2].normB = 0; }
@@ -1412,6 +1577,7 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                     uint8_t* gp     = c->cmds + ((cmdCur + 15u) & ~15u);
                     if (gcount == 0 || gp + gbytes > arena + arenaBytes)
                     {
+                        c->arenaBytes = (uint32_t)((c->cmds + ((cmdCur + 15u) & ~15u)) - arena);
                         c->groupPos = NULL;
                         if (gcount != 0)
                             SH_DBG("[T3DW] %s: %u group AABBs over the arena -- background-only",
@@ -1421,6 +1587,7 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                     {
                         int16_t* gpos = (int16_t*)gp;
                         uint32_t g    = 0;
+                        c->arenaBytes = (uint32_t)(((gp + gbytes) - arena + 15u) & ~15u);
                         c->groupPos   = gpos;
                         c->groupCount = (int)gcount;
                         for (bi = 0; bi < bufCount; bi++)
@@ -1470,12 +1637,19 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                                             mnx = mny = mnz = 0;
                                             mxx = mxy = mxz = 0;
                                         }
-                                        gpos[g * 6 + 0] = (int16_t)((mnx + mxx) / 2);
-                                        gpos[g * 6 + 1] = (int16_t)((mny + mxy) / 2);
-                                        gpos[g * 6 + 2] = (int16_t)((mnz + mxz) / 2);
-                                        gpos[g * 6 + 3] = (int16_t)((mxx - mnx) / 2 + 1);
-                                        gpos[g * 6 + 4] = (int16_t)((mxy - mny) / 2 + 1);
-                                        gpos[g * 6 + 5] = (int16_t)((mxz - mnz) / 2 + 1);
+                                        /* World bounds go to the /8 space
+                                         * viewRow works in (verts are raw
+                                         * Q8); the character's stay raw. */
+                                        {
+                                            int sh = charMode ? 0 : 3;
+                                            int rnd = (1 << sh) - 1;
+                                            gpos[g * 6 + 0] = (int16_t)(((mnx + mxx) / 2) >> sh);
+                                            gpos[g * 6 + 1] = (int16_t)(((mny + mxy) / 2) >> sh);
+                                            gpos[g * 6 + 2] = (int16_t)(((mnz + mxz) / 2) >> sh);
+                                            gpos[g * 6 + 3] = (int16_t)((((mxx - mnx) / 2 + rnd) >> sh) + 1);
+                                            gpos[g * 6 + 4] = (int16_t)((((mxy - mny) / 2 + rnd) >> sh) + 1);
+                                            gpos[g * 6 + 5] = (int16_t)((((mxz - mnz) / 2 + rnd) >> sh) + 1);
+                                        }
                                         g++;
                                     }
                                     else if (opc == OP_TRIS)
@@ -1491,15 +1665,11 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
         }
 
         c->bufCount = bufCount;
-        free(tmp);
-        free(table);
         return 1;
 
 fail:
         if (WFailLog())
             SH_DBG("[T3DW] %s: load failed (see prior line or alloc)", base);
-        free(tmp);
-        free(table);
         return 0;
     }
 }
@@ -1513,6 +1683,8 @@ void ShT3d_WorldChunkEvict(int cellX, int cellZ)
         rspq_wait();
         ChunkFree(c);
     }
+    WPendingDrop(cellX, cellZ);
+    WPendingRetry();
 }
 
 void ShT3d_WorldReset(void)
@@ -1521,6 +1693,7 @@ void ShT3d_WorldReset(void)
     rspq_wait();
     for (i = 0; i < MAX_WCHUNKS; i++)
         ChunkFree(&s_chunks[i]);
+    s_wpendingCount = 0;
     ChunkFree(&s_itemChunk);     /* the area's item pseudo-cell goes with its SHT */
     for (i = 0; i < (int)(sizeof s_tiles / sizeof s_tiles[0]); i++)
         if (s_tiles[i].sthIdx >= 0)
@@ -2623,13 +2796,13 @@ void ShT3d_WorldObjectsFlush(void)
 
         if (!c->inUse || o->buf >= c->bufCount || o->inst >= c->instCount)
             continue;
-        /* ComposeChunkViews' convention: world verts are /8, so the rotation
-         * stays Q12 and only the translation scales. The placeholder matrix
-         * that compose wrote this frame is overwritten here, before use. */
+        /* ComposeChunkViews' convention: raw Q8 verts, the 1/8 in the matrix
+         * (rotation and translation). The placeholder matrix that compose
+         * wrote this frame is overwritten here, before use. */
         memset(&m, 0, sizeof m);
         for (r = 0; r < 3; r++)
             for (cc = 0; cc < 3; cc++)
-                m.m[cc][r] = (float)o->m9[r * 3 + cc] / 4096.0f;
+                m.m[cc][r] = (float)o->m9[r * 3 + cc] / 4096.0f / 8.0f;
         m.m[3][0] = (float)o->t3[0] / 8.0f;
         m.m[3][1] = (float)o->t3[1] / 8.0f;
         m.m[3][2] = (float)o->t3[2] / 8.0f;
