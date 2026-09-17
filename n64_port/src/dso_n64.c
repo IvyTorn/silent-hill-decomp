@@ -198,6 +198,22 @@ void* MapDso_Open(const char* mapName)
         extern void Xbox_MemReport(const char* tag);
         Xbox_MemReport("before dlopen");
     }
+    /* Evidence for the next reclaim: PSX kernel + SLUS executable RAM below
+     * the BODYPROG window. Nothing on N64 is known to address it; a session
+     * of transitions that keeps reporting it clean makes it pool material. */
+    {
+        const uint8_t* p = (const uint8_t*)g_PsxRam;
+        uint32_t i, first = DSO_WIN_BEGIN, nz = 0;
+        for (i = 0; i < DSO_WIN_BEGIN; i++)
+            if (p[i] != 0)
+            {
+                if (first == DSO_WIN_BEGIN)
+                    first = i;
+                nz++;
+            }
+        SH_DBG("[DSO-WIN] low PSX RAM [0,%05x): %u non-zero bytes, first at +%05x",
+               DSO_WIN_BEGIN, (unsigned)nz, (unsigned)first);
+    }
     for (i = 0; i < sizeof(s_dirs) / sizeof(s_dirs[0]); i++)
     {
         snprintf(path, sizeof(path), "%s/%s.dso", s_dirs[i], mapName);

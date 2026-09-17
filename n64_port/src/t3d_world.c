@@ -558,6 +558,8 @@ static WChunk  s_itemChunk;
 static uint8_t s_itemArena[8 * 1024] __attribute__((aligned(16)));
 static void    ItemChunkLoad(const char* prefix);
 
+static int s_palNeedKB;
+
 static int ShtOpen(const char* prefix)
 {
     uint8_t hdr[8];
@@ -583,9 +585,15 @@ static int ShtOpen(const char* prefix)
     s_shtPalCount  = rd16(hdr + 6);
     strncpy(s_shtPrefix, prefix, sizeof s_shtPrefix - 1);
 
-    /* Palettes stay resident: they are tiny and every block references them. */
+    /* Palettes stay resident: every block references them (ER 27 KB, SPR
+     * 13 KB, THR 39 KB with the index). Allocated right after a transition
+     * refilled the PSX texture cache, so the heap can be short: a failed
+     * allocation turns the native world off for this area (PSX fallback)
+     * instead of freading into NULL. */
     s_palOffsets = malloc(s_shtPalCount * 4);
     s_palWords   = malloc(s_shtPalCount * 2);
+    if (s_palOffsets == NULL || s_palWords == NULL)
+        goto palFail;
     {
         int total = 0;
         fseek(s_sht, 8 + s_shtTileCount * 16, SEEK_SET);
@@ -598,6 +606,11 @@ static int ShtOpen(const char* prefix)
             total += (s_palWords[i] + 3) & ~3;
         }
         s_pals = malloc_uncached(total * 2);
+        if (s_pals == NULL)
+        {
+            s_palNeedKB = (total * 2 + s_shtPalCount * 6) / 1024;
+            goto palFail;
+        }
         total = 0;
         for (i = 0; i < s_shtPalCount; i++)
         {
@@ -610,6 +623,20 @@ static int ShtOpen(const char* prefix)
     SH_DBG("[T3DW] %s.SHT open: %d tiles, %d palettes", prefix, s_shtTileCount, s_shtPalCount);
     ItemChunkLoad(prefix);   /* the area's shared item-pickup models, if baked */
     return 1;
+
+palFail:
+    {
+        extern unsigned Xbox_MemFreeKB(void);
+        static char s_failedPrefix[8];
+        if (strcmp(s_failedPrefix, prefix) != 0)
+        {
+            snprintf(s_failedPrefix, sizeof s_failedPrefix, "%s", prefix);
+            SH_DBG("[T3DW] %s.SHT: palette alloc failed (need ~%dKB, %uKB free) -- native world off, PSX fallback",
+                   prefix, s_palNeedKB, Xbox_MemFreeKB());
+        }
+    }
+    ShT3d_WorldReset();
+    return 0;
 }
 
 /* ------------------------------------------------------------- chunks */
