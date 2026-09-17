@@ -28,6 +28,8 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "psx_memory.h"
 #include <sys/stat.h>
 
 #include "sh_log.h"
@@ -64,6 +66,38 @@ typedef struct
 } SaveHandle;
 
 static SaveFile   s_files[SAVEFS_MAX_FILES];
+
+/* This device only exists when no SD card is mounted (the emulator). Its 8 KB
+ * blocks come from PSX RAM below the BODYPROG window -- kernel + SLUS
+ * executable space nothing on N64 addresses (dso_n64.c scans it at every
+ * transition) -- so an emulator run has the same heap as a console, where
+ * these 128 KB are never allocated at all. Heap only past 16 blocks. */
+#define SAVEFS_LOW_BASE   0x4000u
+#define SAVEFS_LOW_BLOCKS 16
+static uint32_t s_lowUsed;
+
+static unsigned char* SaveFs_BlockAlloc(void)
+{
+    int i;
+    for (i = 0; i < SAVEFS_LOW_BLOCKS; i++)
+        if (!(s_lowUsed & (1u << i)))
+        {
+            s_lowUsed |= 1u << i;
+            return (unsigned char*)g_PsxRam + SAVEFS_LOW_BASE + (unsigned)i * SAVEFS_BLOCK_SIZE;
+        }
+    return (unsigned char*)malloc(SAVEFS_BLOCK_SIZE);
+}
+
+static void SaveFs_BlockFree(unsigned char* p)
+{
+    unsigned char* lo = (unsigned char*)g_PsxRam + SAVEFS_LOW_BASE;
+    if (p >= lo && p < lo + SAVEFS_LOW_BLOCKS * SAVEFS_BLOCK_SIZE)
+    {
+        s_lowUsed &= ~(1u << (unsigned)((p - lo) / SAVEFS_BLOCK_SIZE));
+        return;
+    }
+    free(p);
+}
 static SaveHandle s_handles[4];
 static int        s_mounted;
 
@@ -204,7 +238,7 @@ static int SaveFs_Write(void* file, uint8_t* ptr, int len)
                 chunk = len - done;
             if (h->file->block[bi] == NULL)
             {
-                h->file->block[bi] = (unsigned char*)malloc(SAVEFS_BLOCK_SIZE);
+                h->file->block[bi] = SaveFs_BlockAlloc();
                 if (h->file->block[bi] == NULL)
                 {
                     errno = ENOSPC;
@@ -291,7 +325,8 @@ static int SaveFs_Unlink(char* name)
     {
         int bi;
         for (bi = 0; bi < SAVEFS_BLOCK_COUNT; bi++)
-            free(f->block[bi]);
+            if (f->block[bi] != NULL)
+                SaveFs_BlockFree(f->block[bi]);
     }
     memset(f, 0, sizeof(*f));
     return 0;

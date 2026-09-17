@@ -199,8 +199,10 @@ void* MapDso_Open(const char* mapName)
         Xbox_MemReport("before dlopen");
     }
     /* Evidence for the next reclaim: PSX kernel + SLUS executable RAM below
-     * the BODYPROG window. Nothing on N64 is known to address it; a session
-     * of transitions that keeps reporting it clean makes it pool material. */
+     * the BODYPROG window. Nothing on N64 is known to address it; a console
+     * session of transitions that keeps reporting it clean makes it pool
+     * material. (Without an SD card -- the emulator -- savefs_n64.c keeps its
+     * RAM memory card at +4000..+24000, so non-zero there is expected.) */
     {
         const uint8_t* p = (const uint8_t*)g_PsxRam;
         uint32_t i, first = DSO_WIN_BEGIN, nz = 0;
