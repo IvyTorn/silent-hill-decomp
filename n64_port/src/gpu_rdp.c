@@ -245,7 +245,17 @@ static const rdpq_trifmt_t TRIFMT_SH_SHADE = {
  * rdpq_attach re-establishes the mode itself. */
 static int s_appliedTex   = -1;
 static int s_appliedBlend = -2;
+static int s_appliedFog   = -1;
 static int s_cnModeSets;
+
+/* Set by the native world's per-frame fog handoff (t3d_world.c
+ * ShT3d_WorldFogSet) on fogged in-game frames. Opaque PSX-path
+ * prims then carry the game's fog as the "keep" factor in shade alpha
+ * (gpu_xbox.c ApplyFog) and the RDP fog blender mixes in the fog colour --
+ * true fog, where folding it into the vertex colour only tinted the texture
+ * (fully fogged geometry came out dark-textured instead of fog-coloured). */
+int g_N64FogBlend;
+extern float g_PsyX_FogColor[3];
 
 /* Force the next ApplyMode to re-issue the PSX render mode. Called after the
  * native world path (ShT3d_WorldFlush) reprograms rdpq for 3D, so the PSX OT
@@ -255,6 +265,7 @@ void GpuNv2a_PsxModeInvalidate(void)
     s_modeDirty    = 1;
     s_appliedTex   = -1;
     s_appliedBlend = -2;
+    s_appliedFog   = -1;
     /* The native passes LOAD_TLUT their own palettes into the same TMEM
      * bank this path memoises as "my palette is resident" (s_tlutDirty=0).
      * Since the double-draw fix the PSX path draws only a few prims a frame
@@ -267,20 +278,42 @@ void GpuNv2a_PsxModeInvalidate(void)
 
 static void ApplyMode(void)
 {
-    int texOn;
+    int texOn, fogOn;
 
     if (!s_modeDirty)
         return;
     s_modeDirty = 0;
 
     texOn = (s_texEnabled && s_texPage != NULL) ? 1 : 0;
-    if (texOn == s_appliedTex && s_curBlend == s_appliedBlend)
+    fogOn = (g_N64FogBlend && s_curBlend == 0) ? 1 : 0;
+    if (texOn == s_appliedTex && s_curBlend == s_appliedBlend && fogOn == s_appliedFog)
         return;                     /* same mode the RDP already holds */
     s_appliedTex   = texOn;
     s_appliedBlend = s_curBlend;
+    s_appliedFog   = fogOn;
     s_cnModeSets++;
 
     rdpq_set_mode_standard();
+    {
+        extern int PcConfig_N64PsxTint(void);
+        if (PcConfig_N64PsxTint())
+        {
+            if (ZBufOn())
+                rdpq_mode_zbuf(false, false);
+            rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+            rdpq_set_prim_color(RGBA32(0xFF, 0x00, 0xFF, 0xFF));
+            return;
+        }
+    }
+    if (fogOn)
+    {
+        /* rdpq swaps the standard shade combiners so shade alpha (the fog
+         * keep factor) no longer modulates the texture alpha test. */
+        rdpq_mode_fog(RDPQ_FOG_STANDARD);
+        rdpq_set_fog_color(RGBA32((int)(g_PsyX_FogColor[0] * 255.0f),
+                                  (int)(g_PsyX_FogColor[1] * 255.0f),
+                                  (int)(g_PsyX_FogColor[2] * 255.0f), 0xFF));
+    }
     /* Stage 1: the PSX path (characters, items, 2D) has no real per-vertex
      * depth yet (pos[2]=0), so it must NOT touch the Z-buffer -- otherwise it
      * would write Z=0 (nearest) and wrongly occlude the foreground world pass.
@@ -972,6 +1005,7 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
     s_cnTexTris += 2;
     s_modeDirty    = 1;   /* combiner was changed; next flush re-applies */
     s_appliedBlend = -2;  /* ...and it really must re-apply: invalidate the memo */
+    s_appliedFog   = -1;
     return 1;
 }
 
@@ -1073,7 +1107,7 @@ void GpuNv2a_FrameBegin(void)
     s_cnClipped = s_cnRejected = 0;
     s_cnModeSets = 0;
     /* rdpq_attach re-establishes the render mode for the new frame. */
-    s_appliedTex = -1; s_appliedBlend = -2;
+    s_appliedTex = -1; s_appliedBlend = -2; s_appliedFog = -1;
     s_cnAreaPx = 0;
     s_cnBigTris = 0;
     s_cnCulled = 0;

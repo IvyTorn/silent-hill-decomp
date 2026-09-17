@@ -268,6 +268,90 @@ static int     s_worldStarted;    /* per-frame world state applied */
 static int     s_logOnce;
 static int     s_cnBlocks, s_cnFallback;
 
+/* Projection planes (see the nearP comment in WorldFrameStart).
+ *
+ * FAR IS NOT FREE HERE. tiny3d normalises clip W by k = 2/(far+near) and
+ * hands the ucode fixed-point copies of it: W scale round(65535k)/65536,
+ * screen scale round(size*64k), depth scale round(65535*8k). At far=50000
+ * those came out 3/65536 (vs 2.62), 1 (vs 0.82) and 21 -- so the Z-buffer
+ * used ~1/24 of its range (the poster z-fighting that survived vertex
+ * precision, decal ordering and every near plane) and native geometry drew
+ * ~6.7% larger on screen than the PSX path. far+near = 2048 makes k exactly
+ * 1/1024: W 64, screen 20 (320) / 15 (240), depth 512 -- all exact. 2044
+ * t3d units is 64 m; fogged areas cull at ~15 m. */
+#define WORLD_PROJ_NEAR 4.0f
+#define WORLD_PROJ_FAR  2044.0f
+
+/* N64 hardware fog for the native world and Harry: tiny3d writes a per-vertex
+ * fog factor into shade alpha on the RSP, the RDP fog blender mixes in the
+ * area's fog colour. Fed every frame from g_WorldEnvWork (ShT3d_WorldFogSet).
+ * The game's ramp (WorldEnv_FogDistanceSet, curve D_800AE1C0) is 0 until 1/16
+ * of fog.nearDistance and ~94% by 13/16; a linear 6%..80% span tracks it. */
+static int     s_fogOn;
+static uint8_t s_fogRgb[3];
+static float   s_fogFullZ;      /* view depth (t3d units) of 100% fog */
+/* Groups whose nearest point is beyond this are skipped: fully fogged
+ * geometry over a fog-coloured clear is invisible, and at ~14 m outdoor fog a
+ * 40 m cell is mostly past it -- the RDP fill the frame was spending. 0 = off
+ * (no fog, or a clear colour that is not the fog colour). */
+static float   s_fogCullZ;
+static int     s_cnFogCulled;
+static int     s_fogSetThisFrame;
+#define WORLD_FOG_CULL_MARGIN 16.0f   /* t3d units (~0.5 m) past the draw distance */
+
+void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8)
+{
+    extern int PcConfig_N64WorldFog(void);
+    extern unsigned int GpuXbox_GetClearColor(void);
+    unsigned clear;
+    int dr, dg, db;
+
+    extern int g_N64FogBlend;   /* gpu_rdp.c: PSX-path opaque prims fog too */
+
+    s_fogOn    = enabled && fullQ8 > 0 && PcConfig_N64WorldFog();
+    s_fogCullZ = 0.0f;
+    s_fogSetThisFrame = 1;
+    g_N64FogBlend = s_fogOn;
+    if (!s_fogOn)
+        return;
+    s_fogRgb[0] = (uint8_t)r;
+    s_fogRgb[1] = (uint8_t)g;
+    s_fogRgb[2] = (uint8_t)b;
+    s_fogFullZ  = (float)fullQ8 / 8.0f;
+    clear = GpuXbox_GetClearColor();
+    dr = (int)((clear >> 16) & 0xFF) - r;
+    dg = (int)((clear >> 8) & 0xFF) - g;
+    db = (int)(clear & 0xFF) - b;
+    if (dr >= -12 && dr <= 12 && dg >= -12 && dg <= 12 && db >= -12 && db <= 12)
+        s_fogCullZ = (float)(drawQ8 > fullQ8 ? drawQ8 : fullQ8) / 8.0f + WORLD_FOG_CULL_MARGIN;
+}
+
+/* tiny3d's RSP fog is linear in CLIP-space z: 0 at 2*near, full at 2*far
+ * (rsp_tiny3d.rspl: fog = (z_clip - 2n) * 16384/(f-n), saturated). This
+ * projection gives z_clip = A*d + B for view distance d, so a span [ds, de]
+ * in distance maps to near = (A*ds+B)/2, far = (A*de+B)/2. */
+static void WorldFogApply(void)
+{
+    if (!s_fogOn)
+    {
+        t3d_fog_set_enabled(false);
+        rdpq_mode_fog(0);
+        return;
+    }
+    {
+        float n = WORLD_PROJ_NEAR, f = WORLD_PROJ_FAR;
+        float A = f / (f - n);
+        float B = -2.0f * f * n / (f - n);
+        float ds = s_fogFullZ * 0.06f, de = s_fogFullZ * 0.80f;
+        t3d_fog_set_range((A * ds + B) * 0.5f, (A * de + B) * 0.5f);
+    }
+    t3d_fog_set_enabled(true);
+    /* rdpq adjusts the standard TEX_SHADE/SHADE combiners so shade alpha (now
+     * fog) stops modulating the texture alpha test. */
+    rdpq_mode_fog(RDPQ_FOG_STANDARD);
+    rdpq_set_fog_color(RGBA32(s_fogRgb[0], s_fogRgb[1], s_fogRgb[2], 0xFF));
+}
+
 /* Chunk loads that fail RETRY every frame (the FixOffsets maintenance loop
  * calls the hook per loaded chunk per frame); log the first few and then a
  * heartbeat, or the ring drowns. */
@@ -934,6 +1018,10 @@ static int s_cnTileMiss;   /* groups whose geometry was skipped this frame */
  * re-uploaded the full tile set in BOTH passes, and with the RDP pipe already
  * ~119ms busy of a ~128ms frame that pushed heavy frames past rspq's 200ms
  * RSP watchdog ("__rsp_crash" mid-OT walk). */
+/* decal_mode=2 diagnostic: the decal pass binds flat green, so a screenshot
+ * shows which surfaces mkworld tagged as decals. */
+static int s_bindTintDecal;
+
 static int BindWorldTile(uint16_t tref, uint16_t palArg)
 {
     int slot;
@@ -982,6 +1070,11 @@ static int BindWorldTile(uint16_t tref, uint16_t palArg)
                              s_palWords[palArg]);
         rdpq_tex_upload(TILE0, &surf, NULL);
     }
+    if (s_bindTintDecal)
+    {
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+        rdpq_set_prim_color(RGBA32(0x00, 0xFF, 0x00, 0xFF));
+    }
     return 1;
 }
 
@@ -1028,7 +1121,8 @@ static int BindCharTile(uint16_t tref, uint16_t palArg)
 }
 
 /* wantFg: 0 = draw only background groups (farther than the player), 1 =
- * only foreground (nearer). Splitting the same stream twice around the PSX
+ * only foreground (nearer), 2 = every group (the Z-buffer path; groupPos then
+ * only feeds the fog cull). Splitting the same stream twice around the PSX
  * character OT reproduces the OT's back-to-front order with no Z buffer.
  * groupBase = this stream's first index into groupPos (see WBuf); groupPos
  * NULL = no centroid data, everything is background. viewRow = per-instance
@@ -1043,7 +1137,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
     /* depthSkip defaults to wantFg so any geometry before the first OP_VERTS
      * classification draws in the background pass only -- never in both,
      * which would double-draw it. */
-    int i = 0, pushed = 0, needSync = 0, tileSkip = 0, depthSkip = wantFg;
+    int i = 0, pushed = 0, needSync = 0, tileSkip = 0, depthSkip = (wantFg == 1);
     int gIdx = groupBase;
     /* Vertex-cache fill cursor. The world emits one OP_VERTS per window (loads
      * at 0); a CHARACTER window emits several OP_VERTS -- one per owner bone,
@@ -1116,14 +1210,22 @@ static void RunPass(const uint8_t* p, int cmdWords,
             {
                 const int16_t* B = groupPos + g * 6;
                 float r0 = curRow[0], r1 = curRow[1], r2 = curRow[2];
-                float vzMax = r0 * B[0] + r1 * B[1] + r2 * B[2] + curRow[3]
-                            + (r0 < 0 ? -r0 : r0) * B[3]
-                            + (r1 < 0 ? -r1 : r1) * B[4]
-                            + (r2 < 0 ? -r2 : r2) * B[5];
-                depthSkip = (((vzMax < s_playerViewZ - WORLD_FG_BIAS) ? 1 : 0) != wantFg);
+                float vzC = r0 * B[0] + r1 * B[1] + r2 * B[2] + curRow[3];
+                float vzE = (r0 < 0 ? -r0 : r0) * B[3]
+                          + (r1 < 0 ? -r1 : r1) * B[4]
+                          + (r2 < 0 ? -r2 : r2) * B[5];
+                if (s_fogCullZ > 0.0f && vzC - vzE > s_fogCullZ)
+                {
+                    depthSkip = 1;
+                    s_cnFogCulled++;
+                }
+                else if (wantFg == 2)
+                    depthSkip = 0;
+                else
+                    depthSkip = ((((vzC + vzE) < s_playerViewZ - WORLD_FG_BIAS) ? 1 : 0) != wantFg);
             }
             else
-                depthSkip = wantFg;
+                depthSkip = (wantFg == 1);
             if (depthSkip)
                 continue;
             /* Bind the pending tile BEFORE the vert load: for every drawn
@@ -1899,7 +2001,7 @@ static void WorldFrameStart(void)
              * the 12..63 Q8 decal offsets were never a precision problem: the
              * poster flicker is the RDP's dz compare tolerance, fixed with a
              * DECAL-mode pass (OP_DECAL stream), not the near plane. */
-            float nearP = 4.0f, farP = 50000.0f;
+            float nearP = WORLD_PROJ_NEAR, farP = WORLD_PROJ_FAR;
             float oX, oY, sX, sY;
             int   cX;
             T3DMat4 proj;
@@ -1922,6 +2024,7 @@ static void WorldFrameStart(void)
         }
         t3d_viewport_look_at(&s_wvp, &e, &tg, &u);
         t3d_viewport_attach(&s_wvp);
+        WorldFogApply();
 
         rdpq_mode_filter(FILTER_POINT);
         {
@@ -2040,6 +2143,7 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
 typedef struct
 {
     uint16_t       tref, pal, buf, words;
+    uint16_t       gBase;    /* groupPos index of the record's first OP_VERTS */
     WChunk*        c;
     const uint8_t* p;
 } ZRec;
@@ -2056,9 +2160,10 @@ static int ZRecCmp(const void* a, const void* b)
 }
 
 static int ZRecPush(int n, WChunk* c, int b, const uint8_t* p, int start, int end,
-                    uint16_t tref, uint16_t pal)
+                    uint16_t tref, uint16_t pal, int gBase)
 {
     if (n >= ZREC_MAX) { s_cnZRecOverflow++; return n; }
+    s_zrec[n].gBase = (uint16_t)gBase;
     s_zrec[n].tref  = tref;
     s_zrec[n].pal   = pal;
     s_zrec[n].buf   = (uint16_t)b;
@@ -2073,6 +2178,7 @@ static int ZRecPush(int n, WChunk* c, int b, const uint8_t* p, int start, int en
 static int ZSplitStream(WChunk* c, int b, const uint8_t* p, int words, int n)
 {
     int      i = 0, start = -1;
+    int      g = c->bufs[b].opaGroupBase, gStart = g;
     uint16_t tref = 0, pal = 0;
     while (i < words)
     {
@@ -2080,19 +2186,20 @@ static int ZSplitStream(WChunk* c, int b, const uint8_t* p, int words, int n)
         if (opc == OP_TILE)
         {
             if (start >= 0)
-                n = ZRecPush(n, c, b, p, start, i, tref, pal);
-            start = i;
-            tref  = rd16(p + (i + 1) * 2);
-            pal   = arg;
+                n = ZRecPush(n, c, b, p, start, i, tref, pal, gStart);
+            start  = i;
+            gStart = g;
+            tref   = rd16(p + (i + 1) * 2);
+            pal    = arg;
             i += 2;
         }
         else if (opc == OP_MATRIX) i += 1;
-        else if (opc == OP_VERTS)  i += 2;
+        else if (opc == OP_VERTS)  { i += 2; g++; }
         else if (opc == OP_TRIS)   i += 1 + (arg * 3 + 1) / 2;
         else break;                 /* OP_END (or a bad opcode) */
     }
     if (start >= 0)
-        n = ZRecPush(n, c, b, p, start, i, tref, pal);
+        n = ZRecPush(n, c, b, p, start, i, tref, pal, gStart);
     return n;
 }
 
@@ -2140,8 +2247,8 @@ static void WorldFlushPass(int wantFg)
             {
                 const ZRec* r = &s_zrec[i];
                 RunPass(r->p, r->words, r->c->verts + r->c->bufs[r->buf].vbase / 2,
-                        r->c->mats + s_matPhase * r->c->instCount, NULL,
-                        r->c->viewRow, 0, 0, 0, BindWorldTile, first);
+                        r->c->mats + s_matPhase * r->c->instCount, r->c->groupPos,
+                        r->c->viewRow, r->gBase, 2, 0, BindWorldTile, first);
                 first = 0;
                 s_cnBlocks++;
             }
@@ -2155,6 +2262,11 @@ static void WorldFlushPass(int wantFg)
                 int dm = PcConfig_N64DecalMode();
                 if (dm == 1)
                     rdpq_mode_zmode(ZMODE_DECAL);
+                if (dm == 2)
+                {
+                    s_bindTintDecal = 1;
+                    s_lastBoundOk   = 0;   /* force a bind so the tint applies */
+                }
                 for (i = 0; i < s_drawCount; i++)
                 {
                     WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
@@ -2170,6 +2282,11 @@ static void WorldFlushPass(int wantFg)
                 }
                 if (dm == 1)
                     rdpq_mode_zmode(ZMODE_STANDARD);
+                if (dm == 2)
+                {
+                    s_bindTintDecal = 0;
+                    s_lastBoundOk   = 0;
+                }
             }
         }
         else
@@ -2185,8 +2302,8 @@ static void WorldFlushPass(int wantFg)
                     continue;
                 RunPass(c->cmds + c->bufs[b].semiOff, c->bufs[b].semiWords,
                         c->verts + c->bufs[b].vbase / 2,
-                        c->mats + s_matPhase * c->instCount, NULL, c->viewRow,
-                        0, 0, 1, BindWorldTile, first);
+                        c->mats + s_matPhase * c->instCount, c->groupPos, c->viewRow,
+                        c->bufs[b].semiGroupBase, 2, 1, BindWorldTile, first);
                 first = 0;
                 s_cnBlocks++;
             }
@@ -2289,9 +2406,19 @@ void ShT3d_NotifyFrameEnd(void)
     static int s_census;
     s_frameActive = 0;
     if (s_worldStarted && (s_census++ & 127) == 0)
-        SH_DBG("[T3DW] blocks=%d fallback=%d tileRam=%dK tileUp=%d dedup=%d",
-               s_cnBlocks, s_cnFallback, s_tileRam / 1024, s_cnTileUp, s_cnTileDedup);
+        SH_DBG("[T3DW] blocks=%d fallback=%d tileRam=%dK tileUp=%d dedup=%d fog=%d fogFull=%d fogCull=%d culled=%d",
+               s_cnBlocks, s_cnFallback, s_tileRam / 1024, s_cnTileUp, s_cnTileDedup,
+               s_fogOn, (int)s_fogFullZ, (int)s_fogCullZ, s_cnFogCulled);
+    s_cnFogCulled = 0;
     s_cnBlocks = s_cnFallback = 0;
+    {
+        /* A frame that drew no world (menus, 2D screens) must not leave the
+         * PSX path in fog-blend mode. */
+        extern int g_N64FogBlend;
+        if (!s_fogSetThisFrame)
+            g_N64FogBlend = 0;
+        s_fogSetThisFrame = 0;
+    }
     s_cnTileUp = s_cnTileDedup = 0;
 }
 

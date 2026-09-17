@@ -392,6 +392,21 @@ int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 static int s_mapKeySet = 0;
 int PcConfig_MapKeySet(void) { return s_mapKeySet; }
 
+/* N64 fog (keys world_fog, fog_distance). world_fog=0 turns the RDP fog
+ * blend off (native world and PSX path). fog_distance is a percentage of
+ * each area's own fog distance, applied where the game sets it
+ * (WorldEnv_FogDistanceSet): lower = denser fog AND a shorter draw distance,
+ * since fully fogged geometry is not drawn. */
+static int s_n64WorldFog = 1;
+static int s_n64FogDistancePct = 100;
+int PcConfig_N64WorldFog(void) { return s_n64WorldFog; }
+
+/* N64 diagnostic (key psx_tint): paint every PSX-path prim flat magenta so a
+ * screenshot shows exactly what is not drawn natively. */
+static int s_n64PsxTint = 0;
+int PcConfig_N64PsxTint(void) { return s_n64PsxTint; }
+int PcConfig_N64FogDistancePct(void) { return s_n64FogDistancePct; }
+
 void PcConfig_Load(const char* path)
 {
     if (path) {
@@ -848,6 +863,19 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "decal_mode") == 0)
         {
             s_n64DecalMode = atoi(value);
+        }
+        else if (strcmp(key, "psx_tint") == 0)
+        {
+            s_n64PsxTint = atoi(value);
+        }
+        else if (strcmp(key, "world_fog") == 0)
+        {
+            s_n64WorldFog = atoi(value);
+        }
+        else if (strcmp(key, "fog_distance") == 0)
+        {
+            int v = atoi(value);
+            s_n64FogDistancePct = v < 25 ? 25 : v > 200 ? 200 : v;
         }
         else if (strcmp(key, "chara_debug") == 0)
         {

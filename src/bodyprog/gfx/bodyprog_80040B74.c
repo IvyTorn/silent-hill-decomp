@@ -3281,6 +3281,16 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                            Q12_TO_Q8(g_SysWork.playerWork.player.position.vy),
                            Q12_TO_Q8(g_SysWork.playerWork.player.position.vz),
                            ReadGeomScreen(), gofx, gofy);
+        /* Fog for the native renderer (N64 hardware fog + fully-fogged cull):
+         * fog.nearDistance is where the game's ramp reaches 100% (Q8 view
+         * depth), fog.farDistance its draw distance. */
+        {
+            extern void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8);
+            ShT3d_WorldFogSet(g_WorldEnvWork.isFogEnabled,
+                              g_WorldEnvWork.fog.color.r, g_WorldEnvWork.fog.color.g,
+                              g_WorldEnvWork.fog.color.b,
+                              g_WorldEnvWork.fog.nearDistance, g_WorldEnvWork.fog.farDistance);
+        }
         /* One in-game GTE numeric probe per boot; models re-set rot/trans
          * before every draw, so the clobber is invisible. */
         {

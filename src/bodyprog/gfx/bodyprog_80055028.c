@@ -721,6 +721,21 @@ void WorldEnv_FogDistanceSet(q19_12 nearDist, q19_12 farDist) // 0x80055840
     s32 var_v1;
     s32 temp;
 
+#ifdef SH_N64_PORT
+    /* fog_distance (percent): the N64 draw-distance knob. Scaling the game's
+     * own fog keeps the PSX-path ramp, the native RDP fog and the native
+     * fully-fogged cull in agreement. Fog-less areas keep their distances. */
+    if (g_WorldEnvWork.isFogEnabled)
+    {
+        extern int PcConfig_N64FogDistancePct(void);
+        s32 pct = PcConfig_N64FogDistancePct();
+        if (pct != 100)
+        {
+            nearDist = (s32)(((s64)nearDist * pct) / 100);
+            farDist  = (s32)(((s64)farDist * pct) / 100);
+        }
+    }
+#endif
     nearDist = Q12_TO_Q8(nearDist);
 
     g_WorldEnvWork.fog.nearDistance = nearDist;

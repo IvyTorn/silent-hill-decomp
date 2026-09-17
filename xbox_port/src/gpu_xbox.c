@@ -82,6 +82,9 @@ extern int  Pgxp_GetPreciseVertex(const void* addr, unsigned value, float* ox, f
  * the diffuse and puts fogColor*f into the specular attribute, which the final
  * combiner ADDS (out = tex*col*(1-f) + fogC*f — exactly PsyCross's mix()). */
 extern float g_PsyX_FogColor[3];
+#ifdef SH_N64_PORT
+extern int g_N64FogBlend;   /* gpu_rdp.c: opaque prims use the RDP fog blender */
+#endif
 
 /* --- render census (probe [OTS]/[FOGPAD]/[ABR]/[PRIM?]) --------------------
  * Accumulated over a 150-frame window, dumped as 3 integer-only lines. Replaces
@@ -94,6 +97,9 @@ static int s_cnNodes[2];                  /* nodes walked, call slot 0/1 (last f
 static int s_cnCallsMax = 0;              /* max DrawOTag calls seen in one frame */
 static int s_cnPrims = 0;                 /* prims parsed in the window */
 static int s_cnGt = 0, s_cnFogged = 0;    /* GT prims / with nonzero fog pads */
+#ifdef SH_N64_PORT
+static int s_cnFogDropped = 0;            /* fully fogged opaque prims skipped */
+#endif
 static int s_cnPadMin = 999, s_cnPadMax = -1;
 static int s_cnAbr[4];                    /* semi-trans prims per ABR mode */
 static int s_cnLines = 0, s_cnUnk = 0;    /* line prims / unknown-code skips */
@@ -628,6 +634,19 @@ static void ApplyFog(ShVertex* v, int pad)
     if (pad <= 0) return;
     if (pad > 127) pad = 127;
     f = (float)pad * (1.0f / 127.0f);
+#ifdef SH_N64_PORT
+    if (g_N64FogBlend)
+    {
+        /* Keep factor for the RDP fog blender (gpu_rdp.c ApplyMode); colour
+         * stays unfogged. Semi-transparent prims fold it back below
+         * (N64FogFoldSemi) because their blend needs the alpha. */
+        v->col[3] = 1.0f - f;
+        s_cnFogged++;
+        if (pad < s_cnPadMin) s_cnPadMin = pad;
+        if (pad > s_cnPadMax) s_cnPadMax = pad;
+        return;
+    }
+#endif
     v->col[0] *= 1.0f - f;
     v->col[1] *= 1.0f - f;
     v->col[2] *= 1.0f - f;
@@ -986,6 +1005,39 @@ static int ProcessPoly(P_TAG* tag)
             return primLen;   /* skip the emit; walk stays in sync */
         }
     }
+
+#ifdef SH_N64_PORT
+    if (g_N64FogBlend && gouraud && textured)
+    {
+        const int n = quad ? 4 : 3;
+        if (abe)
+        {
+            /* The blend owns the alpha: fold the fog into the colour the way
+             * the fog-less path does and restore full alpha. */
+            for (i = 0; i < n; i++)
+            {
+                float k = v[i].col[3], f = 1.0f - k;
+                v[i].col[0] = v[i].col[0] * k + g_PsyX_FogColor[0] * f;
+                v[i].col[1] = v[i].col[1] * k + g_PsyX_FogColor[1] * f;
+                v[i].col[2] = v[i].col[2] * k + g_PsyX_FogColor[2] * f;
+                v[i].col[3] = 1.0f;
+            }
+        }
+        else
+        {
+            /* Completely fogged opaque geometry would paint the fog colour
+             * over the fog-coloured clear: skip it (fill the RDP never does). */
+            for (i = 0; i < n; i++)
+                if (v[i].col[3] > 0.0f)
+                    break;
+            if (i == n)
+            {
+                s_cnFogDropped++;
+                return primLen;
+            }
+        }
+    }
+#endif
 
     /* Semi-transparent (ABE) prims use the tpage's ABR mode (bits 5-6): 0 =
      * 0.5B+0.5F average, 1 = B+F additive (fire/flashlight glow), 2 = B-F
@@ -1402,6 +1454,11 @@ void DrawOTag(u_long* p)
                    s_bbMinX, s_bbMaxX, s_bbMinY, s_bbMaxY);
             SH_DBG("[FOGPAD] gt=%d fogged=%d padMin=%d padMax=%d",
                    s_cnGt, s_cnFogged, s_cnPadMin > 128 ? -1 : s_cnPadMin, s_cnPadMax);
+#ifdef SH_N64_PORT
+            SH_DBG("[N64FOG] blend=%d gt=%d fogged=%d dropped=%d (120-frame sums)",
+                   g_N64FogBlend, s_cnGt, s_cnFogged, s_cnFogDropped);
+            s_cnFogDropped = 0;
+#endif
             SH_DBG("[ABR] avg=%d add=%d sub=%d q=%d lines=%d unk=%d oversize=%d",
                    s_cnAbr[0], s_cnAbr[1], s_cnAbr[2], s_cnAbr[3], s_cnLines, s_cnUnk, s_cnOversize);
             /* Where the render frame goes: walk = the whole DrawOTag(s) (parse +
