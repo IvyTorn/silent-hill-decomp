@@ -39,6 +39,37 @@ extern void Fs_InitFileTableForRegion(int region);
 
 extern void* g_OvlDynamic;
 extern void* g_OvlBodyprog;
+extern void* g_Demo_PlayFileBufferPtr;   /* s_DemoFrameData* on the game side */
+extern void* D_800ED230[2];
+
+extern void GroanerAnimInfos_Init(void);
+extern void BloodsuckerAnimInfos_Init(void);
+extern void BloodyLisaAnimInfos_Init(void);
+extern void AlessaAnimInfos_Init(void);
+extern void GhostChildAlessaAnimInfos_Init(void);
+extern void LisaAnimInfos_Init(void);
+extern void KaufmannAnimInfos_Init(void);
+extern void DahliaAnimInfos_Init(void);
+extern void CatAnimInfos_Init(void);
+extern void PuppetNurseData_Init(void);
+extern void LarvalStalkerAnimInfos_Init(void);
+extern void HangedScratcherAnimInfos_Init(void);
+extern void CreeperAnimInfos_Init(void);
+extern void SplitHeadAnimInfos_Init(void);
+extern void RomperAnimInfos_Init(void);
+extern void LockerDeadBodyAnimInfos_Init(void);
+extern void TwinfeelerAnimInfos_Init(void);
+extern void FloatstingerAnimInfos_Init(void);
+extern void MonsterCybilAnimInfos_Init(void);
+extern void FlaurosAnimInfos_Init(void);
+extern void ParasiteAnimInfos_Init(void);
+extern void GhostDoctorAnimInfos_Init(void);
+extern void BloodyIncubatorAnimInfos_Init(void);
+extern void IncubatorAnimInfos_Init(void);
+extern void LittleIncubusAnimInfos_Init(void);
+extern void IncubusAnimInfos_Init(void);
+extern void Unkkown23AnimInfos_Init(void);
+extern void Map6S04ExtraAnimInfos_Init(void);
 
 /* ---------------------------------------------------------------- hal */
 
@@ -93,9 +124,50 @@ static void Sh_InitGameData(void)
     PcPort_InitSdBuffers();
     AsRodata_Reformat();
 
+    /* Monster/NPC animation tables live in the executable (every map module
+     * that includes the character imports the same table) with their
+     * playbackFunc pointers filled at runtime, exactly as main_pc.c and
+     * main_xbox.c do. N64 never called these: the tables stayed all-NULL
+     * and the first Groaner update outside the police station called
+     * through GROANER_ANIM_INFOS[..].playbackFunc = NULL (seen in ares,
+     * map2_s02, Groaner_Update -> sharedFunc_800E5EC4_2_s00). */
+    GroanerAnimInfos_Init();
+    BloodsuckerAnimInfos_Init();
+    BloodyLisaAnimInfos_Init();
+    AlessaAnimInfos_Init();
+    GhostChildAlessaAnimInfos_Init();
+    LisaAnimInfos_Init();
+    KaufmannAnimInfos_Init();
+    DahliaAnimInfos_Init();
+    CatAnimInfos_Init();
+    PuppetNurseData_Init();
+    LarvalStalkerAnimInfos_Init();
+    HangedScratcherAnimInfos_Init();
+    CreeperAnimInfos_Init();
+    SplitHeadAnimInfos_Init();
+    RomperAnimInfos_Init();
+    LockerDeadBodyAnimInfos_Init();
+    TwinfeelerAnimInfos_Init();
+    FloatstingerAnimInfos_Init();
+    MonsterCybilAnimInfos_Init();
+    FlaurosAnimInfos_Init();
+    ParasiteAnimInfos_Init();
+    GhostDoctorAnimInfos_Init();
+    BloodyIncubatorAnimInfos_Init();
+    IncubatorAnimInfos_Init();
+    LittleIncubusAnimInfos_Init();
+    IncubusAnimInfos_Init();
+    Unkkown23AnimInfos_Init();
+    Map6S04ExtraAnimInfos_Init();
+
     /* Overlay base pointers into emulated PSX RAM (USA addresses, per main_pc.c). */
-    g_OvlDynamic  = PSX_ADDR(0x000C9578);
-    g_OvlBodyprog = PSX_ADDR(0x00024B60);
+    g_OvlDynamic             = PSX_ADDR(0x000C9578);
+    g_OvlBodyprog            = PSX_ADDR(0x00024B60);
+    g_Demo_PlayFileBufferPtr = PSX_ADDR(0x000F5E00);
+
+    /* map7_s03 ending DMS phase headers (main_pc.c): FS_BUFFER_20, FS_BUFFER_18. */
+    D_800ED230[0] = PSX_ADDR(0x00185600);
+    D_800ED230[1] = PSX_ADDR(0x00180600);
 }
 
 /* --------------------------------------------------------------- main */
