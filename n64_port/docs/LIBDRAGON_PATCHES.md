@@ -65,6 +65,24 @@ Current patches (2026-09-05):
    a zero-length plane -> NaN -> FPU trap). Rebuilt into n64_inst the same
    way.
 
+7. `src/dlfcn.c` -- **app-owned storage for DSO modules and the main-exe
+   symbol table (2026-09-16).** Three weak hooks, defined in
+   `n64_port/src/dso_n64.c`: `sh_dl_module_alloc(size)` /
+   `sh_dl_module_free(ptr)` (dlopen sizes the module with
+   `asset_loadfd_into(fd, &sz, NULL, &need)`, then loads into the returned
+   block; close_module hands it back instead of `free`) and
+   `sh_dl_symtab_alloc(size)` (load_mainexe_sym_table). A NULL/0 answer, or
+   no hook, keeps stock heap behaviour. Why: the heap is ~1.5 MB and runs
+   ~100 KB free and fragmented in-game, so the next map's 200+ KB contiguous
+   `memalign` asserted at the police-station front door ("Out of memory:
+   cannot allocate 213824 bytes"), and the 114 KB symbol table, loaded at the
+   first dlopen right after the texture cache was released, sat in the middle
+   of the heap for the rest of the run. The app places both in the dead PSX
+   BODYPROG window of `g_PsxRam` ([0x24B60, 0xC9578): native code on N64,
+   never written). Verified in ares: all 42 map modules load there, bind and
+   unload (`[DSO-TEST] 42 modules OK, 0 bad`, emulator-only self-test in
+   `MapDso_SelfTest`).
+
 After changing any of these:
 
     ./n64_port/docker_run.sh bash ./n64_port/build_libdragon.sh

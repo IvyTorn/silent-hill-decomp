@@ -131,9 +131,18 @@ void XboxConfig_ApplyOverrides(void)
     g_PcConfig.audioOutput = 0;
     g_PcConfig.adsr        = 1;
 
+#ifdef SH_N64_PORT
     /* Police station (map2_s04): a small interior, a better bring-up target
-     * than the intro alley's dead-world sequence. N64 default only; a
-     * silenthill.cfg on the SD card still wins. */
-    strncpy(g_PcConfig.mapName, "map2_s04", sizeof(g_PcConfig.mapName) - 1);
-    g_PcConfig.mapName[sizeof(g_PcConfig.mapName) - 1] = '\0';
+     * than the intro alley's dead-world sequence. N64 default only, and only
+     * when silenthill.cfg names no map: this runs AFTER the file is loaded,
+     * so an unconditional copy silently ate every `map=` line. */
+    {
+        extern int PcConfig_MapKeySet(void);
+        if (!PcConfig_MapKeySet())
+        {
+            strncpy(g_PcConfig.mapName, "map2_s04", sizeof(g_PcConfig.mapName) - 1);
+            g_PcConfig.mapName[sizeof(g_PcConfig.mapName) - 1] = '\0';
+        }
+    }
+#endif
 }

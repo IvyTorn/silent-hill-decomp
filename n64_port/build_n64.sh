@@ -167,7 +167,10 @@ if [ -f "$SCRIPT_DIR/build/diag_disc.shpak" ] && [ -d "$SCRIPT_DIR/filesystem/ma
     # no SD card, so rom:/N64W is the only way t3d_world.c finds them there.
     if [ -d "$SCRIPT_DIR/build/n64w" ]; then
         cp -r "$SCRIPT_DIR/build/n64w" "$SCRIPT_DIR/build/diagfs/N64W"
-        echo "    [DIAG] N64W: $(du -sh "$SCRIPT_DIR/build/n64w" | cut -f1)"
+        # THR (the town, ~20MB) would push this ROM past ares's 64MB ISViewer
+        # limit; the diag ROM keeps the smaller areas only.
+        rm -f "$SCRIPT_DIR/build/diagfs/N64W/"THR*
+        echo "    [DIAG] N64W: $(du -sh "$SCRIPT_DIR/build/diagfs/N64W" | cut -f1)"
     fi
     "$I/bin/mkdfs" "$SCRIPT_DIR/build/sh_diag.dfs" "$SCRIPT_DIR/build/diagfs" >/dev/null
     rm -f "$OUT/sh_diag.z64"

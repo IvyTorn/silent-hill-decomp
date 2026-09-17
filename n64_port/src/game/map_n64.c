@@ -24,6 +24,13 @@
 #include "sh_log.h"
 #include "map_dso_n64.h"
 
+/* map0_s01's cutscenes call this map-shared helper, but no map source
+ * includes its definition (every PSX overlay carried its own copy; PC defines
+ * it in main_pc.c). Defined here in the executable so map0_s01.dso binds:
+ * without it the first dlopen after the opening alley asserts "Failed to find
+ * symbol SysWork_StateStepIncrementAfterTime". */
+#include "maps/shared/SysWork_StateStepIncrementAfterTime.h"
+
 extern s_MapOverlayHdr g_MapOverlayHeader_map0_s00;
 
 /* RSP-park evidence, called across the include firewall from gpu_rdp.c's

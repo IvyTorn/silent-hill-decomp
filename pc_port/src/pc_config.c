@@ -387,6 +387,11 @@ const char* Pc_FlashlightModeLabel(int mode)
 static int s_n64DecalMode = 0;
 int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 
+/* Whether the loaded file named a start map: a console's own default start
+ * map (XboxConfig_ApplyOverrides) must not override the user's choice. */
+static int s_mapKeySet = 0;
+int PcConfig_MapKeySet(void) { return s_mapKeySet; }
+
 void PcConfig_Load(const char* path)
 {
     if (path) {
@@ -1014,6 +1019,7 @@ void PcConfig_Load(const char* path)
             {
                 strncpy(g_PcConfig.mapName, value, sizeof(g_PcConfig.mapName) - 1);
                 g_PcConfig.mapName[sizeof(g_PcConfig.mapName) - 1] = '\0';
+                s_mapKeySet = 1;
             }
         }
         else if (strncmp(key, "launcher_", 9) == 0)

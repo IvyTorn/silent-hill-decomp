@@ -82,6 +82,8 @@ static void Sh_Say(const char* msg)
 
 /* --------------------------------------------------------------- data */
 
+extern int Cd_N64SdPresent(void);
+
 static void Sh_InitGameData(void)
 {
     /* PSX memory emulation first -- everything below is g_PsxRam-relative. */
@@ -209,6 +211,11 @@ int main(void)
     g_PcConfig.allowLooseFiles = 1;
     PcConfig_Load("sd:/silenthill/silenthill.cfg");
     XboxConfig_ApplyOverrides();
+    /* Emulator smoke runs (no SD card = never a console) start New Game on
+     * the exterior behind the police-station door: it exercises a DSO load,
+     * four active cells in the world chunk pool, and fog, with no human. */
+    if (!Cd_N64SdPresent())
+        strcpy(g_PcConfig.mapName, "map2_s02");
 
     /* PSX kernel events + memory card. NOT optional and not obvious: it is what
      * resolves the save location, and without it mcard_xbox.c reports no card,
@@ -231,6 +238,12 @@ int main(void)
 
     Sh_Say("fs queue");
     Fs_QueueInitialize();
+
+    {
+        extern void MapDso_SelfTest(void);
+        if (!Cd_N64SdPresent())
+            MapDso_SelfTest();
+    }
 
     Xbox_MemReport("before MainLoop");
     Sh_Say("entering MainLoop");
