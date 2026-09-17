@@ -3285,11 +3285,13 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
          * fog.nearDistance is where the game's ramp reaches 100% (Q8 view
          * depth), fog.farDistance its draw distance. */
         {
-            extern void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8);
+            extern void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8,
+                                          int intensityQ12);
             ShT3d_WorldFogSet(g_WorldEnvWork.isFogEnabled,
                               g_WorldEnvWork.fog.color.r, g_WorldEnvWork.fog.color.g,
                               g_WorldEnvWork.fog.color.b,
-                              g_WorldEnvWork.fog.nearDistance, g_WorldEnvWork.fog.farDistance);
+                              g_WorldEnvWork.fog.nearDistance, g_WorldEnvWork.fog.farDistance,
+                              g_WorldEnvWork.fog.intensity);
         }
         /* One in-game GTE numeric probe per boot; models re-set rot/trans
          * before every draw, so the clobber is invisible. */
@@ -3527,6 +3529,19 @@ void Ipd_ChunkDraw(s_IpdHeader* ipdHdr, q19_12 posX, q19_12 posZ, GsOT* ot, bool
                     if (n64NativeBuf && ipdHdr->lmHdr != NULL &&
                         modelInfo.modelHdr >= ipdHdr->lmHdr->modelHdrs &&
                         modelInfo.modelHdr <  ipdHdr->lmHdr->modelHdrs + ipdHdr->lmHdr->modelCount)
+                        continue;
+                    /* A --glb bake (2) made every instance the area's GLB.PLM
+                     * resolves native too; the resident global LM must be
+                     * that same file, or the name match the bake relied on
+                     * does not hold. Without this the exterior's shared props
+                     * drew twice (native + PSX): ~600 PSX tris and 60-180K
+                     * extra pixels a frame on the street. */
+                    if (n64NativeBuf == 2 && g_Map.globalLm.lmHdr != NULL &&
+                        g_Map.globalLm.lmHdr->isLoaded &&
+                        g_WorldGfxWork.mapInfo != NULL &&
+                        g_Map.globalLm.fileIdx == g_WorldGfxWork.mapInfo->plmFileIdx &&
+                        modelInfo.modelHdr >= g_Map.globalLm.lmHdr->modelHdrs &&
+                        modelInfo.modelHdr <  g_Map.globalLm.lmHdr->modelHdrs + g_Map.globalLm.lmHdr->modelCount)
                         continue;
 #endif
                     // Set model matrix.

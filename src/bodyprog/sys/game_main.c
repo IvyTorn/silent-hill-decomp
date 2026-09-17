@@ -3280,9 +3280,19 @@ void MainLoop(void) // 0x80032EE0
                 }
                 while (cur && w2 < 8192) {
                     uintptr_t curAddr = (uintptr_t)cur;
+#if defined(SH_N64_PORT)
+                    /* Every legitimate node here lives in KSEG0 RDRAM, not
+                     * only in the packet arena: the native character's OT
+                     * marker (gpu_xbox.c), map-module statics, PSX RAM work
+                     * buffers. The arena-only test cut the chain at the first
+                     * such node and dropped EVERY nearer bucket with it. */
+                    int curOk = (curAddr >= 0x80000000u && curAddr < 0x80800000u &&
+                                 (curAddr & 3u) == 0);
+#else
                     int curOk = ((curAddr >= pktLo && curAddr < pktHi) ||
                                  (curAddr >= otLo  && curAddr < otHi)  ||
                                  (subLo && curAddr >= subLo && curAddr < subHi));
+#endif
                     if (pmapTrace && w2 < 200) {
                         u8 dbgCode = curOk ? ((P_TAG*)cur)->code : 0xFF;
                         int dbgLen = curOk ? getlen(cur) : -1;
@@ -3291,6 +3301,10 @@ void MainLoop(void) // 0x80032EE0
                         static int s_dumpedOnce = 0;
                         if (!s_dumpedOnce) {
                             s_dumpedOnce = 1;
+#if defined(SH_N64_PORT)
+                            SH_DBG("[OT-SANIT] OT0 chain cut at %p (node %d, prev %p) -- nearer buckets dropped",
+                                   (void*)cur, w2, (void*)prev);
+#endif
                         }
                         /* Skip past the corrupt prim by re-linking prev to
                          * ot0->org[0] — the closest-to-camera bucket, last in

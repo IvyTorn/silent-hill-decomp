@@ -41,6 +41,11 @@
 /* ------------------------------------------------------------- formats */
 
 #define SHW_MAGIC 0x53485731u /* 'SHW1' */
+/* bufferCount bit 15: baked with the area's GLB.PLM (mkworld --glb);
+ * bit 14: OP_VERTS indices are cell-global (shared vertex windows). */
+#define SHW_FLAG_GLB     0x8000u
+#define SHW_FLAG_SHAREDV 0x4000u
+#define SHW_COUNT_MASK   0x3FFFu
 #define SHT_MAGIC 0x53485431u /* 'SHT1' */
 
 #define OP_TILE   0x1
@@ -159,6 +164,8 @@ typedef struct
     uint32_t       arenaBytes; /* block size; pool chunks shrink to what they used */
     int            tileRefCount;
     int            triCount;   /* all passes, all buffers: the chunk's fill upper bound */
+    int            glbBaked;   /* SHW_FLAG_GLB: global-PLM instances are native too */
+    int            sharedVerts;/* SHW_FLAG_SHAREDV: every buffer's vbase is 0 */
 } WChunk;
 
 static WChunk  s_chunks[MAX_WCHUNKS];
@@ -260,6 +267,15 @@ static uint32_t* s_palOffsets;    /* file offset + word count per palette */
 static uint16_t* s_palWords;
 
 static T3DViewport s_wvp;
+/* Same camera with the depth row shifted nearer by s_decalBias tiny3d depth
+ * steps, attached for the decal pass only. tiny3d hands the RDP a 16-bit
+ * per-vertex depth, so a fixed separation is resolved only up to a distance
+ * (~2 Q8 of poster-to-wall resolves to ~6 m at near=4, 4 Q8 to ~8 m); a
+ * constant NDC offset is a polygon offset that holds at every distance and
+ * lets a decal win only over surfaces within a few depth steps of it. */
+static T3DViewport s_wvpDecal;
+static int         s_wvpDecalInited;
+static int         s_decalBias;
 static int     s_wvpInited;
 static int     s_frameActive;     /* between NotifyFrameBegin/End */
 static int     s_worldStarted;    /* per-frame world state applied */
@@ -296,10 +312,14 @@ static float   s_fogFullZ;      /* view depth (t3d units) of 100% fog */
  * (no fog, or a clear colour that is not the fog colour). */
 static float   s_fogCullZ;
 static int     s_cnFogCulled;
+/* The game's fog.intensity (Q12) is added to every PSX-path fog factor on top
+ * of the ramp; as a fraction of the ramp span it shifts the native range. */
+static float   s_fogShift;
 static int     s_fogSetThisFrame;
 #define WORLD_FOG_CULL_MARGIN 16.0f   /* t3d units (~0.5 m) past the draw distance */
 
-void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8)
+void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8,
+                       int intensityQ12)
 {
     extern int PcConfig_N64WorldFog(void);
     extern unsigned int GpuXbox_GetClearColor(void);
@@ -311,9 +331,12 @@ void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8)
     s_fogOn    = enabled && fullQ8 > 0 && PcConfig_N64WorldFog();
     s_fogCullZ = 0.0f;
     s_fogSetThisFrame = 1;
-    g_N64FogBlend = s_fogOn;
+    g_N64FogBlend = 0;
     if (!s_fogOn)
         return;
+    if (intensityQ12 < -4096) intensityQ12 = -4096;
+    if (intensityQ12 >  4096) intensityQ12 =  4096;
+    s_fogShift = (float)intensityQ12 / 4096.0f;
     s_fogRgb[0] = (uint8_t)r;
     s_fogRgb[1] = (uint8_t)g;
     s_fogRgb[2] = (uint8_t)b;
@@ -324,6 +347,9 @@ void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8)
     db = (int)(clear & 0xFF) - b;
     if (dr >= -12 && dr <= 12 && dg >= -12 && dg <= 12 && db >= -12 && db <= 12)
         s_fogCullZ = (float)(drawQ8 > fullQ8 ? drawQ8 : fullQ8) / 8.0f + WORLD_FOG_CULL_MARGIN;
+    /* 2 = the clear IS the fog colour, so fully fogged PSX prims may be
+     * dropped too; 1 = fog, but a dropped prim would leave a hole. */
+    g_N64FogBlend = s_fogCullZ > 0.0f ? 2 : 1;
 }
 
 /* tiny3d's RSP fog is linear in CLIP-space z: 0 at 2*near, full at 2*far
@@ -342,7 +368,12 @@ static void WorldFogApply(void)
         float n = WORLD_PROJ_NEAR, f = WORLD_PROJ_FAR;
         float A = f / (f - n);
         float B = -2.0f * f * n / (f - n);
-        float ds = s_fogFullZ * 0.06f, de = s_fogFullZ * 0.80f;
+        /* 4%..75% stays within ~5 points of D_800AE1C0 over 30..70%, where
+         * 6%..80% ran 9-13 points thin against the PSX-path prims. */
+        float ds = s_fogFullZ * 0.04f, de = s_fogFullZ * 0.75f;
+        float sh = (de - ds) * s_fogShift;
+        ds -= sh;
+        de -= sh;
         t3d_fog_set_range((A * ds + B) * 0.5f, (A * de + B) * 0.5f);
     }
     t3d_fog_set_enabled(true);
@@ -864,6 +895,35 @@ static void WPoolInit(void)
            (unsigned)(s_wreg[0].bytes / 1024), (unsigned)(win / 1024), (unsigned)(low / 1024));
 }
 
+/* dso_n64.c is about to place a map module at [limit, window end): shrink
+ * the region that holds `limit` and evict any chunk reaching past it. Normally
+ * a no-op -- ShT3d_WorldReset already emptied the pool and reset the regions. */
+static void ChunkFree(WChunk* c);
+
+void ShT3d_WorldPoolClamp(uint8_t* limit)
+{
+    int r, i;
+    for (r = 0; r < s_wregCount; r++)
+    {
+        uint8_t* b = s_wreg[r].base;
+        if (limit <= b || limit > b + s_wreg[r].bytes + (256u * 1024u))
+            continue;
+        for (i = 0; i < MAX_WCHUNKS; i++)
+        {
+            WChunk* c = &s_chunks[i];
+            if (c->inUse && c->arena != NULL && c->arena >= b &&
+                c->arena + c->arenaBytes > limit)
+            {
+                SH_DBG("[T3DW] pool chunk %d,%d overlaps the incoming map module -- evicted",
+                       c->cellX, c->cellZ);
+                rspq_wait();
+                ChunkFree(c);
+            }
+        }
+        s_wreg[r].bytes = (uint32_t)(limit - b) & ~(uint32_t)15;
+    }
+}
+
 /* Walk each region's gaps between live chunks in address order; best fit for
  * `need` (0 = only report the largest gap through *largest). */
 static uint8_t* WPoolScan(uint32_t need, uint32_t* gapOut, uint32_t* largest)
@@ -918,6 +978,151 @@ static uint32_t WPoolLargestGap(void)
     return l;
 }
 
+/* Pool defragmentation. Four exterior cells fit the pool's TOTAL free space
+ * long before they fit its gaps (three resident cells left 87K + 41K + 130K
+ * against a 154K fourth). A plan packs every live pool chunk plus the
+ * newcomer, biggest first, best-fit into empty regions; WPoolRepack then
+ * moves the chunks there and rebases their pointers. */
+typedef struct
+{
+    WChunk*  c;      /* NULL = the newcomer */
+    uint32_t size;
+    uint8_t* dst;
+} WPlan;
+
+static int WPoolRegionOf(const uint8_t* p)
+{
+    int r;
+    for (r = 0; r < s_wregCount; r++)
+        if (p >= s_wreg[r].base && p < s_wreg[r].base + s_wreg[r].bytes)
+            return r;
+    return -1;
+}
+
+static int WPoolPlan(uint32_t need, WPlan* plan, int* nPlan)
+{
+    uint32_t fill[3] = {0, 0, 0};
+    int      n = 0, i, j, r;
+
+    if (s_wregCount == 0)
+        return 0;
+    for (i = 0; i < MAX_WCHUNKS; i++)
+    {
+        WChunk* c = &s_chunks[i];
+        if (!c->inUse || c->arena == NULL || WPoolRegionOf(c->arena) < 0)
+            continue;
+        plan[n].c    = c;
+        plan[n].size = (c->arenaBytes + 15u) & ~15u;
+        plan[n].dst  = NULL;
+        n++;
+    }
+    plan[n].c    = NULL;
+    plan[n].size = (need + 15u) & ~15u;
+    plan[n].dst  = NULL;
+    n++;
+    for (i = 1; i < n; i++)
+    {
+        WPlan k = plan[i];
+        for (j = i - 1; j >= 0 && plan[j].size < k.size; j--)
+            plan[j + 1] = plan[j];
+        plan[j + 1] = k;
+    }
+    for (i = 0; i < n; i++)
+    {
+        int      best = -1;
+        uint32_t bestLeft = 0xFFFFFFFFu;
+        for (r = 0; r < s_wregCount; r++)
+        {
+            uint32_t left = s_wreg[r].bytes - fill[r];
+            if (left >= plan[i].size && left < bestLeft)
+            {
+                best     = r;
+                bestLeft = left;
+            }
+        }
+        if (best < 0)
+            return 0;
+        plan[i].dst = s_wreg[best].base + fill[best];
+        fill[best] += plan[i].size;
+    }
+    *nPlan = n;
+    return 1;
+}
+
+static void WChunkRelocate(WChunk* c, uint8_t* dst)
+{
+    intptr_t d = (intptr_t)dst - (intptr_t)c->arena;
+    if (d == 0)
+        return;
+    memmove(dst, c->arena, c->arenaBytes);
+#define WRELOC(p) do { if ((p) != NULL) (p) = (void*)((intptr_t)(p) + d); } while (0)
+    WRELOC(c->bufs);
+    WRELOC(c->verts);
+    WRELOC(c->mats);
+    WRELOC(c->rawRot);
+    WRELOC(c->rawTrans);
+    WRELOC(c->viewRow);
+    WRELOC(c->groupPos);
+    WRELOC(c->tileRefs);
+    WRELOC(c->cmds);
+#undef WRELOC
+    c->arena = dst;
+    /* The RSP reads vertices and matrices from RAM, not the CPU cache. */
+    data_cache_hit_writeback(dst, c->arenaBytes);
+}
+
+/* Whether `need` can be placed, directly or after a repack. */
+static int WPoolFits(uint32_t need)
+{
+    WPlan plan[MAX_WCHUNKS + 1];
+    int   n;
+    return need <= WPoolLargestGap() || WPoolPlan(need, plan, &n);
+}
+
+static int WPoolRepack(uint32_t need)
+{
+    WPlan plan[MAX_WCHUNKS + 1];
+    int   n, i, j, moved, left, total = 0;
+
+    if (!WPoolPlan(need, plan, &n))
+        return 0;
+    rspq_wait();   /* in-flight RSP lists still point at the old places */
+    do
+    {
+        moved = left = 0;
+        for (i = 0; i < n; i++)
+        {
+            WChunk* c = plan[i].c;
+            int blocked = 0;
+            if (c == NULL || c->arena == plan[i].dst)
+                continue;
+            /* Move only onto memory no other chunk occupies RIGHT NOW; a
+             * chunk already at its destination never overlaps another's. */
+            for (j = 0; j < n && !blocked; j++)
+            {
+                const WChunk* o = plan[j].c;
+                if (j == i || o == NULL)
+                    continue;
+                if (plan[i].dst < o->arena + o->arenaBytes &&
+                    o->arena < plan[i].dst + plan[i].size)
+                    blocked = 1;
+            }
+            if (blocked)
+            {
+                left++;
+                continue;
+            }
+            WChunkRelocate(c, plan[i].dst);
+            moved++;
+            total++;
+        }
+    } while (moved != 0 && left != 0);
+    SH_DBG("[T3DW] pool repack for %uK: %d chunk(s) moved%s, largest gap now %uK",
+           (unsigned)(need / 1024), total, left ? " -- STALLED on a cycle" : "",
+           (unsigned)(WPoolLargestGap() / 1024));
+    return left == 0;
+}
+
 static void WPendingDrop(int cellX, int cellZ)
 {
     int i;
@@ -954,7 +1159,7 @@ static void WPendingRetry(void)
         char ipd[24];
         /* A cell that cannot fit the biggest gap would only re-read its
          * whole file to fail again (seen: every evict, 81 ms chunk frames). */
-        if (list[i].need != 0 && list[i].need > WPoolLargestGap())
+        if (list[i].need != 0 && !WPoolFits(list[i].need))
             continue;
         snprintf(ipd, sizeof ipd, "%s.IPD", list[i].base);
         ShT3d_WorldChunkLoaded(ipd, list[i].cellX, list[i].cellZ);
@@ -1164,6 +1369,12 @@ static void RunPass(const uint8_t* p, int cmdWords,
             rdpq_mode_blender(RDPQ_BLENDER_ADDITIVE);
         else
             rdpq_mode_blender(0);
+        /* The fog blend cycle would pull an additive surface TOWARD the fog
+         * colour and then add it: distant glows turned into grey blobs. With
+         * the fog cycle off, tiny3d's keep factor (shade alpha) scales the
+         * additive term to nothing instead, like the PSX path's fade. */
+        if (s_fogOn)
+            rdpq_mode_fog(semi ? 0 : RDPQ_FOG_STANDARD);
     }
 
     while (i < cmdWords)
@@ -1314,7 +1525,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
      * already known not to fit the pool stays pending without a file read. */
     for (n = 0; n < s_wpendingCount; n++)
         if (s_wpending[n].cellX == cellX && s_wpending[n].cellZ == cellZ &&
-            s_wpending[n].need != 0 && s_wpending[n].need > WPoolLargestGap())
+            s_wpending[n].need != 0 && !WPoolFits(s_wpending[n].need))
             return;
 
     /* "ERFF00.IPD" -> base ERFF00, prefix ER (strip 4 hex coord chars). */
@@ -1354,7 +1565,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         fclose(f);
         return;
     }
-    bufCount  = rd16(hdr + 6);
+    bufCount  = rd16(hdr + 6) & SHW_COUNT_MASK;
     instCount = rd16(hdr + 8);
     refCount  = rd16(hdr + 10);
     instOff   = rd32(hdr + 0xC);
@@ -1390,6 +1601,8 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     memset(c, 0, sizeof *c);
     c->cellX = cellX;
     c->cellZ = cellZ;
+    c->glbBaked    = (rd16(hdr + 6) & SHW_FLAG_GLB) != 0;
+    c->sharedVerts = (rd16(hdr + 6) & SHW_FLAG_SHAREDV) != 0;
 
     WPoolInit();
     if (!ShwLoadBody(c, NULL, 0, f, base,
@@ -1408,8 +1621,9 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
     fclose(f);
     c->inUse = 1;
     WPendingDrop(cellX, cellZ);
-    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d groups=%d tris=%d tiles=%d/%d miss=%d tileRam=%dK pool=%uK@r%d largestGap=%uK",
-           base, bufCount, instCount, c->groupCount, c->triCount, c->tileRefCount, refCount,
+    SH_DBG("[T3DW] chunk %s resident: bufs=%d insts=%d glb=%d sv=%d groups=%d tris=%d tiles=%d/%d miss=%d tileRam=%dK pool=%uK@r%d largestGap=%uK",
+           base, bufCount, instCount, c->glbBaked, c->sharedVerts, c->groupCount, c->triCount,
+           c->tileRefCount, refCount,
            s_cnTileMiss, s_tileRam / 1024, (unsigned)(c->arenaBytes / 1024),
            (c->arena >= s_wreg[0].base && c->arena < s_wreg[0].base + s_wreg[0].bytes) ? 0 : 1,
            (unsigned)(WPoolLargestGap() / 1024));
@@ -1501,6 +1715,12 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                 uint32_t gap = 0;
                 arena = WPoolAlloc((uint32_t)need + (uint32_t)need / 16, &gap);
                 if (arena == NULL)
+                    arena = WPoolAlloc((uint32_t)need, &gap);
+                /* Fragmented but big enough in total: defragment, soft size
+                 * first so the group AABBs still land. */
+                if (arena == NULL && WPoolRepack((uint32_t)need + (uint32_t)need / 16))
+                    arena = WPoolAlloc((uint32_t)need + (uint32_t)need / 16, &gap);
+                if (arena == NULL && WPoolRepack((uint32_t)need))
                     arena = WPoolAlloc((uint32_t)need, &gap);
                 if (arena == NULL)
                 {
@@ -1648,7 +1868,9 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                 int decWords  = rd16(bt + 6);
                 uint32_t opaOff  = rd32(bt + 0x0C);
                 uint32_t semiOff = rd32(bt + 0x10);
-                c->bufs[i].vbase = (uint16_t)vbase;
+                /* Shared-vertex cells address one cell-wide array (all of it
+                 * in buffer 0's block), so every stream's base is 0. */
+                c->bufs[i].vbase = c->sharedVerts ? 0 : (uint16_t)vbase;
                 if (opaWords > 1)
                 {
                     fseek(f, opaOff, SEEK_SET);
@@ -1849,6 +2071,10 @@ void ShT3d_WorldReset(void)
             s_tiles[i].refs = 0;
         }
     s_tileRam = 0;
+    /* Every pool chunk is gone: re-read the regions at the next load, after
+     * the incoming map module has taken its (size-dependent) share of the
+     * PSX window. */
+    s_wregCount = 0;
     if (s_sht)
     {
         fclose(s_sht);
@@ -1883,7 +2109,7 @@ static void ItemChunkLoad(const char* prefix)
         fclose(f);
         return;
     }
-    bufCount  = rd16(hdr + 6);
+    bufCount  = rd16(hdr + 6) & SHW_COUNT_MASK;
     instCount = rd16(hdr + 8);
     refCount  = rd16(hdr + 10);
     instOff   = rd32(hdr + 0xC);
@@ -2021,8 +2247,27 @@ static void WorldFrameStart(void)
             proj.m[2][1] =  ((((float)s_geomOfy + oY) * sY) - 120.0f) / 120.0f;
             t3d_viewport_set_w_normalize(&s_wvp, nearP, farP);
             t3d_viewport_set_projection_matrix(&s_wvp, &proj);
+            {
+                extern int PcConfig_N64DecalBias(void);
+                s_decalBias = PcConfig_N64DecalBias();
+                if (s_decalBias > 0)
+                {
+                    if (!s_wvpDecalInited)
+                    {
+                        s_wvpDecal = t3d_viewport_create();
+                        s_wvpDecalInited = 1;
+                    }
+                    /* z_ndc = (m22*z + m32) / -z, so +eps on m22 is -eps on
+                     * z_ndc; the 16-bit depth spans the NDC range of 2. */
+                    proj.m[2][2] += (float)s_decalBias * (2.0f / 32768.0f);
+                    t3d_viewport_set_w_normalize(&s_wvpDecal, nearP, farP);
+                    t3d_viewport_set_projection_matrix(&s_wvpDecal, &proj);
+                }
+            }
         }
         t3d_viewport_look_at(&s_wvp, &e, &tg, &u);
+        if (s_decalBias > 0)
+            t3d_viewport_look_at(&s_wvpDecal, &e, &tg, &u);
         t3d_viewport_attach(&s_wvp);
         WorldFogApply();
 
@@ -2092,7 +2337,8 @@ static void WorldFrameStart(void)
  * FrameEnd. Drawing here (during OT build) put t3d output on the framebuffer
  * before the PSX batch flushed and presented, and it never survived to the
  * screen -- the spike proved t3d output only reaches the frame when drawn in
- * FrameEnd. Returning 1 still tells the game to skip its PSX per-prim path. */
+ * FrameEnd. Nonzero tells the game to skip its PSX per-prim path for the
+ * buffer's local models; 2 = the global-PLM instances are native as well. */
 int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
 {
     WChunk* c;
@@ -2120,7 +2366,7 @@ int ShT3d_WorldDrawBuffer(int cellX, int cellZ, int bufIdx)
         s_drawList[s_drawCount].buf = (int16_t)bufIdx;
         s_drawCount++;
     }
-    return 1;
+    return c->glbBaked ? 2 : 1;
 }
 
 /* Replay every recorded buffer, but only the instances on the requested side
@@ -2267,18 +2513,31 @@ static void WorldFlushPass(int wantFg)
                     s_bindTintDecal = 1;
                     s_lastBoundOk   = 0;   /* force a bind so the tint applies */
                 }
-                for (i = 0; i < s_drawCount; i++)
                 {
-                    WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
-                    int b = s_drawList[i].buf;
-                    if (c == NULL || b >= c->bufCount || c->bufs[b].decalWords <= 1)
-                        continue;
-                    RunPass(c->cmds + c->bufs[b].decalOff, c->bufs[b].decalWords,
-                            c->verts + c->bufs[b].vbase / 2,
-                            c->mats + s_matPhase * c->instCount, NULL, c->viewRow,
-                            0, 0, 0, BindWorldTile, first);
-                    first = 0;
-                    s_cnBlocks++;
+                    /* Every decal stream opens with OP_MATRIX, so its
+                     * instances re-push under the biased camera. */
+                    int biased = 0;
+                    for (i = 0; i < s_drawCount; i++)
+                    {
+                        WChunk* c = ChunkFind(s_drawList[i].cx, s_drawList[i].cz);
+                        int b = s_drawList[i].buf;
+                        if (c == NULL || b >= c->bufCount || c->bufs[b].decalWords <= 1)
+                            continue;
+                        if (!biased && s_decalBias > 0)
+                        {
+                            /* RunPass ends synced with its matrix popped. */
+                            t3d_viewport_attach(&s_wvpDecal);
+                            biased = 1;
+                        }
+                        RunPass(c->cmds + c->bufs[b].decalOff, c->bufs[b].decalWords,
+                                c->verts + c->bufs[b].vbase / 2,
+                                c->mats + s_matPhase * c->instCount, NULL, c->viewRow,
+                                0, 0, 0, BindWorldTile, first);
+                        first = 0;
+                        s_cnBlocks++;
+                    }
+                    if (biased)
+                        t3d_viewport_attach(&s_wvp);
                 }
                 if (dm == 1)
                     rdpq_mode_zmode(ZMODE_STANDARD);
@@ -2539,7 +2798,7 @@ static int CharaLoad(const char* name)
         fclose(f);
         return 0;
     }
-    bufCount  = rd16(hdr + 6);
+    bufCount  = rd16(hdr + 6) & SHW_COUNT_MASK;
     instCount = rd16(hdr + 8);
     refCount  = rd16(hdr + 10);
     instOff   = rd32(hdr + 0xC);
@@ -2635,9 +2894,27 @@ int ShT3d_CharaDrawBegin(int isHarry)
     return 1;
 }
 
-void ShT3d_CharaDrawEnd(void)
+/* Returns the drawn character's mean part-centroid view depth (raw Q8, the
+ * PSX OT's unit) so the caller can place an OT0 marker where his prims would
+ * have sorted, or -1 when he did not draw natively this frame. */
+int ShT3d_CharaDrawEnd(void)
 {
+    const WChunk* c = &s_charChunk;
+    float sum = 0.0f;
+    int   i, n = 0;
+    int   was = s_charActive;
     s_charActive = 0;
+    if (!was || s_charMask == 0)
+        return -1;
+    for (i = 0; i < c->instCount && i < 32; i++)
+        if (s_charMask & (1u << i))
+        {
+            sum += c->viewRow[i * 4 + 3];
+            n++;
+        }
+    if (n == 0 || sum <= 0.0f)
+        return -1;
+    return (int)(sum / (float)n);
 }
 
 /* The bone loop hands over each part's GAME view matrix (Vw_CoordToWorldAnd

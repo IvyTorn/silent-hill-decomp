@@ -387,6 +387,10 @@ const char* Pc_FlashlightModeLabel(int mode)
 static int s_n64DecalMode = 0;
 int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 
+/* N64 decal pass depth bias in tiny3d depth steps (key decal_bias, 0..64). */
+static int s_n64DecalBias = 4;
+int PcConfig_N64DecalBias(void) { return s_n64DecalBias; }
+
 /* Whether the loaded file named a start map: a console's own default start
  * map (XboxConfig_ApplyOverrides) must not override the user's choice. */
 static int s_mapKeySet = 0;
@@ -863,6 +867,12 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "decal_mode") == 0)
         {
             s_n64DecalMode = atoi(value);
+        }
+        else if (strcmp(key, "decal_bias") == 0)
+        {
+            s_n64DecalBias = atoi(value);
+            if (s_n64DecalBias < 0)  s_n64DecalBias = 0;
+            if (s_n64DecalBias > 64) s_n64DecalBias = 64;
         }
         else if (strcmp(key, "psx_tint") == 0)
         {

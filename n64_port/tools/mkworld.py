@@ -302,14 +302,39 @@ def _cross(a, b):
 
 DECAL_MAX_Q8 = 64      # measured: real decals sit 0..63 Q8 in front of their wall
 DECAL_NUDGE_Q8 = 4     # coplanar overlays are moved this far toward the viewer
+# An overlay aligned to its wall's tessellation has its centroid a third of a
+# Q8 unit outside the backing triangle whenever it straddles the wall's own
+# diagonal (integer verts): 190 ER overlays were missed by a strict test.
+DECAL_EDGE_TOL_Q8 = 1.0
+# Coplanar pairs keep a near-strict test: a quad's own halves have their
+# centroids a third of the quad's height from the shared diagonal.
+DECAL_COPLANAR_TOL_Q8 = 0.25
+DECAL_PARALLEL = 0.99  # ~8 degrees: slightly tilted posters are still overlays
 
 
-def _in_tri(p, t, n):
-    """Strict: p (on or near t's plane) projects inside triangle t."""
+def _in_tri(p, t, n, tol=0.0):
+    """p (on or near t's plane) projects inside triangle t, or at most tol
+    units outside any edge."""
     for u, v in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
-        if _dot(_cross(_sub(v, u), _sub(p, u)), n) < 0:
+        e = _sub(v, u)
+        side = _dot(_cross(e, _sub(p, u)), n)
+        if side < 0 and (tol <= 0 or side < -tol * (_dot(e, e) ** 0.5)):
             return False
     return True
+
+
+def _plane_key(n):
+    """Facing-folded, rounded normal: n and -n share a key. The fold follows
+    the first NONZERO ROUNDED component; folding on the raw tuple let float
+    noise (1e-17 vs -1e-17 in x) put a poster and its wall in different
+    buckets."""
+    r = [round(x, 2) for x in n]
+    sgn = 1
+    for x in r:
+        if x != 0:
+            sgn = 1 if x > 0 else -1
+            break
+    return tuple(x * sgn + 0.0 for x in r), sgn
 
 
 def tag_decals(pieces, instances):
@@ -321,12 +346,15 @@ def tag_decals(pieces, instances):
     arbitrarily.
 
     Rule (measured on ER, see project_n64_decal_zfight_nearplane): S is a
-    decal over B when both face the same way, S's centroid projects strictly
-    inside B, and S sits on B's VISIBLE side -- the NEGATIVE winding-normal
-    side in this data -- by 0.5..64 Q8; or is exactly coplanar with a
-    different texture and a smaller area. Same instance counts: most posters
-    are part of their wall's model. Opposite-facing pairs are the two sides
-    of thin panels, and same-texture coplanar pairs are a quad's own halves.
+    decal over B when both face the same way, S's centroid projects inside B
+    (within DECAL_EDGE_TOL_Q8), and S sits on B's VISIBLE side -- the
+    NEGATIVE winding-normal side in this data -- by 0.5..64 Q8; or is
+    exactly coplanar, strictly inside, and smaller (equal areas: the later
+    piece). Same instance counts: most posters are part of their wall's
+    model. Opposite-facing pairs are the two sides of thin panels (culled).
+    Coplanar overlays sharing the wall's texture sheet ARE tagged: a quad's
+    own halves never pass the strict centroid test, and 478 ER overlays with
+    different texels on the same TIM/CLUT fought their walls unconditionally.
     Coplanar decals are nudged DECAL_NUDGE_Q8 toward the viewer so the
     compare cannot tie. Returns the number of pieces tagged."""
     import math
@@ -344,51 +372,69 @@ def tag_decals(pieces, instances):
         n = (n[0] / L, n[1] / L, n[2] / L)
         cen = ((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3,
                (a[2] + b[2] + c[2]) / 3)
-        planes.append((n, L / 2, cen, (a, b, c), pc))
+        planes.append((n, L / 2, cen, (a, b, c), pc, len(planes)))
 
-    # Bucket by sign-folded normal and plane offset so only near-coplanar
-    # pairs meet; a piece scans its own and both neighbouring offset buckets.
-    buckets = defaultdict(list)
+    # Candidate search: a 3D grid over every surface's box grown by
+    # DECAL_MAX_Q8, queried at the overlay's centroid. (Buckets keyed on the
+    # plane's offset from the cell origin only ever matched EXACTLY parallel
+    # surfaces: a 1-degree tilt moves that offset by hundreds of Q8.)
+    G = 512.0
+    grid = defaultdict(list)
     for p in planes:
-        n = p[0]
-        sgn = 1 if n > (0.0, 0.0, 0.0) else -1
-        key = (round(n[0] * sgn, 2), round(n[1] * sgn, 2), round(n[2] * sgn, 2))
-        d = _dot(n, p[2]) * sgn
-        buckets[(key, int(math.floor(d / DECAL_MAX_Q8)))].append(p)
+        t = p[3]
+        lo = [int(math.floor((min(v[k] for v in t) - DECAL_MAX_Q8) / G)) for k in range(3)]
+        hi = [int(math.floor((max(v[k] for v in t) + DECAL_MAX_Q8) / G)) for k in range(3)]
+        for gx in range(lo[0], hi[0] + 1):
+            for gy in range(lo[1], hi[1] + 1):
+                for gz in range(lo[2], hi[2] + 1):
+                    grid[(gx, gy, gz)].append(p)
 
+    # Biggest first, so a coplanar backing's own stacking level is final
+    # before anything smaller lying on it is placed one level above it.
+    level = {}
     tagged = 0
-    for (nkey, db), plist in buckets.items():
-        cands = []
-        for nb in (db - 1, db, db + 1):
-            cands += buckets.get((nkey, nb), [])
-        for small in plist:
-            nS, aS, cS, _, pS = small
-            for big in cands:
-                if big is small:
+    for small in sorted(planes, key=lambda p: (-p[1], p[5])):
+        nS, aS, cS, _, pS, iS = small
+        cell = tuple(int(math.floor(cS[k] / G)) for k in range(3))
+        offset = False
+        stack = -1
+        nTop = None
+        for big in grid.get(cell, ()):
+            if big is small:
+                continue
+            nB, aB, _, tB, pB, iB = big
+            if _dot(nS, nB) < DECAL_PARALLEL:
+                continue
+            d = _dot(nB, _sub(cS, tB[0]))
+            if d > 0.5 or d < -DECAL_MAX_Q8:
+                continue
+            if d > -0.5:
+                if aB < aS - 1e-6 or (abs(aB - aS) <= 1e-6 and iB > iS):
                     continue
-                nB, aB, _, tB, pB = big
-                if _dot(nS, nB) < 0.999:
+                if not _in_tri(cS, tB, nB, DECAL_COPLANAR_TOL_Q8):
                     continue
-                d = _dot(nB, _sub(cS, tB[0]))
-                if d > 0.5 or d < -DECAL_MAX_Q8:
-                    continue
-                coplanar = d > -0.5
-                if coplanar and (aB <= aS or pS.key == pB.key):
-                    continue
-                if not _in_tri(cS, tB, nB):
-                    continue
-                pS.decal = True
-                tagged += 1
-                if coplanar:
-                    r = instances[pS.inst].rot
-                    w = (-nB[0] * DECAL_NUDGE_Q8, -nB[1] * DECAL_NUDGE_Q8,
-                         -nB[2] * DECAL_NUDGE_Q8)
-                    # world -> model: the rows are orthonormal Q12, so R^T
-                    loc = tuple((r[0][k] * w[0] + r[1][k] * w[1] + r[2][k] * w[2]) / 4096.0
-                                for k in range(3))
-                    pS.verts = [(v[0] + loc[0], v[1] + loc[1], v[2] + loc[2]) + tuple(v[3:])
-                                for v in pS.verts]
-                break
+                lv = level.get(iB, 0)
+                if lv > stack:
+                    stack, nTop = lv, nB
+            elif _in_tri(cS, tB, nB, DECAL_EDGE_TOL_Q8):
+                offset = True
+        if not offset and stack < 0:
+            continue
+        pS.decal = True
+        tagged += 1
+        if stack >= 0:
+            # Coplanar: one DECAL_NUDGE_Q8 above the highest coplanar surface
+            # it lies on, so stacked overlays (a label on a sign on a wall)
+            # cannot tie with each other in the decal pass either.
+            level[iS] = stack + 1
+            k = DECAL_NUDGE_Q8 * (stack + 1)
+            r = instances[pS.inst].rot
+            w = (-nTop[0] * k, -nTop[1] * k, -nTop[2] * k)
+            # world -> model: the rows are orthonormal Q12, so R^T
+            loc = tuple((r[0][j] * w[0] + r[1][j] * w[1] + r[2][j] * w[2]) / 4096.0
+                        for j in range(3))
+            pS.verts = [(v[0] + loc[0], v[1] + loc[1], v[2] + loc[2]) + tuple(v[3:])
+                        for v in pS.verts]
     return tagged
 
 
@@ -652,10 +698,60 @@ def encode_buffer_cmds(pieces, verts_out):
     return cmds
 
 
-def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
+def share_vertex_windows(buffers):
+    """Rewrite every OP_VERTS to a cell-global index into one vertex list in
+    which each distinct window (vertex tuple sequence) is stored once.
+    Windows are contiguous, even-sized and never overlap in the input."""
+    gverts = []
+    seen = {}
+    out = []
+    for streams in buffers:
+        c_opa, c_semi, c_dec, verts = streams
+        new = []
+        for cmds in (c_opa, c_semi, c_dec):
+            cmds = list(cmds)
+            i = 0
+            while i < len(cmds):
+                w = cmds[i]
+                opc, arg = w >> 12, w & 0xFFF
+                if opc == OP_TILE:
+                    i += 2
+                elif opc == OP_MATRIX:
+                    i += 1
+                elif opc == OP_VERTS:
+                    first = cmds[i + 1]
+                    win = tuple(verts[first:first + arg])
+                    assert len(win) == arg and not (arg & 1), (first, arg)
+                    g = seen.get(win)
+                    if g is None:
+                        g = len(gverts)
+                        gverts.extend(win)
+                        seen[win] = g
+                    assert g + arg <= 0xFFFF
+                    cmds[i + 1] = g
+                    i += 2
+                elif opc == OP_TRIS:
+                    i += 1 + (arg * 3 + 1) // 2
+                else:
+                    break
+            new.append(cmds)
+        out.append([new[0], new[1], new[2], []])
+    if out:
+        out[0][3] = gverts
+    return [tuple(b) for b in out]
+
+
+def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None,
+               glb_baked=False, share_verts=False):
     """SHW1 layout (all big-endian, the console's own order):
       0x00 u32 magic 'SHW1'
-      0x04 s8 cellX, s8 cellZ, u16 bufferCount
+      0x04 s8 cellX, s8 cellZ, u16 bufferCount (bit 15 = SHW_FLAG_GLB: the
+                 cell was baked --glb, so every global-PLM instance the area's
+                 GLB resolves is native and the PSX path must skip it too;
+                 bit 14 = SHW_FLAG_SHAREDV: OP_VERTS indices are CELL-global,
+                 all vertices sit in buffer 0's block, and identical vertex
+                 windows -- the same prop instanced again, 30-49% of an
+                 exterior cell -- are stored once)
       0x08 u16 instanceCount, u16 tileRefCount
       0x0C u32 instancesOff, u32 tileRefsOff
       0x14 bufferCount * { u16 vertCount; u16 opaWords; u16 semiWords;
@@ -699,6 +795,9 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
             verts.append(verts[-1] if verts else (0, 0, 0, 0, 0, 0, 0, 0, 0))
         buffers.append((c_opa, c_semi, c_dec, verts))
 
+    if share_verts:
+        buffers = share_vertex_windows(buffers)
+
     refs = sorted(tile_refs)
     base = 0x14 + 20 * len(buffers)   # entries are ">4H3I" = 20 bytes
     blobs = bytearray()
@@ -734,8 +833,11 @@ def encode_shw(ipd, buffer_count, cell_pieces, instances, buf_encoder=None):
         table += struct.pack(">4H3I", len(verts), len(c_opa), len(c_semi),
                              len(c_dec), vo, oo, so)
 
+    assert len(buffers) < 0x4000
     out = bytearray(struct.pack(">4sbbHHH2I", b"SHW1", ipd.cell_x, ipd.cell_z,
-                                len(buffers), len(instances), len(refs),
+                                len(buffers) | (0x8000 if glb_baked else 0)
+                                | (0x4000 if share_verts else 0),
+                                len(instances), len(refs),
                                 instances_off, refs_off))
     assert len(out) == 0x14, len(out)
     out += table
@@ -864,7 +966,10 @@ def main():
 
         shw_total = 0
         for ci, (fn, ipd, buffer_count, instances, obj_names) in enumerate(parsed):
-            shw = encode_shw(ipd, buffer_count, per_cell.get(ci, []), instances)
+            is_cell = not isinstance(ipd, _ItemShim)
+            shw = encode_shw(ipd, buffer_count, per_cell.get(ci, []), instances,
+                             glb_baked=glb_lm is not None and is_cell,
+                             share_verts=is_cell)
             if obj_names:
                 # OBJ1 trailer: the LAST len(obj_names) buffers/instances are
                 # world objects; their 8-char names follow the SHW body and the

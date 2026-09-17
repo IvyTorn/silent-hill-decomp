@@ -1012,21 +1012,36 @@ static int ProcessPoly(P_TAG* tag)
         const int n = quad ? 4 : 3;
         if (abe)
         {
-            /* The blend owns the alpha: fold the fog into the colour the way
-             * the fog-less path does and restore full alpha. */
+            /* The blend owns the alpha: fold the fog into the colour and
+             * restore full alpha. Only the 50/50 average (abr 0) fades toward
+             * the fog colour; additive, subtractive and quarter-additive terms
+             * fade to nothing (the PC renderer's rule) -- fog-coloured
+             * additive glows lit up in the distance. */
+            const int abr = (blendTpage >> 5) & 3;
             for (i = 0; i < n; i++)
             {
                 float k = v[i].col[3], f = 1.0f - k;
-                v[i].col[0] = v[i].col[0] * k + g_PsyX_FogColor[0] * f;
-                v[i].col[1] = v[i].col[1] * k + g_PsyX_FogColor[1] * f;
-                v[i].col[2] = v[i].col[2] * k + g_PsyX_FogColor[2] * f;
+                if (abr == 0)
+                {
+                    v[i].col[0] = v[i].col[0] * k + g_PsyX_FogColor[0] * f;
+                    v[i].col[1] = v[i].col[1] * k + g_PsyX_FogColor[1] * f;
+                    v[i].col[2] = v[i].col[2] * k + g_PsyX_FogColor[2] * f;
+                }
+                else
+                {
+                    v[i].col[0] *= k;
+                    v[i].col[1] *= k;
+                    v[i].col[2] *= k;
+                }
                 v[i].col[3] = 1.0f;
             }
         }
-        else
+        else if (g_N64FogBlend == 2)
         {
             /* Completely fogged opaque geometry would paint the fog colour
-             * over the fog-coloured clear: skip it (fill the RDP never does). */
+             * over the fog-coloured clear: skip it (fill the RDP never does).
+             * Only when the clear IS the fog colour (t3d_world.c), or the
+             * skipped prim would leave a hole. */
             for (i = 0; i < n; i++)
                 if (v[i].col[3] > 0.0f)
                     break;
@@ -1357,6 +1372,26 @@ extern int  LoadImage(RECT* rect, u_long* p);
 
 /* Returns the parsed primitive's length in longs (excl. tag), or the tag's
  * declared length for unhandled prims so the packet walk stays in sync. */
+#ifdef SH_N64_PORT
+/* OT0 placeholder for the natively drawn character (world_draw.c places it
+ * at his depth slot): reaching it in the walk flushes the PSX prims so far
+ * and draws him, so nearer OT0 prims still paint over him. A 3-word no-op
+ * packet to every other reader. Linked at most once per frame: a second
+ * addPrim of the same packet into one OT would close a cycle. */
+static struct { P_TAG tag; u_int w[2]; } s_n64CharaMarker;
+static int s_n64CharaMarkerFrame = -1;
+
+void GpuXbox_N64CharaMarkerAdd(void* otEntry)
+{
+    if (s_n64CharaMarkerFrame == g_Nv2aFrameCount)
+        return;
+    s_n64CharaMarkerFrame = g_Nv2aFrameCount;
+    setlen(&s_n64CharaMarker, 3);
+    setcode(&s_n64CharaMarker, 0x00);
+    addPrim(otEntry, &s_n64CharaMarker);
+}
+#endif
+
 static int ParsePrim(P_TAG* tag)
 {
     const int primType = tag->code & 0xF0;
@@ -1365,6 +1400,19 @@ static int ParsePrim(P_TAG* tag)
 
     switch (primType) {
     case 0x00: {
+#ifdef SH_N64_PORT
+        if ((void*)tag == (void*)&s_n64CharaMarker) {
+            extern void ShT3d_CharaFlush(void);
+            static int s_markLogged;   /* one-shot [CHARAMARK], not per frame */
+            if (!s_markLogged) {
+                s_markLogged = 1;
+                SH_DBG("[CHARAMARK] native character drawn at its OT0 slot (frame %d)", g_Nv2aFrameCount);
+            }
+            GpuNv2a_FlushBatch();
+            ShT3d_CharaFlush();
+            return 3;
+        }
+#endif
         /* sub-code 0x01 = DR_MOVE (VRAM->VRAM copy, water refraction etc.);
          * sub-code 0x00 = 3-long cache-flush packet (skip). Word layout per
          * PsyCross SetDrawMove/ParsePrimitivesLinkedList. */

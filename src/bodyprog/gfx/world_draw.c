@@ -1739,8 +1739,20 @@ void func_8003DA9C(e_CharaId charaId, GsCOORDINATE2* boneCoords, s32 arg2, q3_12
                   boneCoords, Q8_TO_Q12(CHARA_FILE_INFOS[charaId].field_6), ret, CHARA_FILE_INFOS[charaId].field_8);
 #ifdef SH_N64_PORT
     {
-        extern void ShT3d_CharaDrawEnd(void);
-        ShT3d_CharaDrawEnd();
+        /* Native Harry draws when the OT0 walk reaches his own depth slot
+         * (the slot Gfx_MeshDraw would give his prims: org[2] + (z >> shift)
+         * >> 2), so PSX-path prims nearer than him -- a Romper pinning him --
+         * paint over him as on the PSX instead of vanishing under him. */
+        extern int  ShT3d_CharaDrawEnd(void);
+        extern void GpuXbox_N64CharaMarkerAdd(void* otEntry);
+        int z = ShT3d_CharaDrawEnd();
+        if (z >= 0)
+        {
+            s32 slot = 2 + ((z >> (arg2 ? 1 : 0)) >> 2);
+            if (slot > ORDERING_TABLE_SIZE - 1)
+                slot = ORDERING_TABLE_SIZE - 1;
+            GpuXbox_N64CharaMarkerAdd(&g_OrderingTable0[g_ActiveBufferIdx].org[slot]);
+        }
     }
 #endif
 #ifdef SH_PC_PORT

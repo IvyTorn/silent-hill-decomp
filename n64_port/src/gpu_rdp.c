@@ -272,6 +272,9 @@ void GpuNv2a_PsxModeInvalidate(void)
      * (the global-PLM instances: wall posters, the map board), so nothing
      * else re-dirtied it -- they drew with the world's last palette. */
     s_tlutDirty    = 1;
+    /* ...and their tile uploads overwrote the TMEM window this path memoises
+     * (a native pass can now run in the middle of an OT walk). */
+    s_winValid     = 0;
     /* rdpq scissor was narrowed to the t3d viewport; restore full screen. */
     rdpq_set_scissor(0, 0, SCR_W, SCR_H);
 }
@@ -294,6 +297,10 @@ static void ApplyMode(void)
     s_cnModeSets++;
 
     rdpq_set_mode_standard();
+    /* The PSX dithered its gouraud prims, and the native world dithers (t3d
+     * square); without it fog on this path steps in visible bands on the
+     * 16-bit framebuffer next to dithered native surfaces. */
+    rdpq_mode_dithering(DITHER_SQUARE_NONE);
     {
         extern int PcConfig_N64PsxTint(void);
         if (PcConfig_N64PsxTint())
@@ -990,6 +997,9 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
     rdpq_set_prim_color(RGBA32((int)(v0->col[0] * 255.0f),
                                (int)(v0->col[1] * 255.0f),
                                (int)(v0->col[2] * 255.0f), 255));
+    /* A blit has no shade alpha for the fog keep factor. */
+    rdpq_mode_fog(0);
+    s_appliedFog = -1;
     rdpq_mode_combiner(RDPQ_COMBINER_TEX_FLAT);
 
     rdpq_tex_blit(&s_pageSurf, x0, y0, &(rdpq_blitparms_t){
