@@ -69,9 +69,9 @@ static SaveFile   s_files[SAVEFS_MAX_FILES];
 
 /* This device only exists when no SD card is mounted (the emulator). Its 8 KB
  * blocks come from PSX RAM below the BODYPROG window -- kernel + SLUS
- * executable space nothing on N64 addresses (dso_n64.c scans it at every
- * transition) -- so an emulator run has the same heap as a console, where
- * these 128 KB are never allocated at all. Heap only past 16 blocks. */
+ * executable space nothing on N64 addresses; a console, which never creates
+ * this device, gives the same space to the world chunk pool instead) -- so an
+ * emulator run has the same heap as a console. Heap only past 16 blocks. */
 #define SAVEFS_LOW_BASE   0x4000u
 #define SAVEFS_LOW_BLOCKS 16
 static uint32_t s_lowUsed;

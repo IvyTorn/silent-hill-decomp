@@ -172,12 +172,12 @@ static WChunk  s_chunks[MAX_WCHUNKS];
 #define WPOOL_BSS_BYTES (3 * WCHUNK_ARENA_BYTES)
 static uint8_t s_wpoolBss[WPOOL_BSS_BYTES] __attribute__((aligned(16)));
 typedef struct { uint8_t* base; uint32_t bytes; } WRegion;
-static WRegion s_wreg[2];
+static WRegion s_wreg[3];
 static int     s_wregCount;
 
 /* Cells the pool could not place, retried when a chunk is evicted. */
 #define WPENDING_MAX 8
-typedef struct { char base[16]; int cellX, cellZ; } WPending;
+typedef struct { char base[16]; int cellX, cellZ; uint32_t need; } WPending;
 static WPending s_wpending[WPENDING_MAX];
 static int      s_wpendingCount;
 static WTile   s_tiles[TILE_SLOTS];
@@ -756,8 +756,9 @@ static void ShT3d_MemCheck(const char* where)
 static void WPoolInit(void)
 {
     extern int ShN64_PsxWindowTail(uint8_t** base, uint32_t* bytes);
+    extern int ShN64_PsxLowRegion(uint8_t** base, uint32_t* bytes);
     uint8_t* b;
-    uint32_t n;
+    uint32_t n, win = 0, low = 0;
     if (s_wregCount != 0)
         return;
     s_wreg[0].base  = s_wpoolBss;
@@ -765,13 +766,18 @@ static void WPoolInit(void)
     s_wregCount     = 1;
     if (ShN64_PsxWindowTail(&b, &n) && n >= 32 * 1024)
     {
-        s_wreg[1].base  = b;
-        s_wreg[1].bytes = n & ~(uint32_t)15;
-        s_wregCount     = 2;
+        s_wreg[s_wregCount].base  = b;
+        s_wreg[s_wregCount].bytes = win = n & ~(uint32_t)15;
+        s_wregCount++;
     }
-    SH_DBG("[T3DW] chunk pool: bss %uK + PSX window %uK",
-           (unsigned)(s_wreg[0].bytes / 1024),
-           (unsigned)(s_wregCount > 1 ? s_wreg[1].bytes / 1024 : 0));
+    if (ShN64_PsxLowRegion(&b, &n) && n >= 32 * 1024)
+    {
+        s_wreg[s_wregCount].base  = b;
+        s_wreg[s_wregCount].bytes = low = n & ~(uint32_t)15;
+        s_wregCount++;
+    }
+    SH_DBG("[T3DW] chunk pool: bss %uK + PSX window %uK + low PSX RAM %uK",
+           (unsigned)(s_wreg[0].bytes / 1024), (unsigned)(win / 1024), (unsigned)(low / 1024));
 }
 
 /* Walk each region's gaps between live chunks in address order; best fit for
@@ -839,7 +845,7 @@ static void WPendingDrop(int cellX, int cellZ)
         }
 }
 
-static void WPendingAdd(const char* base, int cellX, int cellZ)
+static void WPendingAdd(const char* base, int cellX, int cellZ, uint32_t need)
 {
     WPendingDrop(cellX, cellZ);
     if (s_wpendingCount >= WPENDING_MAX)
@@ -847,6 +853,7 @@ static void WPendingAdd(const char* base, int cellX, int cellZ)
     snprintf(s_wpending[s_wpendingCount].base, sizeof s_wpending[0].base, "%s", base);
     s_wpending[s_wpendingCount].cellX = cellX;
     s_wpending[s_wpendingCount].cellZ = cellZ;
+    s_wpending[s_wpendingCount].need  = need;
     s_wpendingCount++;
 }
 
@@ -861,6 +868,10 @@ static void WPendingRetry(void)
     for (i = 0; i < n; i++)
     {
         char ipd[24];
+        /* A cell that cannot fit the biggest gap would only re-read its
+         * whole file to fail again (seen: every evict, 81 ms chunk frames). */
+        if (list[i].need != 0 && list[i].need > WPoolLargestGap())
+            continue;
         snprintf(ipd, sizeof ipd, "%s.IPD", list[i].base);
         ShT3d_WorldChunkLoaded(ipd, list[i].cellX, list[i].cellZ);
     }
@@ -1197,6 +1208,12 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
 
     if (ChunkFind(cellX, cellZ) != NULL)
         return;
+    /* The game re-announces every loaded cell whenever it inits one; a cell
+     * already known not to fit the pool stays pending without a file read. */
+    for (n = 0; n < s_wpendingCount; n++)
+        if (s_wpending[n].cellX == cellX && s_wpending[n].cellZ == cellZ &&
+            s_wpending[n].need != 0 && s_wpending[n].need > WPoolLargestGap())
+            return;
 
     /* "ERFF00.IPD" -> base ERFF00, prefix ER (strip 4 hex coord chars). */
     for (n = 0; ipdName[n] && ipdName[n] != '.' && n < 15; n++)
@@ -1262,7 +1279,7 @@ void ShT3d_WorldChunkLoaded(const char* ipdName, int cellX, int cellZ)
         }
     if (c == NULL)
     {
-        WPendingAdd(base, cellX, cellZ);
+        WPendingAdd(base, cellX, cellZ, 0);
         if (WFailLog())
             SH_DBG("[T3DW] %s: chunk slots full -- retried on evict", base);
         fclose(f);
@@ -1385,7 +1402,7 @@ static int ShwLoadBody(WChunk* c, uint8_t* arena, int arenaBytes, FILE* f,
                     arena = WPoolAlloc((uint32_t)need, &gap);
                 if (arena == NULL)
                 {
-                    WPendingAdd(base, cellX, cellZ);
+                    WPendingAdd(base, cellX, cellZ, (uint32_t)need);
                     if (WFailLog())
                         SH_DBG("[T3DW] %s: %dKB, no pool gap (largest %uKB) -- PSX fallback, retried on evict",
                                base, need / 1024, (unsigned)(WPoolLargestGap() / 1024));

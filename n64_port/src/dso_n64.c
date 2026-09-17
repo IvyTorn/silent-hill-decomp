@@ -46,6 +46,12 @@
 #define DSO_MODULE_CAP (272u * 1024u)
 #define DSO_SYMTAB_CAP (128u * 1024u)
 
+/* [DSO_LOW_BEGIN, DSO_WIN_BEGIN) -- PSX kernel + SLUS executable space, also
+ * never addressed on N64 (scanned clean after boot, title, New Game and a map
+ * transition in ares). A console gives it to the world chunk pool; without an
+ * SD card savefs_n64.c keeps the RAM memory card there instead. */
+#define DSO_LOW_BEGIN 0x00004000u
+
 static int      s_winChecked, s_winClean;
 static int      s_moduleBusy;
 static uint32_t s_symtabUsed;
@@ -123,6 +129,24 @@ void* sh_dl_symtab_alloc(int size)
     return (void*)p;
 }
 
+int ShN64_PsxLowRegion(uint8_t** base, uint32_t* bytes)
+{
+    extern int Cd_N64SdPresent(void);
+    const uint8_t* p = (const uint8_t*)g_PsxRam;
+    uint32_t i;
+    if (!Cd_N64SdPresent())
+        return 0;
+    for (i = DSO_LOW_BEGIN; i < DSO_WIN_BEGIN; i++)
+        if (p[i] != 0)
+        {
+            SH_DBG("[DSO-WIN] low PSX RAM dirty at +%05x -- not pooled", i);
+            return 0;
+        }
+    *base  = (uint8_t*)g_PsxRam + DSO_LOW_BEGIN;
+    *bytes = (DSO_WIN_BEGIN - DSO_LOW_BEGIN) & ~(uint32_t)15;
+    return 1;
+}
+
 int ShN64_PsxWindowTail(uint8_t** base, uint32_t* bytes)
 {
     uintptr_t lo = (DsoSymtabBase() + DSO_SYMTAB_CAP + 15u) & ~(uintptr_t)15u;
@@ -198,23 +222,18 @@ void* MapDso_Open(const char* mapName)
         extern void Xbox_MemReport(const char* tag);
         Xbox_MemReport("before dlopen");
     }
-    /* Evidence for the next reclaim: PSX kernel + SLUS executable RAM below
-     * the BODYPROG window. Nothing on N64 is known to address it; a console
-     * session of transitions that keeps reporting it clean makes it pool
-     * material. (Without an SD card -- the emulator -- savefs_n64.c keeps its
-     * RAM memory card at +4000..+24000, so non-zero there is expected.) */
+    /* Canary: PSX RAM [0, LOW_BEGIN) is left unused on purpose. Above it,
+     * low PSX RAM holds world chunks (console) or the RAM memory card
+     * (emulator); a write down here would mean something on N64 does address
+     * PSX kernel/SLUS space after all. */
     {
         const uint8_t* p = (const uint8_t*)g_PsxRam;
-        uint32_t i, first = DSO_WIN_BEGIN, nz = 0;
-        for (i = 0; i < DSO_WIN_BEGIN; i++)
-            if (p[i] != 0)
-            {
-                if (first == DSO_WIN_BEGIN)
-                    first = i;
-                nz++;
-            }
-        SH_DBG("[DSO-WIN] low PSX RAM [0,%05x): %u non-zero bytes, first at +%05x",
-               DSO_WIN_BEGIN, (unsigned)nz, (unsigned)first);
+        uint32_t i, nz = 0;
+        for (i = 0; i < DSO_LOW_BEGIN; i++)
+            nz += (p[i] != 0);
+        if (nz != 0)
+            SH_DBG("[DSO-WIN] low PSX RAM canary [0,%04x) DIRTY: %u non-zero bytes",
+                   DSO_LOW_BEGIN, (unsigned)nz);
     }
     for (i = 0; i < sizeof(s_dirs) / sizeof(s_dirs[0]); i++)
     {
