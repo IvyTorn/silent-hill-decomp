@@ -140,11 +140,24 @@ void Pad_Poll(void)
             static unsigned s_menuParked;
             if (g_N64GameState == 11)
             {
+                /* Walk, then TURN IN PLACE: the z-fighting the user reports is
+                 * "definitely visible while turning", and with SH1's fixed
+                 * cameras only the character (and what he faces) moves then. */
+                static unsigned s_inGame;
+                unsigned ph = (s_inGame++ / 240u) & 3u;   /* ~4 s per leg */
                 s_padBuf[0] = 0x00; s_padBuf[1] = 0x41;
                 s_padBuf[2] = 0xFF;
-                s_padBuf[3] = (unsigned char)~(1u << PSXB_UP);        /* 0xEF */
                 s_padBuf[4] = s_padBuf[5] = 0x80;
-                s_padBuf[6] = 0x80; s_padBuf[7] = 0x00;               /* stick full up */
+                if (ph == 0 || ph == 2)
+                {
+                    s_padBuf[3] = (unsigned char)~(1u << PSXB_UP);    /* 0xEF */
+                    s_padBuf[6] = 0x80; s_padBuf[7] = 0x00;           /* stick full up */
+                }
+                else
+                {
+                    s_padBuf[3] = (unsigned char)~(1u << (ph == 1 ? PSXB_LEFT : PSXB_RIGHT));
+                    s_padBuf[6] = s_padBuf[7] = 0x80;                 /* stick neutral */
+                }
                 return;
             }
             if (g_N64GameState == 7 && s_menuParked < 60)

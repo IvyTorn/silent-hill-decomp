@@ -3323,6 +3323,33 @@ void MainLoop(void) // 0x80032EE0
                         break;
                     }
                     if (isendprim(cur)) break;
+#if defined(SH_N64_PORT)
+                    /* NEVER write into a node this code does not own. The
+                     * strip below is a read-modify-write of the node's len
+                     * field, and with the RDRAM-wide validity test above a
+                     * wild chain pointer into the HEAP would land it in the
+                     * rspq command buffer -- clearing a 16-bit field of a
+                     * command word whose other bits were already zero leaves
+                     * exactly the "single aligned 32-bit zero" that parks the
+                     * RSP (the crash 100 frames into the station, 2026-09-18).
+                     * The strip is a PsyCross-only defence anyway: ParsePrim
+                     * skips unknown codes by length, and DR_MODE (0xE0) is
+                     * handled here, not crashed on. */
+                    {
+                        uintptr_t a = (uintptr_t)cur;
+                        int owned = ((a >= pktLo && a < pktHi) ||
+                                     (a >= otLo  && a < otHi)  ||
+                                     (subLo && a >= subLo && a < subHi));
+                        if (!owned) {
+                            static int s_outsideLogged = 0;
+                            if (!s_outsideLogged) {
+                                s_outsideLogged = 1;
+                                SH_DBG("[OT-SANIT] node outside the packet arena at %p code=%02x len=%d (kept, not written)",
+                                       (void*)cur, (unsigned)((P_TAG*)cur)->code, getlen(cur));
+                            }
+                        }
+                    }
+#else
                     int len = getlen(cur);
                     if (len > 0) {
                         u8 hi = ((P_TAG*)cur)->code & 0xF0;
@@ -3348,6 +3375,7 @@ void MainLoop(void) // 0x80032EE0
                             setlen(cur, 0);
                         }
                     }
+#endif
                     OT_TAG* next = (OT_TAG*)nextPrim(cur);
                     /* Guard against wild next pointers. Truncate at cur — make
                      * it the new chain terminator instead of just zeroing its
@@ -3402,7 +3430,22 @@ void MainLoop(void) // 0x80032EE0
                         /* Re-link cur past the corrupt next to ot0->org[0]
                          * (closest-camera bucket) so DrawOTag walks through
                          * the nearest geometry instead of the wild pointer. */
+#if defined(SH_N64_PORT)
+                        {
+                            uintptr_t a = (uintptr_t)cur;
+                            int owned = ((a >= pktLo && a < pktHi) ||
+                                         (a >= otLo  && a < otHi)  ||
+                                         (subLo && a >= subLo && a < subHi));
+                            if (owned)
+                                setaddr(cur, &ot0->org[0]);
+                            else if (prev != NULL)
+                                setaddr(prev, &ot0->org[0]);
+                            else
+                                ot0->tag = (u_long*)&ot0->org[0];
+                        }
+#else
                         setaddr(cur, &ot0->org[0]);
+#endif
                         break;
                     }
                     prev = cur;

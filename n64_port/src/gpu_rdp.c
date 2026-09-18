@@ -1165,7 +1165,8 @@ void GpuNv2a_FrameBegin(void)
          * after the snapshot is logged as such, so a merely slow frame is
          * never mistaken for a park. */
         extern void ShN64_ParkSnapshot(unsigned frame, unsigned ms) __attribute__((weak));
-        int parkLogged = 0;
+        extern bool __rspq_try_heal(void) __attribute__((weak));
+        int parkLogged = 0, healed = 0;
         /* 32-bit COUNT register, NOT get_ticks(): the 64-bit get_ticks() is a
          * software extension that is not interrupt-safe -- a timer interrupt
          * between its read and its `last` update makes the caller see a false
@@ -1202,9 +1203,27 @@ void GpuNv2a_FrameBegin(void)
             if (ms >= 1500)
             {
                 /* libdragon's own RDP-hang test: did DP_CURRENT move since? */
-                SH_DBG("[RSPQ-PARK] +%u ms: dpCur=%08lx (%s), handing off to display_get",
+                SH_DBG("[RSPQ-PARK] +%u ms: dpCur=%08lx (%s)",
                        ms, (unsigned long)SH_DP_CURRENT,
                        SH_DP_CURRENT == dpCur0 ? "STUCK" : "moving");
+                /* Try to restart the RSP before the watchdog turns a lost
+                 * command word into the end of the session. rspq's own heal
+                 * sits in rspq_syncpoint_wait, which display_get never
+                 * reaches: its wait loop asserts first (that is what every
+                 * [CRASH] dump so far has been). One attempt, then hand the
+                 * wait back so a genuine hang still produces the dump. */
+                if (!healed && __rspq_try_heal)
+                {
+                    healed = 1;
+                    if (__rspq_try_heal())
+                    {
+                        t0_32 = TICKS_READ();   /* give the restarted RSP its frame */
+                        parkLogged = 0;
+                        s_fb = display_try_get();
+                        continue;
+                    }
+                    SH_DBG("[RSPQ-PARK] heal refused -- handing off to display_get");
+                }
                 break;      /* hand the wait, and its watchdog, back to display_get */
             }
             s_fb = display_try_get();

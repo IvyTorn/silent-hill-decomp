@@ -391,13 +391,26 @@ void ShN64_RspCrashDetail(unsigned spStatus, int sigMore, int bufdoneLo, int buf
  * not found; keep them. */
 void ShN64_RspqHealed(unsigned addr, const unsigned* words, int n, int kind)
 {
+    /* kind 3 skipped the rest of the frame's commands, so the RDP's mode
+     * state is whatever the last executed command left: make the PSX path
+     * re-send all of it. (t3d re-sends its own state every flush pass.) */
+    if (kind == 3)
+    {
+        extern void GpuNv2a_PsxModeInvalidate(void) __attribute__((weak));
+        if (GpuNv2a_PsxModeInvalidate)
+            GpuNv2a_PsxModeInvalidate();
+    }
     void SH_DebugLogFlush(void);
     char buf[96];
     int  i, len = 0;
     buf[0] = 0;
     for (i = 0; i < n && len < (int)sizeof(buf) - 10; i++)
         len += snprintf(buf + len, sizeof(buf) - len, "%08x ", words[i]);
-    SH_DBG("[RSPQ-HEAL] kind=%d at=%08x hole=%s", kind, addr, buf);
+    SH_DBG("[RSPQ-HEAL] kind=%d (%s) at=%08x hole=%s", kind,
+           kind == 0 ? "lost command NOOPed" :
+           kind == 1 ? "lost wake-up, restarted" :
+           kind == 3 ? "skipped to the write cursor -- one frame of drawing lost" :
+                       "REFUSED", addr, buf);
     SH_DebugLogFlush();
 }
 

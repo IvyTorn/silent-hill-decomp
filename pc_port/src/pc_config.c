@@ -387,8 +387,11 @@ const char* Pc_FlashlightModeLabel(int mode)
 static int s_n64DecalMode = 0;
 int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 
-/* N64 decal pass depth bias in tiny3d depth steps (key decal_bias, 0..64). */
-static int s_n64DecalBias = 4;
+/* N64 decal pass depth bias in tiny3d depth steps (key decal_bias, 0..64).
+ * 4 steps still left posters fighting on hardware ("definitely while
+ * turning"); 16 covers the wall's own depth slope at oblique angles and only
+ * lets a decal win over geometry within a few cm of it. */
+static int s_n64DecalBias = 16;
 int PcConfig_N64DecalBias(void) { return s_n64DecalBias; }
 
 /* Whether the loaded file named a start map: a console's own default start

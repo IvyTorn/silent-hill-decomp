@@ -52,13 +52,24 @@ Current patches (2026-09-05):
    and INDUCED the RDP-overrun crashes; the enlarged queue alone + native
    backpressure is the stable config. Do NOT re-add the drain.
 
-4. `src/rspq/rspq.c` `rspq_try_heal` -- **DISABLED via a `0 &&` gate on both
-   call sites (2026-09-09)**, kept in source for reference. It only ever
-   refused (kind=2), and was part of the band-aid stack that induced the RDP
-   crashes. `src/rsp.c` `__rsp_set_cur_ucode` remains (harmless). The heal
-   snapshotted IMEM/DMEM and NOOPed a lone zero command word; the "RSP crash"
-   it targeted turned out to be the induced buffer-switch race, gone once the
-   drain/heal were removed.
+4. `src/rspq/rspq.c` `rspq_try_heal` -- **RE-ENABLED AND REWRITTEN
+   (2026-09-18)**, because the zero-command-word park kept ending hardware
+   sessions (six dumps, writer still unknown; see the crash memory). Two
+   outcomes now, reported through the weak `ShN64_RspqHealed` hook:
+   *kind 0* -- every word after the hole up to the next real command has a
+   zero top byte, so they can only be arguments: NOOP exactly those, losing
+   one command. *kind 3* -- otherwise JUMP to `rspq_cur_pointer`, the CPU's
+   write cursor, which IS a command boundary; that loses the rest of the
+   frame's drawing, so the heal also forces `__rspq_syncpoints_done[0]` to
+   `rspq_syncpoints_genid` and sets the lowpri bufdone signal -- the skipped
+   commands would have done both, and every waiter blocks forever otherwise.
+   Guessing a command's LENGTH (the old heal) was the bug: an argument word
+   can hold any value, so a lone NOOP let an argument execute as a command.
+   `bool __rspq_try_heal(void)` is exported (rspq.h) because the park is
+   detected OUTSIDE rspq: `display_get`'s own wait loop asserts long before
+   `rspq_syncpoint_wait` would heal, which is what every [CRASH] dump has
+   been. gpu_rdp.c's park detector calls it at +1500 ms.
+   `src/rsp.c` `__rsp_set_cur_ucode` remains.
 
 3. `src/t3d/t3dmath.c` in ../tiny3d (pinned c2cdbf2): `t3d_mat4_to_frustum`
    skips normalizing a plane when `len < 1e-6f` (off-centre projections make
