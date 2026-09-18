@@ -1166,7 +1166,7 @@ void GpuNv2a_FrameBegin(void)
          * never mistaken for a park. */
         extern void ShN64_ParkSnapshot(unsigned frame, unsigned ms) __attribute__((weak));
         extern bool __rspq_try_heal(void) __attribute__((weak));
-        int parkLogged = 0, healed = 0;
+        int parkLogged = 0, healed = 0, parked = 0;
         /* 32-bit COUNT register, NOT get_ticks(): the 64-bit get_ticks() is a
          * software extension that is not interrupt-safe -- a timer interrupt
          * between its read and its `last` update makes the caller see a false
@@ -1191,6 +1191,7 @@ void GpuNv2a_FrameBegin(void)
                 int sp1 = rspq_syncpoint_check(s_frameSp);
                 int sp2 = rspq_syncpoint_check(s_frameSpEnd);
                 parkLogged = 1;
+                parked     = !sp1 && !sp2;
                 dpCur0     = SH_DP_CURRENT;
                 SH_DBG("[RSPQ-PARK] no framebuffer for %u ms (frame %u): frameSp %s, endSp %s | sp=%08lx dp=%08lx dpCur=%08lx dpEnd=%08lx",
                        ms, (unsigned)g_Nv2aFrameCount,
@@ -1212,7 +1213,16 @@ void GpuNv2a_FrameBegin(void)
                  * reaches: its wait loop asserts first (that is what every
                  * [CRASH] dump so far has been). One attempt, then hand the
                  * wait back so a genuine hang still produces the dump. */
-                if (!healed && __rspq_try_heal)
+                /* Heal ONLY a proven park: both markers unreached and the RSP
+                 * self-halted. A long LOAD frame also sits here for seconds
+                 * with the RSP idle-parked on an empty queue, and healing that
+                 * restarts a perfectly healthy RSP. */
+                {
+                    extern int PcConfig_N64RspHeal(void);
+                    if (!PcConfig_N64RspHeal())
+                        healed = 1;   /* rsp_heal=0: straight to the dump */
+                }
+                if (!healed && parked && (SH_SP_STATUS & 3u) == 3u && __rspq_try_heal)
                 {
                     healed = 1;
                     if (__rspq_try_heal())

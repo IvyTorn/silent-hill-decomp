@@ -201,12 +201,27 @@ static void CpuWatchdogTick(int ovfl)
     {
         reg_block_t* r = (reg_block_t*)((uint8_t*)interrupt_exception_frame + 32);
         void* bt[16];
-        int   n, i;
-        n = __backtrace_from(bt, 16,
-                             (uint32_t*)(uintptr_t)(uint32_t)r->epc,
-                             (uint32_t*)(uintptr_t)(uint32_t)r->sp,
-                             (uint32_t*)(uintptr_t)(uint32_t)r->fp,
-                             (uint32_t*)(uintptr_t)(uint32_t)r->ra);
+        int   n = 0, i;
+        /* Stack-walking an ARBITRARY interrupted frame is not safe: this
+         * fires from a timer interrupt, so epc/sp/ra can point anywhere
+         * (inside a leaf with no frame yet, a libdragon spin loop, the
+         * exception stub). backtrace_foreach then dereferenced a NULL and
+         * took the whole run down -- which is what most of this session's
+         * "ares stalled at boot" runs actually were. Walk only when all four
+         * look like cached RDRAM, and keep the register line regardless. */
+        {
+            uint32_t epc = (uint32_t)r->epc, sp = (uint32_t)r->sp;
+            uint32_t fp  = (uint32_t)r->fp,  ra = (uint32_t)r->ra;
+            int sane = epc >= 0x80000000u && epc < 0x80800000u && !(epc & 3u) &&
+                       sp  >= 0x80000000u && sp  < 0x80800000u && !(sp  & 7u) &&
+                       ra  >= 0x80000000u && ra  < 0x80800000u && !(ra  & 3u) &&
+                       (fp == 0 || (fp >= 0x80000000u && fp < 0x80800000u));
+            if (sane)
+                n = __backtrace_from(bt, 16, (uint32_t*)(uintptr_t)epc,
+                                     (uint32_t*)(uintptr_t)sp,
+                                     (uint32_t*)(uintptr_t)fp,
+                                     (uint32_t*)(uintptr_t)ra);
+        }
         debugf("[CPUWD] no frame for %us (frame %d): epc=%08lx ra=%08lx sp=%08lx a0=%08lx a1=%08lx v0=%08lx s0=%08lx frames=%d\n",
                s_cwStill, g_Nv2aFrameCount, (unsigned long)(uint32_t)r->epc,
                (unsigned long)(uint32_t)r->ra, (unsigned long)(uint32_t)r->sp,

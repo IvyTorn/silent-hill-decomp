@@ -387,6 +387,11 @@ const char* Pc_FlashlightModeLabel(int mode)
 static int s_n64DecalMode = 0;
 int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 
+/* N64: restart a parked RSP instead of letting the watchdog end the session
+ * (key rsp_heal, default 1). Off = the old behaviour, a [CRASH] dump. */
+static int s_n64RspHeal = 1;
+int PcConfig_N64RspHeal(void) { return s_n64RspHeal; }
+
 /* N64 decal pass depth bias in tiny3d depth steps (key decal_bias, 0..64).
  * 4 steps still left posters fighting on hardware ("definitely while
  * turning"); 16 covers the wall's own depth slope at oblique angles and only
@@ -870,6 +875,10 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "decal_mode") == 0)
         {
             s_n64DecalMode = atoi(value);
+        }
+        else if (strcmp(key, "rsp_heal") == 0)
+        {
+            s_n64RspHeal = atoi(value);
         }
         else if (strcmp(key, "decal_bias") == 0)
         {
