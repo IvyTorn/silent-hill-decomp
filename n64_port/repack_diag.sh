@@ -8,6 +8,11 @@ I="${N64_INST:-/n64_inst}"
 OUT="$SCRIPT_DIR/bin"
 [ -d "$SCRIPT_DIR/build/diagfs" ] || { echo "no build/diagfs -- run build_n64.sh first"; exit 1; }
 cp "$SCRIPT_DIR/emu/silenthill.cfg" "$SCRIPT_DIR/build/diagfs/silenthill.cfg"
+# The disc pack too: a --files rebuild (e.g. adding VIN map binaries) is
+# exactly the kind of change worth testing without a full build.
+if [ -f "$SCRIPT_DIR/build/diag_disc.shpak" ]; then
+    cp "$SCRIPT_DIR/build/diag_disc.shpak" "$SCRIPT_DIR/build/diagfs/disc.shpak"
+fi
 MSYM=""
 [ -f "$OUT/sh.msym" ] && MSYM="$OUT/sh.msym"
 "$I/bin/mkdfs" "$SCRIPT_DIR/build/sh_diag.dfs" "$SCRIPT_DIR/build/diagfs" >/dev/null

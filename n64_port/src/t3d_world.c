@@ -228,6 +228,7 @@ static int       s_charLoaded, s_charLoadTried;
  * PSX ordering-table's per-primitive depth is what this approximates. */
 static int16_t   s_charPartCent[32][3];
 static int       s_cnRunPassTris;   /* [T3DCB2] probe: tris t3d_tri_draw'd */
+static int       s_cnWorldTris;     /* world tris submitted THIS frame */
 
 /* Tile-bind dedup: the command stream re-emits OP_TILE for a tile it already
  * used in an earlier BUFFER or in the other half of the fg/bg split, so the
@@ -328,7 +329,10 @@ void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8,
 
     extern int g_N64FogBlend;   /* gpu_rdp.c: PSX-path opaque prims fog too */
 
-    s_fogOn    = enabled && fullQ8 > 0 && PcConfig_N64WorldFog();
+    {
+        extern int g_ShPerfFogOff;   /* gpu_rdp.c perf sweep */
+        s_fogOn = enabled && fullQ8 > 0 && PcConfig_N64WorldFog() && !g_ShPerfFogOff;
+    }
     s_fogCullZ = 0.0f;
     s_fogSetThisFrame = 1;
     g_N64FogBlend = 0;
@@ -346,7 +350,11 @@ void ShT3d_WorldFogSet(int enabled, int r, int g, int b, int fullQ8, int drawQ8,
     dg = (int)((clear >> 8) & 0xFF) - g;
     db = (int)(clear & 0xFF) - b;
     if (dr >= -12 && dr <= 12 && dg >= -12 && dg <= 12 && db >= -12 && db <= 12)
+    {
+        extern float g_ShPerfCullScale;   /* gpu_rdp.c perf sweep */
         s_fogCullZ = (float)(drawQ8 > fullQ8 ? drawQ8 : fullQ8) / 8.0f + WORLD_FOG_CULL_MARGIN;
+        s_fogCullZ *= g_ShPerfCullScale;
+    }
     /* 2 = the clear IS the fog colour, so fully fogged PSX prims may be
      * dropped too; 1 = fog, but a dropped prim would leave a hole. */
     g_N64FogBlend = s_fogCullZ > 0.0f ? 2 : 1;
@@ -1479,6 +1487,7 @@ static void RunPass(const uint8_t* p, int cmdWords,
                     int base = i * 2 + k * 3;
                     t3d_tri_draw(p[base], p[base + 1], p[base + 2]);
                     s_cnRunPassTris++;
+                    s_cnWorldTris++;
                 }
                 needSync = 1;
             }
@@ -2647,6 +2656,7 @@ void ShT3d_NotifyFrameBegin(void)
 {
     s_frameActive  = 1;
     s_worldStarted = 0;
+    s_cnWorldTris  = 0;
     /* NOT s_drawCount = 0 here: FrameBegin fires on a mid-frame VSync between
      * the OT build and the GsDrawOt flush. The list is bounded by s_flushed. */
 }
@@ -2660,13 +2670,19 @@ int ShT3d_WorldDrewThisFrame(void)
     return s_drawCount > 0;
 }
 
+int ShT3d_WorldFrameTris(void)
+{
+    return s_cnWorldTris;
+}
+
 void ShT3d_NotifyFrameEnd(void)
 {
     static int s_census;
     s_frameActive = 0;
     if (s_worldStarted && (s_census++ & 127) == 0)
-        SH_DBG("[T3DW] blocks=%d fallback=%d tileRam=%dK tileUp=%d dedup=%d fog=%d fogFull=%d fogCull=%d culled=%d",
-               s_cnBlocks, s_cnFallback, s_tileRam / 1024, s_cnTileUp, s_cnTileDedup,
+        SH_DBG("[T3DW] blocks=%d tris=%d fallback=%d tileRam=%dK tileUp=%d dedup=%d fog=%d fogFull=%d fogCull=%d culled=%d",
+               s_cnBlocks, s_cnWorldTris,
+               s_cnFallback, s_tileRam / 1024, s_cnTileUp, s_cnTileDedup,
                s_fogOn, (int)s_fogFullZ, (int)s_fogCullZ, s_cnFogCulled);
     s_cnFogCulled = 0;
     s_cnBlocks = s_cnFallback = 0;
@@ -3234,6 +3250,12 @@ void ShT3d_WorldObjectsFlush(void)
         return;
     }
     WorldFrameStart();      /* world lights, cull, Z mode and draw flags */
+    /* World objects are props LYING ON world surfaces -- the map against the
+     * wall, an ammo box on the counter -- so they need the decal pass's depth
+     * offset for the same reason posters do: at room distances their few Q8
+     * of clearance is under the 16-bit depth resolution. */
+    if (s_decalBias > 0 && s_wvpDecalInited)
+        t3d_viewport_attach(&s_wvpDecal);
     for (i = 0; i < s_wobjCount; i++)
     {
         WObjRec*   o    = &s_wobj[i];
@@ -3275,6 +3297,8 @@ void ShT3d_WorldObjectsFlush(void)
         }
         drawn++;
     }
+    if (s_decalBias > 0 && s_wvpDecalInited)
+        t3d_viewport_attach(&s_wvp);
     /* Same fence as CharaFlush: the PSX walk's next mode change is auto-
      * synced only against rdpq's own prims, never our t3d triangles. */
     rdpq_sync_pipe();

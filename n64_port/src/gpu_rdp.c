@@ -104,7 +104,71 @@ int GpuNv2a_ZBufActive(void) { return ZBufOn(); }
  * (the PSX sorted his polygons into the OT one by one, which per-PART
  * painter's order cannot reproduce -- the holstered gun showed through the
  * trousers), the world stays painter's and never touches the Z image. */
-int GpuNv2a_ZBufMode(void) { return ZBufOn() ? g_PcConfig.n64ZBuffer : 0; }
+/* Perf-sweep overrides (see PerfSweepTick): 0 = no override. */
+int   g_ShPerfZMode;
+int   g_ShPerfFogOff;
+float g_ShPerfCullScale = 1.0f;
+
+/* Outdoors the frame is RDP-bound (pipe 145 ms of 166 on hardware), and which
+ * per-pixel cost that is cannot be measured in an emulator: ares does not
+ * implement the RDP busy counters. So measure it on the console, in one
+ * session: hold each setting for a window of frames and log the window's mean
+ * frame/pipe time with the geometry that produced it. cfg perf_sweep=1. */
+static unsigned RdpBusyUs(uint32_t busy);
+
+static void PerfSweepTick(void)
+{
+    extern int PcConfig_N64PerfSweep(void);
+    extern int ShT3d_WorldFrameTris(void);
+    enum { SWEEP_WINDOW = 150, SWEEP_WARMUP = 20 };
+    static const char* const s_names[4] = {
+        "baseline", "world fog OFF", "world Z OFF (chara only)", "cull 60%"
+    };
+    static int      s_phase, s_n;
+    static unsigned s_frameSum, s_pipeSum, s_trisSum;
+    unsigned frameUs, pipeUs;
+
+    if (!PcConfig_N64PerfSweep())
+        return;
+    /* Only while the native world is actually drawing (menus/loads would
+     * average in frames that measure nothing). */
+    {
+        extern int ShT3d_WorldDrewThisFrame(void);
+        if (!ShT3d_WorldDrewThisFrame())
+            return;
+    }
+    frameUs = (unsigned)TICKS_TO_US((unsigned)(get_ticks() - s_frameStart));
+    pipeUs  = RdpBusyUs(*DP_PIPE_BUSY);
+    s_n++;
+    if (s_n > SWEEP_WARMUP)          /* let the first frames after a switch settle */
+    {
+        s_frameSum += frameUs;
+        s_pipeSum  += pipeUs;
+        s_trisSum  += (unsigned)ShT3d_WorldFrameTris();
+    }
+    if (s_n < SWEEP_WINDOW)
+        return;
+    {
+        unsigned k = SWEEP_WINDOW - SWEEP_WARMUP;
+        SH_DBG("[PERFSWEEP] %-24s frame=%ums pipe=%ums tris=%u (mean of %u frames)",
+               s_names[s_phase], s_frameSum / k / 1000, s_pipeSum / k / 1000,
+               s_trisSum / k, k);
+    }
+    s_n = 0;
+    s_frameSum = s_pipeSum = s_trisSum = 0;
+    s_phase = (s_phase + 1) & 3;
+    g_ShPerfFogOff    = (s_phase == 1);
+    g_ShPerfZMode     = (s_phase == 2) ? 2 : 0;
+    g_ShPerfCullScale = (s_phase == 3) ? 0.6f : 1.0f;
+}
+
+int GpuNv2a_ZBufMode(void)
+{
+    int m = ZBufOn() ? g_PcConfig.n64ZBuffer : 0;
+    if (g_ShPerfZMode && m)
+        m = g_ShPerfZMode;
+    return m;
+}
 /* Public: t3d_world.c reads the native-character switch through here so it
  * needs no config include of its own. */
 int GpuNv2a_NativeCharaEnabled(void) { return g_PcConfig.n64NativeChara; }
@@ -195,6 +259,9 @@ static int             s_cnTlutReuse;
 static tex_loader_t    s_texLoader;
 static int             s_texLoaderValid;
 static int             s_winValid, s_winS0, s_winT0, s_winS1, s_winT1;
+/* Physical address of this frame's tail commands (present + syncpoint); the
+ * RSP heal resumes there when the lost command cannot be identified. */
+static uint32_t        s_frameTailPhys;
 static int             s_cnWinHits;
 static surface_t       s_pageSurf;
 
@@ -1165,7 +1232,7 @@ void GpuNv2a_FrameBegin(void)
          * after the snapshot is logged as such, so a merely slow frame is
          * never mistaken for a park. */
         extern void ShN64_ParkSnapshot(unsigned frame, unsigned ms) __attribute__((weak));
-        extern bool __rspq_try_heal(void) __attribute__((weak));
+        extern bool __rspq_try_heal(uint32_t prefer_target) __attribute__((weak));
         int parkLogged = 0, healed = 0, parked = 0;
         /* 32-bit COUNT register, NOT get_ticks(): the 64-bit get_ticks() is a
          * software extension that is not interrupt-safe -- a timer interrupt
@@ -1225,7 +1292,7 @@ void GpuNv2a_FrameBegin(void)
                 if (!healed && parked && (SH_SP_STATUS & 3u) == 3u && __rspq_try_heal)
                 {
                     healed = 1;
-                    if (__rspq_try_heal())
+                    if (__rspq_try_heal(s_frameTailPhys))
                     {
                         t0_32 = TICKS_READ();   /* give the restarted RSP its frame */
                         parkLogged = 0;
@@ -1330,6 +1397,16 @@ void GpuNv2a_FrameEnd(void)
          * zero header" by whether this point is ever reached. */
         s_frameSp      = rspq_syncpoint_new();
         s_frameSpValid = 1;
+        /* Where the frame's TAIL begins: the present and the end-of-frame
+         * syncpoint. A heal that cannot identify the lost command resumes
+         * HERE rather than at the write cursor, so the frame still presents
+         * and the framebuffer still comes back (skipping the tail deadlocked
+         * display_get -- hardware, 2026-09-18). */
+        {
+            extern volatile uint32_t* rspq_cur_pointer;
+            s_frameTailPhys = rspq_cur_pointer
+                            ? (uint32_t)PhysicalAddr((void*)rspq_cur_pointer) : 0;
+        }
         rdpq_detach_show();
         /* Second marker AFTER the detach: reached = the RSP consumed the whole
          * stream including the swap, so a framebuffer that still never frees
@@ -1340,6 +1417,8 @@ void GpuNv2a_FrameEnd(void)
     s_fb = NULL;
 
     g_Nv2aDrawCycles = get_ticks() - s_frameStart;
+
+    PerfSweepTick();
 
 
     {

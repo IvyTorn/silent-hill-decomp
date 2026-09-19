@@ -10853,7 +10853,21 @@ void GameFs_PlayerMapAnimLoad(s32 mapIdx) // 0x8007EB64
                  * = 0x800DA61C, which is the 0x3C field). g_OvlDynamic loads at
                  * the overlay's link base (USA 0x800C9578), so PSX_ADDR converts
                  * the stored pointer directly. */
+#if defined(SH_N64_PORT)
+                /* The overlay is RAW LITTLE-ENDIAN DISC DATA on a big-endian
+                 * console: both this pointer and the s16 rows it names. Read
+                 * big-endian it became 0xACAC0E80 and failed the range guard
+                 * below, so the patch silently no-opped and field_38 stayed on
+                 * map0_s00's linked table -- the only one in the main ELF.
+                 * That table has no status_2 == 255 row, so func_8007FB94
+                 * never set Harry's animation and a Romper pinning him left
+                 * him running on the spot (hardware, 2026-09-19). */
+                const u8* _f38 = (const u8*)g_OvlDynamic + 0x3C;
+                u32 psxField38 = (u32)_f38[0] | ((u32)_f38[1] << 8) |
+                                 ((u32)_f38[2] << 16) | ((u32)_f38[3] << 24);
+#else
                 u32 psxField38 = *(u32*)((u8*)g_OvlDynamic + 0x3C);
+#endif
                 /* EUR overlays are linked for base 0x800CB370, JAP (Rev 1/2)
                  * for 0x800CBBD0, but both load at the US base 0x800C9578 —
                  * rebase overlay-internal pointers by the link delta or they
@@ -10878,7 +10892,34 @@ void GameFs_PlayerMapAnimLoad(s32 mapIdx) // 0x8007EB64
                 }
                 if (psxField38 >= 0x80000000u && psxField38 < 0x80200000u) {
                     s_patchedMapHeader            = *g_pMapOverlayHeader;
+#if defined(SH_N64_PORT)
+                    /* Same story for the rows: four s16 each, little-endian on
+                     * disc. func_8007FB94 always scans 40 of them, so copy 40
+                     * (exactly what the PC path reads in place). */
+                    {
+                        static s_UnkStruct3_Mo s_n64Field38[40];
+                        const u8* src = (const u8*)PSX_ADDR(psxField38);
+                        int r, k;
+                        for (r = 0; r < 40; r++) {
+                            s16*      d = (s16*)&s_n64Field38[r];
+                            const u8* q = src + r * sizeof(s_UnkStruct3_Mo);
+                            for (k = 0; k < (int)(sizeof(s_UnkStruct3_Mo) / sizeof(s16)); k++)
+                                d[k] = (s16)((u16)q[k * 2] | ((u16)q[k * 2 + 1] << 8));
+                        }
+                        s_patchedMapHeader.field_38 = s_n64Field38;
+                        {
+                            static u32 s_loggedFor;
+                            if (s_loggedFor != psxField38) {
+                                s_loggedFor = psxField38;
+                                SH_DBG("[MAPANIM] field_38 <- overlay %08x, 40 rows byte-swapped (row0 status=%d/%d)",
+                                       (unsigned)psxField38,
+                                       (int)s_n64Field38[0].status, (int)s_n64Field38[0].status_2);
+                            }
+                        }
+                    }
+#else
                     s_patchedMapHeader.field_38   = (s_UnkStruct3_Mo*)PSX_ADDR(psxField38);
+#endif
                     g_pMapOverlayHeader           = &s_patchedMapHeader;
                 }
             }

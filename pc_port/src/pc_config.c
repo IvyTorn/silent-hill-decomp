@@ -387,6 +387,12 @@ const char* Pc_FlashlightModeLabel(int mode)
 static int s_n64DecalMode = 0;
 int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 
+/* N64 outdoor perf sweep (key perf_sweep): 1 = cycle fog / world-Z / cull
+ * distance every ~180 frames and log [PERFSWEEP] means, so ONE hardware
+ * session says which of them the RDP time is actually in. */
+static int s_n64PerfSweep = 0;
+int PcConfig_N64PerfSweep(void) { return s_n64PerfSweep; }
+
 /* N64: restart a parked RSP instead of letting the watchdog end the session
  * (key rsp_heal, default 1). Off = the old behaviour, a [CRASH] dump. */
 static int s_n64RspHeal = 1;
@@ -875,6 +881,10 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "decal_mode") == 0)
         {
             s_n64DecalMode = atoi(value);
+        }
+        else if (strcmp(key, "perf_sweep") == 0)
+        {
+            s_n64PerfSweep = atoi(value);
         }
         else if (strcmp(key, "rsp_heal") == 0)
         {
