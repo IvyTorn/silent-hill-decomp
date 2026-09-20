@@ -378,6 +378,38 @@ void ShN64_RspCrashDetail(unsigned spStatus, int sigMore, int bufdoneLo, int buf
         }
         SH_DBG("[CRASH] queue@reading: %s", line);
     }
+    /* What the RDP choked on. A stuck DP_CURRENT is a different failure from
+     * a parked RSP, and the command it stopped at is the only evidence. */
+    if ((rdpCur & 0x7FFFFFu) < 0x7FFF00u && rdpCur >= 0x1000u)
+    {
+        const volatile unsigned* r = (const volatile unsigned*)(0xA0000000u | (rdpCur & 0x7FFFFCu));
+        char line[200];
+        int  i, n = 0;
+        for (i = -8; i < 8 && n < (int)sizeof(line) - 12; i++)
+            n += snprintf(line + n, sizeof(line) - n, "%08x%c", r[i], i == 0 ? '*' : ' ');
+        SH_DBG("[CRASH] rdp@current: %s", line);
+    }
+    /* Corruption census: how many aligned zero words sit in the command
+     * stream the CPU has already written but the RSP has not reached? One is
+     * the known single-word writer; a run would mean something else. */
+    {
+        unsigned lo  = cur & 0x7FFFFCu;
+        unsigned hi  = ((unsigned)(uintptr_t)rspq_cur_pointer) & 0x7FFFFCu;
+        unsigned n   = 0, first[3] = {0, 0, 0}, i;
+        if (hi > lo && hi - lo < 0x20000u)
+        {
+            const volatile unsigned* q = (const volatile unsigned*)(0xA0000000u | lo);
+            for (i = 0; i < (hi - lo) / 4u; i++)
+                if (q[i] == 0u)
+                {
+                    if (n < 3)
+                        first[n] = lo + i * 4u;
+                    n++;
+                }
+            SH_DBG("[CRASH] zero-word census: %u zeros in %u words ahead of the RSP (first %08x %08x %08x)",
+                   n, (hi - lo) / 4u, first[0], first[1], first[2]);
+        }
+    }
     SH_DebugLogFlush();
     ShLogN64_CrashCommit();
 }

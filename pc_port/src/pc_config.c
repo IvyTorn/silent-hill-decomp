@@ -387,6 +387,20 @@ const char* Pc_FlashlightModeLabel(int mode)
 static int s_n64DecalMode = 0;
 int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 
+/* N64: shadow-copy each frame's RSP command stream and re-check it on the
+ * next frame (key queue_watch). The indoor hangs are a single aligned zero
+ * word appearing in commands the CPU already wrote; this catches the write
+ * itself -- address, old value, new value -- instead of the aftermath. */
+static int s_n64QueueWatch = 0;
+int PcConfig_N64QueueWatch(void) { return s_n64QueueWatch; }
+
+/* N64: libdragon's RDP command validator (key rdp_validate). It checks every
+ * RDP command for the illegal combinations that HANG the chip (the indoor
+ * "surfaces crash" class) and reports them through the log. Measurable CPU
+ * overhead: a diagnostic session, not a default. */
+static int s_n64RdpValidate = 0;
+int PcConfig_N64RdpValidate(void) { return s_n64RdpValidate; }
+
 /* N64 outdoor perf sweep (key perf_sweep): 1 = cycle fog / world-Z / cull
  * distance every ~180 frames and log [PERFSWEEP] means, so ONE hardware
  * session says which of them the RDP time is actually in. */
@@ -881,6 +895,14 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "decal_mode") == 0)
         {
             s_n64DecalMode = atoi(value);
+        }
+        else if (strcmp(key, "queue_watch") == 0)
+        {
+            s_n64QueueWatch = atoi(value);
+        }
+        else if (strcmp(key, "rdp_validate") == 0)
+        {
+            s_n64RdpValidate = atoi(value);
         }
         else if (strcmp(key, "perf_sweep") == 0)
         {

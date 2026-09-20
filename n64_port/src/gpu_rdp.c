@@ -262,6 +262,67 @@ static int             s_winValid, s_winS0, s_winT0, s_winS1, s_winT1;
 /* Physical address of this frame's tail commands (present + syncpoint); the
  * RSP heal resumes there when the lost command cannot be identified. */
 static uint32_t        s_frameTailPhys;
+
+/* queue_watch: a shadow of the command words this frame wrote, re-checked on
+ * the next frame. The RSP only READS that memory, so any difference is the
+ * wild writer behind the indoor hangs, caught with its address and the value
+ * it destroyed. */
+#define QWATCH_WORDS 8192
+static uint32_t*       s_qwShadow;
+static uint32_t        s_qwLo, s_qwWords;
+static uint32_t        s_qwFrameStart;
+static int             s_qwHits;
+
+static void QueueWatchCheck(void)
+{
+    const volatile uint32_t* live;
+    uint32_t i;
+
+    if (s_qwShadow == NULL || s_qwWords == 0)
+        return;
+    live = (const volatile uint32_t*)(0xA0000000u | s_qwLo);
+    for (i = 0; i < s_qwWords; i++)
+        if (live[i] != s_qwShadow[i])
+        {
+            if (s_qwHits < 8)
+                SH_DBG("[QWATCH] command word CHANGED after it was written: %08lx was %08lx now %08lx (frame %u, +%lu of %lu words)",
+                       (unsigned long)(s_qwLo + i * 4u), (unsigned long)s_qwShadow[i],
+                       (unsigned long)live[i], (unsigned)g_Nv2aFrameCount,
+                       (unsigned long)i, (unsigned long)s_qwWords);
+            s_qwHits++;
+            break;
+        }
+    s_qwWords = 0;
+}
+
+static void QueueWatchSnapshot(uint32_t startPhys, uint32_t endPhys)
+{
+    extern int PcConfig_N64QueueWatch(void);
+    uint32_t n;
+
+    if (!PcConfig_N64QueueWatch())
+        return;
+    if (s_qwShadow == NULL)
+    {
+        s_qwShadow = (uint32_t*)malloc(QWATCH_WORDS * sizeof(uint32_t));
+        if (s_qwShadow == NULL)
+            return;
+        SH_DBG("[QWATCH] on: %d KB shadow", (int)(QWATCH_WORDS * sizeof(uint32_t) / 1024));
+    }
+    if (endPhys <= startPhys)
+        return;
+    n = (endPhys - startPhys) / 4u;
+    if (n > QWATCH_WORDS)
+        n = QWATCH_WORDS;
+    {
+        const volatile uint32_t* live = (const volatile uint32_t*)(0xA0000000u | startPhys);
+        uint32_t i;
+        for (i = 0; i < n; i++)
+            s_qwShadow[i] = live[i];
+    }
+    s_qwLo    = startPhys;
+    s_qwWords = n;
+}
 static int             s_cnWinHits;
 static surface_t       s_pageSurf;
 
@@ -1156,6 +1217,7 @@ static int                s_frameSpValid;
 /* Raw SP/DP status for the park snapshot; the crash-time dump in __rsp_crash
  * does not always reach the card (the latest one left a single line). */
 #define SH_SP_STATUS  (*(volatile uint32_t*)0xA4040010)
+#define SH_DP_START   (*(volatile uint32_t*)0xA4100000)
 #define SH_DP_END     (*(volatile uint32_t*)0xA4100004)
 #define SH_DP_CURRENT (*(volatile uint32_t*)0xA4100008)
 #define SH_DP_STATUS  (*(volatile uint32_t*)0xA410000C)
@@ -1166,6 +1228,32 @@ void GpuNv2a_FrameBegin(void)
 
     if (!s_inited)
         GpuNv2a_Init();
+    QueueWatchCheck();
+    {
+        extern volatile uint32_t* rspq_cur_pointer;
+        s_qwFrameStart = rspq_cur_pointer
+                       ? (uint32_t)PhysicalAddr((void*)rspq_cur_pointer) : 0;
+    }
+    {
+        /* cfg rdp_validate=1: libdragon checks every RDP command for the
+         * illegal sequences that HANG the chip (a TMEM load without its sync,
+         * an out-of-range tile) and logs them. Started here, not next to
+         * rdpq_init: the config file is read after the GPU comes up, so there
+         * it always read 0. It therefore misses the boot commands, which is
+         * what its "start it immediately" note warns about -- acceptable for
+         * a diagnostic that hunts an in-game hang. */
+        extern int PcConfig_N64RdpValidate(void);
+        static int s_validatorTried;
+        if (!s_validatorTried)
+        {
+            s_validatorTried = 1;
+            if (PcConfig_N64RdpValidate())
+            {
+                rdpq_debug_start();
+                SH_DBG("[GPU] RDP validator ON (rdp_validate=1) -- expect it to cost frames and heap");
+            }
+        }
+    }
 
     /* Incremented HERE, not in FrameEnd: gpu_xbox.c documents the contract as
      * "incremented each GpuNv2a_FrameBegin" and psx_vram.c keys its whole
@@ -1233,7 +1321,9 @@ void GpuNv2a_FrameBegin(void)
          * never mistaken for a park. */
         extern void ShN64_ParkSnapshot(unsigned frame, unsigned ms) __attribute__((weak));
         extern bool __rspq_try_heal(uint32_t prefer_target) __attribute__((weak));
-        int parkLogged = 0, healed = 0, parked = 0;
+        extern int  PcConfig_N64RspHeal(void);
+        extern void GpuNv2a_PsxModeInvalidate(void);
+        int parkLogged = 0, healed = 0, parked = 0, attempts = 0;
         /* 32-bit COUNT register, NOT get_ticks(): the 64-bit get_ticks() is a
          * software extension that is not interrupt-safe -- a timer interrupt
          * between its read and its `last` update makes the caller see a false
@@ -1271,8 +1361,8 @@ void GpuNv2a_FrameBegin(void)
             if (ms >= 1500)
             {
                 /* libdragon's own RDP-hang test: did DP_CURRENT move since? */
-                SH_DBG("[RSPQ-PARK] +%u ms: dpCur=%08lx (%s)",
-                       ms, (unsigned long)SH_DP_CURRENT,
+                SH_DBG("[RSPQ-PARK] +%u ms (try %d): dpCur=%08lx (%s)",
+                       ms, attempts + 1, (unsigned long)SH_DP_CURRENT,
                        SH_DP_CURRENT == dpCur0 ? "STUCK" : "moving");
                 /* Try to restart the RSP before the watchdog turns a lost
                  * command word into the end of the session. rspq's own heal
@@ -1280,6 +1370,37 @@ void GpuNv2a_FrameBegin(void)
                  * reaches: its wait loop asserts first (that is what every
                  * [CRASH] dump so far has been). One attempt, then hand the
                  * wait back so a genuine hang still produces the dump. */
+                /* Class 2: the RSP is RUNNING but the RDP stopped consuming
+                 * (dpCur stuck, dpCur != dpEnd). The RSP then blocks on RDP
+                 * backpressure, the frame never presents, and display_get's
+                 * watchdog ends the session -- the "surfaces crash" indoors,
+                 * 2026-09-19: sp=00007000 halt=0, dp rdpCrashed=1, dpCur stuck
+                 * in the PREVIOUS RDP buffer. Drop the RDP's pending commands
+                 * and let it restart at the write head: the frame loses its
+                 * remaining graphics, the RSP unblocks, and the session lives.
+                 * State the dropped commands would have set is re-sent (the
+                 * PSX path's mode memo and t3d's per-pass state). */
+                if (!healed && !parked && (SH_SP_STATUS & 1u) == 0u &&
+                    SH_DP_CURRENT == dpCur0 && SH_DP_CURRENT != SH_DP_END &&
+                    PcConfig_N64RspHeal())
+                {
+                    uint32_t end = SH_DP_END;
+                    healed = 1;
+                    SH_DBG("[RDP-HANG] dpCur=%08lx stuck, dpEnd=%08lx -- dropping pending RDP commands",
+                           (unsigned long)SH_DP_CURRENT, (unsigned long)end);
+                    MEMORY_BARRIER();
+                    SH_DP_STATUS = 0x1u | 0x4u | 0x10u;   /* clear XBUS, freeze, flush */
+                    MEMORY_BARRIER();
+                    SH_DP_START  = end;                   /* skip to the write head */
+                    MEMORY_BARRIER();
+                    SH_DP_END    = end;
+                    MEMORY_BARRIER();
+                    GpuNv2a_PsxModeInvalidate();
+                    t0_32      = TICKS_READ();
+                    parkLogged = 0;
+                    s_fb = display_try_get();
+                    continue;
+                }
                 /* Heal ONLY a proven park: both markers unreached and the RSP
                  * self-halted. A long LOAD frame also sits here for seconds
                  * with the RSP idle-parked on an empty queue, and healing that
@@ -1299,8 +1420,21 @@ void GpuNv2a_FrameBegin(void)
                         s_fb = display_try_get();
                         continue;
                     }
-                    SH_DBG("[RSPQ-PARK] heal refused -- handing off to display_get");
+                    SH_DBG("[RSPQ-PARK] heal refused (try %d)", attempts + 1);
                 }
+                /* Retry rather than dying on the first refusal: nothing else
+                 * can unstick this, and display_get only asserts. Four goes,
+                 * 1.5 s apart, then hand the wait (and its watchdog) back so a
+                 * genuine hang still produces the [CRASH] dump. */
+                if (++attempts < 4)
+                {
+                    healed     = 0;
+                    parkLogged = 0;
+                    t0_32      = TICKS_READ();
+                    s_fb       = display_try_get();
+                    continue;
+                }
+                SH_DBG("[RSPQ-PARK] %d recovery attempts failed -- handing off to display_get", attempts);
                 break;      /* hand the wait, and its watchdog, back to display_get */
             }
             s_fb = display_try_get();
@@ -1406,6 +1540,9 @@ void GpuNv2a_FrameEnd(void)
             extern volatile uint32_t* rspq_cur_pointer;
             s_frameTailPhys = rspq_cur_pointer
                             ? (uint32_t)PhysicalAddr((void*)rspq_cur_pointer) : 0;
+            /* Everything this frame queued, for the next frame's re-check. */
+            if (s_qwFrameStart && s_frameTailPhys > s_qwFrameStart)
+                QueueWatchSnapshot(s_qwFrameStart, s_frameTailPhys);
         }
         rdpq_detach_show();
         /* Second marker AFTER the detach: reached = the RSP consumed the whole
