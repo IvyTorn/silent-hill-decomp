@@ -1271,4 +1271,44 @@ int PsxVram_PageIs4bpp(const void* page)
             return s_pages[i].fmt4 != 0;
     return 0;
 }
+
+/* The GPU does not read a page when the page is LOOKED UP. It reads it when
+ * the commands that sample it are handed to the RDP, which happens later, at
+ * the backend's batch flush -- and a flush can land AFTER a drain that the
+ * lookup came before.
+ *
+ * Stamping seq at lookup time therefore made the eviction test lie. Concretely,
+ * on the title screen: the four background quadrants take all four slots, the
+ * first menu glyph finds every slot in flight and drains, its page is decoded
+ * into slot A, and the flush that this bind triggers queues the LAST quadrant's
+ * triangles -- which read slot B. The next glyph then looks at slot B, sees a
+ * seq from before the drain, calls it idle, and decodes the font atlas into it
+ * while the RDP is still loading that quadrant's texels. The quadrant came out
+ * with a band of font glyphs across its top: the black box with a row of
+ * letters in the corner of the title screen and the 2D menus.
+ *
+ * The backend calls this from the flush, which is the moment the claim "the GPU
+ * may still be reading this" actually becomes true. */
+void PsxVram_NoteGpuUse(const void* page, const void* pal)
+{
+    unsigned thisFrame = (unsigned)g_Nv2aFrameCount;
+    int      i;
+
+    if (page != NULL)
+        for (i = 0; i < PAGE_N; i++)
+            if (s_pages[i].data == (const uint8_t*)page)
+            {
+                s_pages[i].lastUse = thisFrame;
+                s_pages[i].seq     = ++s_bindSeq;
+                break;
+            }
+    if (pal != NULL)
+        for (i = 0; i < PAL_N; i++)
+            if (s_pals[i].data == (const uint32_t*)pal)
+            {
+                s_pals[i].lastUse = thisFrame;
+                s_pals[i].seq     = ++s_bindSeq;
+                break;
+            }
+}
 #endif

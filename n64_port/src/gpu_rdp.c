@@ -982,6 +982,14 @@ void GpuNv2a_FlushBatch(void)
 
     if (s_texEnabled && s_texPage != NULL)
     {
+        /* THIS is where the page starts being read by the RDP, not where
+         * psx_vram.c looked it up: everything above was staged on the CPU.
+         * Telling the cache now is what keeps it from recycling this slot
+         * out from under the commands queued just below. */
+        {
+            extern void PsxVram_NoteGpuUse(const void* page, const void* pal);
+            PsxVram_NoteGpuUse(s_texPage, s_texPal);
+        }
         if (s_tlutDirty)
             UploadTlut();
 
@@ -1130,6 +1138,11 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
     s_appliedFog = -1;
     rdpq_mode_combiner(RDPQ_COMBINER_TEX_FLAT);
 
+    {   /* same contract as the triangle path: the RDP reads the page from
+         * here on, so the cache must not recycle the slot yet. */
+        extern void PsxVram_NoteGpuUse(const void* page, const void* pal);
+        PsxVram_NoteGpuUse(s_texPage, s_texPal);
+    }
     rdpq_tex_blit(&s_pageSurf, x0, y0, &(rdpq_blitparms_t){
         .s0      = s0,
         .t0      = t0,
