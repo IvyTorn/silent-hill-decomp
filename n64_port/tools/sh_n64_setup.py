@@ -167,6 +167,10 @@ def main():
     print(f"\ndisc  : {image}")
 
     out = args.out or pick_out()
+    # "E:" alone is the current directory ON drive E, not its root, and
+    # os.path.join would quietly produce "E:silenthill" somewhere else entirely.
+    if re.fullmatch(r"[A-Za-z]:", out):
+        out += os.sep
     root = os.path.join(out, "silenthill")
     os.makedirs(root, exist_ok=True)
     print(f"target: {root}")

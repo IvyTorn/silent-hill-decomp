@@ -1121,6 +1121,30 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
     if (best < 0) {
         int      victim = -1, pinned = -1;
         unsigned bh = 0xFFFFFFFFu, bu = 0xFFFFFFFFu, pu = 0xFFFFFFFFu;
+#if defined(SH_N64_PORT)
+        /* Queue whatever is still STAGED before deciding what to recycle.
+         *
+         * The backend batches primitives on the CPU and only hands them to the
+         * RDP at its next flush, which is triggered by the NEXT bind -- i.e.
+         * after this function has already decoded a new page into some slot.
+         * The "all four slots are in flight" path drains the GPU and then takes
+         * the least-recently-used one, and a drain says nothing about a batch
+         * that has not been submitted yet: the prim staged a moment ago can be
+         * drawn from a slot this call is about to overwrite.
+         *
+         * That is the title screen's black box of font glyphs. The last
+         * background quadrant is staged, the first menu glyph finds every slot
+         * busy, drains, and decodes the font atlas into the quadrant's own
+         * slot; the flush that follows then draws the quadrant out of it. The
+         * font page is CI4 and the quadrant was bound as CI8, so it came out
+         * squeezed 2:1 -- the atlas strip landing halfway down instead of at
+         * the bottom, everything else index 0 and therefore transparent.
+         *
+         * Flushing first makes both the in-flight test and the drain honest:
+         * every staged prim is now queued, and its page is stamped by
+         * PsxVram_NoteGpuUse as the flush goes past. */
+        { extern void GpuNv2a_FlushBatch(void); GpuNv2a_FlushBatch(); }
+#endif
         for (i = 0; i < PAGE_N; i++) {
             if (!s_pages[i].data) continue;
             if (s_pages[i].key == -1) { victim = i; break; }
@@ -1189,6 +1213,31 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
         s_pages[victim].hits = 1;
         best = victim;
 #if defined(SH_N64_PORT)
+        {   /* prim_dump: what the page actually CONTAINS, as the fraction of
+             * non-zero indices in each of 16 row bands (0 = empty, f = full).
+             * PSX index 0 is transparent, so an all-zero band draws nothing --
+             * which is how a sprite ends up as a hole with the background
+             * showing through, and tells a bad decode from a bad sample. */
+            extern int PcConfig_N64PrimDump(void);
+            static int s_pdDec;
+            if (PcConfig_N64PrimDump() && s_pdDec < 24)
+            {
+                char bands[17];
+                int  bi, rows = s_pages[victim].fmt4 ? 128 : 256;
+                s_pdDec++;
+                for (bi = 0; bi < 16; bi++)
+                {
+                    int r0 = (rows / 16) * bi, r1 = r0 + rows / 16, nz = 0, n = 0, r, c;
+                    for (r = r0; r < r1; r += 2)
+                        for (c = 0; c < 256; c += 8, n++)
+                            if (s_pages[victim].data[r * 256 + c]) nz++;
+                    bands[bi] = "0123456789abcdef"[n ? (nz * 15) / n : 0];
+                }
+                bands[16] = 0;
+                SH_DBG("[PGDEC] tpage=%d slot=%p ci4=%d bands=%s",
+                       tpage, (void*)s_pages[victim].data, s_pages[victim].fmt4, bands);
+            }
+        }
         /* A recycled slot keeps its ADDRESS while its CONTENT changes, and the
          * RDP backend memoises its last bind by POINTER -- so the next draw
          * from this page compares equal, skips the re-upload, and rasterises
@@ -1212,6 +1261,11 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
         if (p < 0) {
             int      victim = -1, pinned = -1;
             unsigned bu = 0xFFFFFFFFu, pu = 0xFFFFFFFFu;
+#if defined(SH_N64_PORT)
+            /* Same hazard as the index pages above: a staged prim's palette
+             * must be queued before this decides which one to overwrite. */
+            { extern void GpuNv2a_FlushBatch(void); GpuNv2a_FlushBatch(); }
+#endif
             for (i = 0; i < PAL_N; i++) {
                 if (!s_pals[i].data) continue;
                 if (s_pals[i].key == -1) { victim = i; break; }
