@@ -122,6 +122,32 @@ Streaming audio needs the raw BIN on SD, or the VADPCM conversion that milestone
 `n64_port/filesystem/` is gitignored. It holds disc data, which is not ours to
 redistribute; the ROM builds fine without it and simply finds no disc.
 
+### The SD card someone else can build
+
+`sh_hardware.z64` carries the native world and character assets inside the ROM,
+which makes it 36 MB and ties it to one person's converted data. For a build
+that can be handed to someone, `tools/sh_n64_setup.py` does the whole card from
+their own disc image instead:
+
+```
+python n64_port/tools/sh_n64_setup.py "Silent Hill (USA).bin" --out E:\
+```
+
+It writes `<out>/silenthill/` with `disc.shpak`, `gamedata/load/N64W`,
+`gamedata/load/N64C`, a default `silenthill.cfg` and a README, and leaves an
+existing cfg and the logs alone. The runtime probes the card before the
+cartridge (`WOpenRoot` in `t3d_world.c`), so those files win over anything
+baked in.
+
+`tools/pack_setup_tool.py` bundles the script, the converters it drives, the USA
+file table and a drag-and-drop `.cmd` into `build/sh_n64_setup.zip` — about
+70 KB, no game data in it.
+
+Three texture directories go into every `mkworld` run: `BG`, `TIM`, `ITEM`, in
+that order. `ITEM` is the one that is easy to forget, and forgetting it drops a
+pickup model from `<AREA>ITEM.SHW` with no error. `ER` has no `*_GLB.PLM`;
+`SPR` and `THR` do.
+
 ## Debugging
 
 There is no log file on a cartridge, and ares surfaces IS-Viewer only in a GUI

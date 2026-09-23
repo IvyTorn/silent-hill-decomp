@@ -1206,45 +1206,7 @@ static int ProcessSprtTile(P_TAG* tag)
          * USA font glyphs are 12x16 at v=240, so a 12x16 SPRT at v0=240 is a
          * text glyph. If curTpage stays constant across glyphs whose atlas rows
          * differ, the per-glyph DR_TPAGE is being lost -- that is the garble. */
-#ifdef SH_N64_PORT
-        /* TEMP diagnostic: menu-glyph GEOMETRY. In-game glyphs are correct, so
-         * the garble is specific to the 448i screens: this prints the PSX-space
-         * rect, the env offset/scale it will be transformed by, and the
-         * resulting SCREEN rect, which says outright whether menu text is
-         * mispositioned (origin trap) or merely shrunk (scale trap). */
-        if (w == 12 && h == 16 && v0 >= 224 && !g_XboxTextProbeArm) {
-            static int s_mg;
-            if (s_mg++ < 24)
-                SH_DBG("[MGLY] psx=(%d,%d %dx%d) ofs=%d,%d scl=%d,%d -> scr=(%d,%d %dx%d)",
-                       x0, y0, w, h, (int)s_ofsX, (int)s_ofsY,
-                       (int)(s_scaleX * 1000.0f), (int)(s_scaleY * 1000.0f),
-                       (int)(((float)x0 + s_ofsX) * s_scaleX),
-                       (int)(((float)y0 + s_ofsY) * s_scaleY),
-                       (int)((float)w * s_scaleX), (int)((float)h * s_scaleY));
-        }
-#endif
-#ifdef SH_N64_PORT
-        /* [MGLY2]: the menu-text question in numbers -- the glyph rect the
-         * game asked for, the env applied to it, and where it lands. An
-         * off-screen x, or a row pitch smaller than the glyph height, says
-         * which of the two is wrong without another guess. */
-        if (w == 12 && h == 16 && v0 >= 224) {
-            static int _mg; static int _mgState = -1;
-            extern int g_N64GameState;
-            if (_mgState != g_N64GameState) { _mgState = g_N64GameState; _mg = 0; }
-            if (_mg < 10) {
-                _mg++;
-                SH_DBG("[MGLY2] st=%d psx=(%d,%d %dx%d) disp=%dx%d ofs=%d,%d scl=%d,%d -> scr=(%d,%d %dx%d)",
-                       g_N64GameState, x0, y0, w, h,
-                       (int)g_activeDispEnv.disp.w, (int)g_activeDispEnv.disp.h,
-                       (int)s_ofsX, (int)s_ofsY,
-                       (int)(s_scaleX * 1000.0f), (int)(s_scaleY * 1000.0f),
-                       (int)(((float)x0 + s_ofsX) * s_scaleX),
-                       (int)(((float)y0 + s_ofsY) * s_scaleY),
-                       (int)((float)w * s_scaleX), (int)((float)h * s_scaleY));
-            }
-        }
-#endif
+#ifndef SH_N64_PORT
         if (w == 12 && h == 16 && v0 >= 224) {
             /* Dump the atlas bitmap ONCE per state: at the menu (where text is
              * correct) and again in-game (where it is garbled). Identical dumps
@@ -1257,6 +1219,7 @@ static int ProcessSprtTile(P_TAG* tag)
                 PsxVram_DumpFontStrip(which ? "INGAME" : "MENU");
             }
         }
+#endif
         if (g_XboxTextProbeArm && w == 12 && h == 16 && v0 >= 224) {
             static unsigned s_ts;
             if (s_ts < 60) {
