@@ -740,10 +740,49 @@ static inline void ShVertexCopy(ShVertex* d, const ShVertex* s)
     dw[12] = sw[12]; dw[13] = sw[13]; dw[14] = sw[14]; dw[15] = sw[15];
 }
 
+#ifdef SH_N64_PORT
+/* prim_dump (cfg): the first frames of each game state, every primitive, with
+ * the screen rect it lands on, the page it samples and the blend it uses.
+ * Answers "which primitive is THAT?" for the 2D screens, where the answer is
+ * one prim among a thousand and nothing on screen says which. Bounded twice
+ * over -- six frames and 240 lines per state -- so it is not a per-frame probe;
+ * a state the game sits in forever still prints only its opening frames. */
+static void PrimDump(const char* kind, const ShVertex* v0, const ShVertex* v3)
+{
+    extern int PcConfig_N64PrimDump(void);
+    extern int g_N64GameState;
+    static int s_pdState = -1, s_pdFrame = -1, s_pdFrames, s_pdN;
+
+    if (!PcConfig_N64PrimDump())
+        return;
+    if (s_pdState != g_N64GameState) {
+        s_pdState  = g_N64GameState;
+        s_pdFrame  = -1;
+        s_pdFrames = 0;
+        s_pdN      = 0;
+    }
+    if (s_pdFrame != (int)g_Nv2aFrameCount) {
+        s_pdFrame = (int)g_Nv2aFrameCount;
+        s_pdFrames++;
+    }
+    if (s_pdFrames > 6 || s_pdN >= 240)
+        return;
+    s_pdN++;
+    SH_DBG("[PDUMP] st=%d f%d #%d %s scr=(%d,%d)-(%d,%d) uv=(%d,%d)-(%d,%d) tpage=%d tex=%p pal=%p blend=%d",
+           g_N64GameState, s_pdFrames, s_pdN, kind,
+           (int)v0->pos[0], (int)v0->pos[1], (int)v3->pos[0], (int)v3->pos[1],
+           (int)v0->tex[0], (int)v0->tex[1], (int)v3->tex[0], (int)v3->tex[1],
+           s_curTpage, s_curTex, s_curPal, s_curBlend);
+}
+#else
+#define PrimDump(kind, v0, v3) ((void)0)
+#endif
+
 static void EmitTri(ShVertex* a, ShVertex* b, ShVertex* c)
 {
     unsigned long long t0 = shx_rdtsc();
     ShVertex* d = GpuNv2a_BatchAlloc(3);
+    PrimDump("tri", a, c);
     if (d) {
         if (UV_NEEDS_SCALE()) { ShVertex* sv[3]; sv[0]=a; sv[1]=b; sv[2]=c; ScalePalUvSrc(sv, 3); }
         ShVertexCopy(&d[0], a); ShVertexCopy(&d[1], b); ShVertexCopy(&d[2], c);
@@ -775,29 +814,7 @@ static void EmitQuad(ShVertex* v0, ShVertex* v1, ShVertex* v2, ShVertex* v3)
     }
 #endif
 #ifdef SH_N64_PORT
-    /* prim_dump: ONE frame per game state, every quad, with the screen rect it
-     * lands on. Answers "which primitive is that?" for the 2D screens without
-     * a per-frame probe -- s_pdState only advances when the state changes. */
-    {
-        extern int PcConfig_N64PrimDump(void);
-        extern int g_N64GameState;
-        static int s_pdState = -1, s_pdFrame = -1, s_pdN;
-        if (PcConfig_N64PrimDump()) {
-            if (s_pdState != g_N64GameState) {
-                s_pdState = g_N64GameState;
-                s_pdFrame = (int)g_Nv2aFrameCount;
-                s_pdN     = 0;
-            }
-            if (s_pdFrame == (int)g_Nv2aFrameCount && s_pdN < 90) {
-                s_pdN++;
-                SH_DBG("[PDUMP] st=%d #%d scr=(%d,%d)-(%d,%d) uv=(%d,%d)-(%d,%d) tpage=%d tex=%p pal=%p blend=%d",
-                       g_N64GameState, s_pdN,
-                       (int)v0->pos[0], (int)v0->pos[1], (int)v3->pos[0], (int)v3->pos[1],
-                       (int)v0->tex[0], (int)v0->tex[1], (int)v3->tex[0], (int)v3->tex[1],
-                       s_curTpage, s_curTex, s_curPal, s_curBlend);
-            }
-        }
-    }
+    PrimDump("quad", v0, v3);
 #endif
     d = GpuNv2a_BatchAlloc(6);
     if (d) {

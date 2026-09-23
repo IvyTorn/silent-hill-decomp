@@ -58,6 +58,9 @@ README = """Silent Hill (N64 port) - SD card contents
 silenthill/
   disc.shpak                  Data read straight from your disc image. The
                               port reads this the way the PSX read the CD.
+                              It holds every directory except XA, whose
+                              streamed voice tracks cannot survive the form
+                              this file uses.
   gamedata/load/N64W/         World geometry rebuilt for the N64's GPU.
   gamedata/load/N64C/         Characters, same.
   silenthill.cfg              Settings. Edit with any text editor.
@@ -136,8 +139,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("image", nargs="?", help="disc image (.bin, .img or .cue)")
     ap.add_argument("--out", default=None, help="SD card root, or a folder")
-    ap.add_argument("--dirs", default=None,
-                    help="disc directories for the pack (mkdiscpack default if omitted)")
+    # Every directory but XA. The smaller default mkdiscpack ships (boot, title
+    # and audio banks) is for iterating on a cartridge, and a game played from
+    # it would find no map data at all: BG holds the rooms and VIN the map
+    # overlays. XA cannot be packed -- Mode-2 Form-2 sectors do not survive the
+    # cooked 2048-byte form -- so the streamed voice tracks need the raw BIN.
+    ap.add_argument("--dirs", default="ALL",
+                    help="disc directories for the pack (default: ALL, i.e. everything but XA)")
     ap.add_argument("--keep-pack", action="store_true",
                     help="keep an existing disc.shpak instead of rebuilding it")
     ap.add_argument("--no-world", action="store_true",

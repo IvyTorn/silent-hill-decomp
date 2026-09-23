@@ -137,9 +137,13 @@ def main():
     entries = load_filetable(ft)
     files_re = re.compile(args.files) if args.files else None
 
+    # ALL means every directory but XA, for packing as much as for extracting.
+    # It used to expand only on the extract path, so `--dirs ALL` quietly built
+    # an EMPTY pack: no topdir is literally named "ALL".
+    if "ALL" in wanted:
+        wanted = {d for _, _, d, _ in entries if d != "XA"}
+
     if args.extract:
-        if "ALL" in wanted:
-            wanted = {d for _, _, d, _ in entries if d != "XA"}
         extract_loose(args.bin, args.extract, entries, wanted, files_re)
         return
     runs = merge_runs(entries, wanted, files_re)
