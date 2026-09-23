@@ -1139,6 +1139,15 @@ int GpuNv2a_TryBlitQuad(const ShVertex* v0, const ShVertex* v1,
         .scale_y = (y1 - y0) / (float)(t1 - t0),
     });
 
+    /* The blitter loads its own chunks into TMEM and reprograms TILE0, so the
+     * triangle path's "window W is still resident" memo is now a lie. Without
+     * this, the next triangle from THIS page (a bind memoised by pointer never
+     * re-runs, so nothing else clears it) takes the window-hit branch, skips
+     * its upload and rasterises whatever the blit left behind -- how a 2D
+     * screen's background quad came out as a box of font-atlas glyphs. */
+    s_winValid       = 0;
+    s_texLoaderValid = 0;
+
     s_cnTris += 2;
     s_cnTexTris += 2;
     s_modeDirty    = 1;   /* combiner was changed; next flush re-applies */
@@ -1507,6 +1516,24 @@ void GpuNv2a_FrameEnd(void)
      *
      * It stays up until something explicitly turns it off. Flip this when there
      * is a picture worth seeing. */
+    /* The config is read after the GPU comes up, so this is the first place
+     * that can honour it. Default off: the block was appearing on the main
+     * menu and flashing back on at any screen that drew no textured geometry.
+     * screen_log=1 keeps the old always-on behaviour for a black-screen hunt. */
+    {
+        extern int PcConfig_N64ScreenLog(void);
+        extern int PcConfig_Loaded(void);
+        static int s_screenLogSettled;
+        if (!s_screenLogSettled && PcConfig_Loaded())
+        {
+            s_screenLogSettled = 1;
+            if (!PcConfig_N64ScreenLog() && ShLogN64_ScreenEnabled())
+            {
+                ShLogN64_ScreenEnable(0);
+                SH_DBG("[GPU] on-screen log off (screen_log=1 turns it back on)");
+            }
+        }
+    }
     if (SH_N64_LOG_HIDE_ON_FIRST_TRI && s_cnTexTris > 0 && ShLogN64_ScreenEnabled())
     {
         ShLogN64_ScreenEnable(0);

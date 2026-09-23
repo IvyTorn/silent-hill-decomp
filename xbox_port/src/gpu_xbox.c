@@ -62,6 +62,19 @@ extern int g_Nv2aFbW, g_Nv2aFbH, g_Nv2aContentX, g_Nv2aContentW, g_Nv2aContentH;
  * -1 = unknown, forcing a bind on the first prim of the walk. */
 static const void* s_curTex = (const void*)-1;
 static const void* s_curPal = (const void*)-1;  /* palette bound with s_curTex */
+
+#ifdef SH_N64_PORT
+/* psx_vram.c recycles a page slot: same ADDRESS, different CONTENT. Both memos
+ * that key off that pointer have to forget it -- the backend's (which psx_vram
+ * clears with BindPaletted(NULL,NULL)) and this one. Otherwise the next prim
+ * compares equal, the rebind is skipped, and it draws with the texture
+ * DISABLED: a flat quad where a sprite belongs. */
+void GpuXbox_TexMemoInvalidate(void)
+{
+    s_curTex = (const void*)-1;
+    s_curPal = (const void*)-1;
+}
+#endif
 static int         s_curBlend = -1;   /* current blend-enable state (dedup) */
 /* Current PSX texture page for SPRT sprites — they carry no tpage of their own and
  * inherit it from the most recent DR_TPAGE the game prepends into the OT bucket.
@@ -758,6 +771,31 @@ static void EmitQuad(ShVertex* v0, ShVertex* v1, ShVertex* v2, ShVertex* v3)
             s_primCount++;
             s_emitCycles += shx_rdtsc() - t0;
             return;
+        }
+    }
+#endif
+#ifdef SH_N64_PORT
+    /* prim_dump: ONE frame per game state, every quad, with the screen rect it
+     * lands on. Answers "which primitive is that?" for the 2D screens without
+     * a per-frame probe -- s_pdState only advances when the state changes. */
+    {
+        extern int PcConfig_N64PrimDump(void);
+        extern int g_N64GameState;
+        static int s_pdState = -1, s_pdFrame = -1, s_pdN;
+        if (PcConfig_N64PrimDump()) {
+            if (s_pdState != g_N64GameState) {
+                s_pdState = g_N64GameState;
+                s_pdFrame = (int)g_Nv2aFrameCount;
+                s_pdN     = 0;
+            }
+            if (s_pdFrame == (int)g_Nv2aFrameCount && s_pdN < 90) {
+                s_pdN++;
+                SH_DBG("[PDUMP] st=%d #%d scr=(%d,%d)-(%d,%d) uv=(%d,%d)-(%d,%d) tpage=%d tex=%p pal=%p blend=%d",
+                       g_N64GameState, s_pdN,
+                       (int)v0->pos[0], (int)v0->pos[1], (int)v3->pos[0], (int)v3->pos[1],
+                       (int)v0->tex[0], (int)v0->tex[1], (int)v3->tex[0], (int)v3->tex[1],
+                       s_curTpage, s_curTex, s_curPal, s_curBlend);
+            }
         }
     }
 #endif

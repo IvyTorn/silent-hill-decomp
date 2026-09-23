@@ -327,11 +327,13 @@ void Gfx_2dEffectsDraw(void) // 0x800550D0
         func_8008D470(g_WorldEnvWork.field_50, &g_WorldEnvWork.field_58, &g_WorldEnvWork.field_60, g_WorldEnvWork.waterZones);
     }
 
-    if (g_WorldEnvWork.screenBrightness > 0
-#ifdef SH_N64_PORT
-        && !ShT3d_WorldDrewThisFrame()   /* would darken the native world to black */
-#endif
-        )
+    /* N64: this quad is the screen fade. It used to be skipped on any frame
+     * the native world drew, because with DR_MODE stripped from OT0 it took a
+     * stale blend mode and washed the scene grey. The sanitizer no longer
+     * strips DR_MODE on this port, so the quad gets its own additive mode and
+     * composites correctly -- and skipping it every other frame is what made
+     * a map fade-in flicker grey instead of fading. */
+    if (g_WorldEnvWork.screenBrightness > 0)
     {
         poly            = (POLY_G4*)GsOUT_PACKET_P;
         mode            = (DR_MODE*)(GsOUT_PACKET_P + sizeof(POLY_G4));

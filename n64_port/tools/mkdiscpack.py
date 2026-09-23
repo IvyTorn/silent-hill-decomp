@@ -123,7 +123,11 @@ def main():
     ft = args.filetable
     if ft is None:
         here = os.path.dirname(os.path.abspath(__file__))
-        ft = os.path.join(here, "..", "..", "src", "main", "filetable.c.USA.inc")
+        # Next to the script first: that is how the standalone setup tool ships,
+        # with no decomp tree around it.
+        ft = os.path.join(here, "filetable.c.USA.inc")
+        if not os.path.isfile(ft):
+            ft = os.path.join(here, "..", "..", "src", "main", "filetable.c.USA.inc")
     ft = os.path.normpath(ft)
 
     wanted = {d.strip().upper() for d in args.dirs.split(",") if d.strip()}

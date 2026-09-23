@@ -1195,7 +1195,9 @@ const void* PsxVram_GetPaletted(int tpage, int clut, const void** palOut)
          * the PREVIOUS texture out of TMEM. That is surfaces "warping into"
          * each other's art. Drop the memo so the next bind re-uploads. */
         { extern void GpuNv2a_BindPaletted(const void*, const void*);
-          GpuNv2a_BindPaletted(NULL, NULL); }
+          extern void GpuXbox_TexMemoInvalidate(void);
+          GpuNv2a_BindPaletted(NULL, NULL);
+          GpuXbox_TexMemoInvalidate(); }
 #endif
     }
     s_pages[best].lastUse = thisFrame;

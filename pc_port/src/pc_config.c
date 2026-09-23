@@ -387,6 +387,26 @@ const char* Pc_FlashlightModeLabel(int mode)
 static int s_n64DecalMode = 0;
 int PcConfig_N64DecalMode(void) { return s_n64DecalMode; }
 
+/* N64 on-screen debug log (key screen_log): the white-on-black text block in
+ * the top-left. It is the only diagnostic channel when nothing renders, so it
+ * stays up through boot; from the config load on it obeys this, default OFF.
+ * It used to hide itself at the first textured triangle, which left it visible
+ * on the main menu and flashing back on whenever a screen drew none. */
+static int s_n64ScreenLog = 0;
+int PcConfig_N64ScreenLog(void) { return s_n64ScreenLog; }
+
+/* N64: dump every 2D/character quad of the FIRST frame of each game state --
+ * screen rect, texture page, UV box (key prim_dump). For "what draws that?"
+ * questions about the 2D screens, where the answer is one primitive among
+ * fifty and nothing on screen says which. One frame per state, not per frame. */
+static int s_n64PrimDump = 0;
+int PcConfig_N64PrimDump(void) { return s_n64PrimDump; }
+
+/* Has PcConfig_Load run? Anything that comes up BEFORE the config (the N64
+ * GPU does) must wait for this before honouring a key. */
+static int s_configLoaded;
+int PcConfig_Loaded(void) { return s_configLoaded; }
+
 /* N64: shadow-copy each frame's RSP command stream and re-check it on the
  * next frame (key queue_watch). The indoor hangs are a single aligned zero
  * word appearing in commands the CPU already wrote; this catches the write
@@ -445,6 +465,8 @@ void PcConfig_Load(const char* path)
         strncpy(s_configPath, path, sizeof(s_configPath) - 1);
         s_configPath[sizeof(s_configPath) - 1] = '\0';
     }
+
+    s_configLoaded = 1;
 
     FILE* f = fopen(path, "r");
     if (!f)
@@ -895,6 +917,14 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "decal_mode") == 0)
         {
             s_n64DecalMode = atoi(value);
+        }
+        else if (strcmp(key, "screen_log") == 0)
+        {
+            s_n64ScreenLog = atoi(value);
+        }
+        else if (strcmp(key, "prim_dump") == 0)
+        {
+            s_n64PrimDump = atoi(value);
         }
         else if (strcmp(key, "queue_watch") == 0)
         {
