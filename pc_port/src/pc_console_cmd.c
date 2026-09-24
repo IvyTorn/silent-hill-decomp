@@ -15,6 +15,10 @@
  *   FMV                  - list all FMV names (numbered)
  *   FMV <name|number>    - play an FMV (fades out, plays, fades back in)
  *   FMV INTROn / ENDn    - alias for the nth intro (C*) / ending (Z*) movie
+ *   (console open) left-click the scene to select a character,
+ *                  right-click to deselect
+ *   SELECT [clear|player] - show / clear / force the current selection
+ *   SCALE <f>            - resize the selected character (0.05..20)
  *   ABOUT                - PC port credits (same block the staff roll appends)
  *   PCCREDITS [0|1]      - toggle that block in the staff roll (persists)
  *   LOGA / LOGB          - stamp an incremental A#/B# position mark
@@ -41,6 +45,7 @@
 #include "dbg_overlay.h"
 #include "pc_config.h"
 #include "pc_credits.h"
+#include "pc_pick.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -491,6 +496,8 @@ static const char* const HELP_LINES[] = {
     " kf [n]         keyframe inspector: set/show frame (K key)",
     " playas [name]  play as another character (bare = list)",
     " minimapnomap [0|1]  minimap before the map is found: 0 hide, 1 empty panel",
+    " select [clear|player]  show/clear the clicked selection",
+    " scale <f>      resize the selected character (click one first)",
     " about          PC port credits",
     " pccredits [0|1]  PC port credits block in the staff roll",
     " loga / logb    log Harry+camera pos/angles to SilentHill.log",
@@ -1031,6 +1038,51 @@ static void cmd_logmark(char letter, const char* arg)
             (int)vcWork.cam_mat_ang.vx, (int)vcWork.cam_mat_ang.vy);
 }
 
+/* pc_pick.c labels a picked NPC with the name SPAWN uses for it. */
+const char* Pc_Console_CharaName(s32 charaId)
+{
+    return spawn_chara_name(charaId);
+}
+
+static void cmd_select(const char* arg)
+{
+    char what[64];
+
+    if (strcmp(arg, "CLEAR") == 0 || strcmp(arg, "NONE") == 0) {
+        Pc_Pick_Clear(1);
+        return;
+    }
+    if (strcmp(arg, "PLAYER") == 0)
+        Pc_Pick_SelectPlayer();
+
+    if (Pc_Pick_Kind() == PcPick_None) {
+        cprintf("nothing selected - left-click a character in the scene");
+        return;
+    }
+
+    Pc_Pick_Describe(what, sizeof(what));
+    cprintf("selected %s  scale %.2f", what, Pc_Pick_GetScale() / 4096.0f);
+}
+
+static void cmd_scale(const char* arg)
+{
+    char what[64];
+
+    if (Pc_Pick_Kind() == PcPick_None) {
+        cprintf("scale: nothing selected - left-click a character in the scene first");
+        return;
+    }
+
+    if (arg[0] != '\0') {
+        double v = atof(arg);
+        Pc_Pick_SetScale((int)(v * 4096.0));
+    }
+
+    Pc_Pick_Describe(what, sizeof(what));
+    cprintf("%s scale %.2f (0.05..20; collision and hitboxes are not scaled)",
+            what, Pc_Pick_GetScale() / 4096.0f);
+}
+
 /* The staff-roll block, read straight off the same table pc_credits.c encodes
  * for the roll, so the two can never drift apart. */
 static void cmd_about(void)
@@ -1119,6 +1171,10 @@ void Pc_ConsoleExec(const char* line)
             push_lines(DEBUG_PAGE1, (int)(sizeof(DEBUG_PAGE1) / sizeof(DEBUG_PAGE1[0])));
     } else if (strcmp(cmd, "AMBSFX") == 0) {
         cmd_ambsfx(arg);
+    } else if (strcmp(cmd, "SELECT") == 0 || strcmp(cmd, "SEL") == 0) {
+        cmd_select(arg);
+    } else if (strcmp(cmd, "SCALE") == 0) {
+        cmd_scale(arg);
     } else if (strcmp(cmd, "ABOUT") == 0 || strcmp(cmd, "CREDITS") == 0) {
         cmd_about();
     } else if (strcmp(cmd, "PCCREDITS") == 0) {

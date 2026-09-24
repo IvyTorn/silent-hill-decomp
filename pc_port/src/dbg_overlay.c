@@ -14,6 +14,7 @@
 #include "bodyprog/bodyprog.h"
 #include "sh_log.h"
 #include "dbg_overlay.h"
+#include "pc_pick.h"
 #include <PsyX/PsyX_backend.h>
 #include "screens/options.h" /* OptionsMenuState_* — Escape backs out of the brightness screen */
 #include "pc_config.h"
@@ -95,6 +96,7 @@ static int s_sel_active = 0; /* left button held, drag in progress */
 static int s_sel_a_line, s_sel_a_col; /* anchor */
 static int s_sel_b_line, s_sel_b_col; /* drag end */
 static int s_prev_lmb = 0;
+static int s_prev_rmb = 0;
 /* Panel hit-test geometry: the GL viewport the console was last drawn in
  * (window pixels, GL bottom-left origin). Captured in Render. */
 static int s_hit_vp[4];
@@ -1401,6 +1403,9 @@ static int Dbg_GfxBindActive(const unsigned char* ks, const char* name)
 
 void DbgOverlay_Update(void)
 {
+    /* A click parked last frame has had a frame of drawing to resolve. */
+    Pc_Pick_FrameEnd();
+
     static int s_mark_a = 0;
     static int s_mark_b = 0;
     static int s_prev_tilde = 0;
@@ -1544,6 +1549,8 @@ void DbgOverlay_Update(void)
                     s_sel_active = 1;
                 } else {
                     s_sel_valid = 0; /* click off the text clears it */
+                    /* Below the panel is the scene: pick whatever is there. */
+                    Pc_Pick_RequestAt(wx, wy);
                 }
             } else if (lmb && s_sel_active) {
                 if (line != -2) {
@@ -1554,6 +1561,13 @@ void DbgOverlay_Update(void)
                 s_sel_active = 0;
             }
             s_prev_lmb = lmb;
+
+            {
+                int rmb = (mb & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
+                if (rmb && !s_prev_rmb)
+                    Pc_Pick_Clear(1);
+                s_prev_rmb = rmb;
+            }
         }
     }
 

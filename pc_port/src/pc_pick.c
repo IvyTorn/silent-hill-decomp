@@ -1,0 +1,384 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Console object picking + per-object SCALE.
+ *
+ * Picking is deferred by one frame on purpose. A click arrives in the console's
+ * update, which runs before the game's frame; the GTE view state a hit test
+ * needs belongs to the frame the player is actually looking at, so the click is
+ * parked and resolved from Pc_Pick_CharaPreDraw, which the draw path already
+ * calls for every character it is about to submit. That also means only drawn
+ * characters are pickable, which is what a click on the picture should mean.
+ *
+ * The hit test happens in prim coordinates -- the space RotTransPers outputs
+ * and the space PsyCross's world ortho maps to the picture. Inverting that
+ * ortho (g_PcWorldOrthoRect) rather than assuming a 320x224 frame is what keeps
+ * the test honest under hfov/vfov, pillarbox, Hor+ and stretch alike.
+ *
+ * SCALE multiplies the root bone's matrix through Chara_ModelBoneScaleSet, the
+ * same call Twinfeeler and map4_s03 use to resize a character. The skeleton is
+ * re-posed from keyframes every frame, so the multiply is re-applied every
+ * frame and never compounds. Collision is not scaled: a giant Groaner still
+ * has a normal-sized hitbox.
+ */
+#include "game.h"
+
+#include "bodyprog/chara/chara.h"
+#include "bodyprog/collision/chara.h"
+
+#include "pc_pick.h"
+#include "pc_mod_registry.h" /* Pc_Console_Print */
+
+#include <stdio.h>
+#include <string.h>
+
+/* PsyCross: the world pass's ortho rect in prim coordinates, and the window ->
+ * picture mapping the mouse cursor already goes through. */
+extern float g_PcWorldOrthoRect[4];
+extern int   PsyX_MapWindowToViewport(int mx, int my, float* outFracX, float* outFracY);
+
+/* pc_console_cmd.c: SPAWN_CHARAS reverse lookup ("GROANER"), NULL if unlisted. */
+const char* Pc_Console_CharaName(s32 charaId);
+
+#define PICK_SCALE_MIN Q12(0.05f)
+#define PICK_SCALE_MAX Q12(20.0f)
+
+static int s_selKind    = PcPick_None;
+static int s_selSlot    = -1;
+static s32 s_selCharaId = -1;
+
+static s32 s_npcScale[NPC_COUNT_MAX];
+/* Which character each NPC slot scale was set for. A slot is recycled on a
+ * map change or a respawn, and without this the next monster to land in it
+ * would inherit the previous one's size. */
+static s32 s_npcScaleChara[NPC_COUNT_MAX];
+static s32 s_playerScale;
+static int s_scalesInit;
+
+/* Pending click: 0 = none, 1 = armed (waiting for a frame), 2 = frame ran. */
+static int s_pendState;
+static int s_pendX, s_pendY;
+static int s_bestKind;
+static int s_bestSlot;
+static s32 s_bestCharaId;
+static s32 s_bestDepth;
+
+static void ScalesInit(void)
+{
+    int i;
+
+    if (s_scalesInit)
+        return;
+
+    for (i = 0; i < NPC_COUNT_MAX; i++)
+    {
+        s_npcScale[i]      = Q12(1.0f);
+        s_npcScaleChara[i] = -1;
+    }
+
+    s_playerScale = Q12(1.0f);
+    s_scalesInit  = 1;
+}
+
+static s32* ScaleSlot(int kind, int slot)
+{
+    ScalesInit();
+
+    if (kind == PcPick_Player)
+        return &s_playerScale;
+    if (kind == PcPick_Npc && slot >= 0 && slot < NPC_COUNT_MAX)
+        return &s_npcScale[slot];
+
+    return NULL;
+}
+
+static void DescribeInto(int kind, int slot, s32 charaId, char* out, int outSize)
+{
+    const char* name;
+
+    if (out == NULL || outSize <= 0)
+        return;
+
+    if (kind == PcPick_Player)
+    {
+        snprintf(out, (size_t)outSize, "player");
+        return;
+    }
+
+    if (kind != PcPick_Npc)
+    {
+        snprintf(out, (size_t)outSize, "nothing");
+        return;
+    }
+
+    name = Pc_Console_CharaName(charaId);
+    if (name != NULL)
+        snprintf(out, (size_t)outSize, "npc[%d] %s", slot, name);
+    else
+        snprintf(out, (size_t)outSize, "npc[%d] chara %d", slot, (int)charaId);
+}
+
+/* Project a world point to prim coordinates. 0 when it is behind the camera. */
+static int ProjectWorld(q19_12 x, q19_12 y, q19_12 z, float* outX, float* outY, s32* outDepth)
+{
+    MATRIX  mat;
+    SVECTOR v;
+    s32     sxy;
+    long    p;
+    long    flag;
+    s32     otz;
+
+    v.vx  = 0;
+    v.vy  = 0;
+    v.vz  = 0;
+    v.pad = 0;
+
+    Vw_WorldScreenMatrixAtPositionGet(&mat, x, y, z);
+    SetRotMatrix(&mat);
+    SetTransMatrix(&mat);
+
+    otz = RotTransPers(&v, (int*)&sxy, &p, &flag);
+    if (otz <= 8)
+        return 0;
+
+    *outX     = (float)(s16)(sxy & 0xFFFF);
+    *outY     = (float)(s16)((u32)sxy >> 16);
+    *outDepth = otz;
+
+    if (*outX < -4096.0f || *outX > 4096.0f || *outY < -4096.0f || *outY > 4096.0f)
+        return 0;
+
+    return 1;
+}
+
+static int CursorPrimPos(int wx, int wy, float* outX, float* outY)
+{
+    float fx;
+    float fy;
+
+    if (!PsyX_MapWindowToViewport(wx, wy, &fx, &fy))
+        return 0;
+
+    *outX = g_PcWorldOrthoRect[0] + fx * (g_PcWorldOrthoRect[1] - g_PcWorldOrthoRect[0]);
+    *outY = g_PcWorldOrthoRect[2] + fy * (g_PcWorldOrthoRect[3] - g_PcWorldOrthoRect[2]);
+
+    return 1;
+}
+
+void Pc_Pick_RequestAt(int windowX, int windowY)
+{
+    s_pendState   = 1;
+    s_pendX       = windowX;
+    s_pendY       = windowY;
+    s_bestKind    = PcPick_None;
+    s_bestSlot    = -1;
+    s_bestCharaId = -1;
+    s_bestDepth   = 0;
+}
+
+void Pc_Pick_Clear(int announce)
+{
+    if (announce)
+    {
+        if (s_selKind == PcPick_None)
+        {
+            Pc_Console_Print("nothing was selected");
+        }
+        else
+        {
+            char what[64];
+            char line[96];
+
+            DescribeInto(s_selKind, s_selSlot, s_selCharaId, what, sizeof(what));
+            snprintf(line, sizeof(line), "deselected %s", what);
+            Pc_Console_Print(line);
+        }
+    }
+
+    s_selKind    = PcPick_None;
+    s_selSlot    = -1;
+    s_selCharaId = -1;
+}
+
+void Pc_Pick_SelectPlayer(void)
+{
+    s_selKind    = PcPick_Player;
+    s_selSlot    = -1;
+    s_selCharaId = g_SysWork.playerWork.player.model.charaId;
+}
+
+int Pc_Pick_Kind(void) { return s_selKind; }
+int Pc_Pick_Slot(void) { return s_selSlot; }
+
+void Pc_Pick_Describe(char* out, int outSize)
+{
+    DescribeInto(s_selKind, s_selSlot, s_selCharaId, out, outSize);
+}
+
+int Pc_Pick_SetScale(int scaleQ12)
+{
+    s32* slot = ScaleSlot(s_selKind, s_selSlot);
+
+    if (slot == NULL)
+        return 0;
+
+    if (scaleQ12 < PICK_SCALE_MIN)
+        scaleQ12 = PICK_SCALE_MIN;
+    if (scaleQ12 > PICK_SCALE_MAX)
+        scaleQ12 = PICK_SCALE_MAX;
+
+    *slot = scaleQ12;
+    if (s_selKind == PcPick_Npc && s_selSlot >= 0 && s_selSlot < NPC_COUNT_MAX)
+        s_npcScaleChara[s_selSlot] = s_selCharaId;
+
+    return 1;
+}
+
+int Pc_Pick_GetScale(void)
+{
+    s32* slot = ScaleSlot(s_selKind, s_selSlot);
+
+    return (slot != NULL) ? *slot : Q12(1.0f);
+}
+
+void Pc_Pick_Reset(void)
+{
+    s_scalesInit = 0;
+    ScalesInit();
+    s_selKind    = PcPick_None;
+    s_selSlot    = -1;
+    s_selCharaId = -1;
+    s_pendState  = 0;
+}
+
+void Pc_Pick_CharaPreDraw(struct _SubCharacter* charaPtr, int slot, void* boneCoordsPtr)
+{
+    s_SubCharacter* chara      = (s_SubCharacter*)charaPtr;
+    GsCOORDINATE2*  boneCoords = (GsCOORDINATE2*)boneCoordsPtr;
+    int             kind       = (slot < 0) ? PcPick_Player : PcPick_Npc;
+    s32*            scale;
+
+    if (chara == NULL)
+        return;
+
+    /* A recycled NPC slot is a different character: drop a stale selection
+     * rather than scale whatever moved in. */
+    if (kind == PcPick_Npc && s_selKind == PcPick_Npc && slot == s_selSlot &&
+        chara->model.charaId != s_selCharaId)
+    {
+        Pc_Pick_Clear(0);
+    }
+
+    scale = ScaleSlot(kind, slot);
+
+    /* Slot recycled into a different character: its scale was not meant for
+     * this one. */
+    if (kind == PcPick_Npc && scale != NULL && *scale != Q12(1.0f) &&
+        s_npcScaleChara[slot] != chara->model.charaId)
+    {
+        *scale = Q12(1.0f);
+    }
+
+    if (scale != NULL && *scale != Q12(1.0f) && boneCoords != NULL)
+        Chara_ModelBoneScaleSet(boneCoords, 0, *scale, *scale, *scale);
+
+    if (s_pendState != 1)
+        return;
+
+    /* Hit test: the body's projected vertical span, widened into a box about
+     * half as wide as it is tall. The two span points come from the collision
+     * box, whose sign convention differs per character, so take the min/max
+     * rather than assuming which way is up. */
+    {
+        q19_12 yA  = chara->position.vy + chara->collision.box.top;
+        q19_12 yB  = chara->position.vy + chara->collision.box.height;
+        q19_12 yLo = (yA < yB) ? yA : yB;
+        q19_12 yHi = (yA < yB) ? yB : yA;
+        float  x0, y0, x1, y1;
+        float  cx, cy, curX, curY;
+        float  halfH, halfW;
+        s32    d0, d1, depth;
+
+        /* No usable collision span (some scripted actors): assume a body about
+         * 1.6 units tall standing on the character's own position. */
+        if (yHi - yLo < Q12(0.25f))
+        {
+            yLo = chara->position.vy - Q12(1.6f);
+            yHi = chara->position.vy;
+        }
+
+        if (!ProjectWorld(chara->position.vx, yLo, chara->position.vz, &x0, &y0, &d0))
+            return;
+        if (!ProjectWorld(chara->position.vx, yHi, chara->position.vz, &x1, &y1, &d1))
+            return;
+        if (!CursorPrimPos(s_pendX, s_pendY, &curX, &curY))
+            return;
+
+        cx    = (x0 + x1) * 0.5f;
+        cy    = (y0 + y1) * 0.5f;
+        halfH = (y0 > y1) ? (y0 - y1) * 0.5f : (y1 - y0) * 0.5f;
+        if (halfH < 4.0f)
+            halfH = 4.0f;
+        halfW = halfH * 0.45f;
+        if (halfW < 4.0f)
+            halfW = 4.0f;
+
+        if (curX < cx - halfW || curX > cx + halfW ||
+            curY < cy - halfH || curY > cy + halfH)
+        {
+            return;
+        }
+
+        /* Nearest hit wins when two bodies overlap on screen. */
+        depth = (d0 < d1) ? d0 : d1;
+        if (s_bestKind != PcPick_None && depth >= s_bestDepth)
+            return;
+
+        s_bestKind    = kind;
+        s_bestSlot    = slot;
+        s_bestCharaId = chara->model.charaId;
+        s_bestDepth   = depth;
+    }
+}
+
+void Pc_Pick_FrameEnd(void)
+{
+    char what[64];
+    char line[160];
+
+    if (s_pendState == 1)
+    {
+        /* One frame of drawing has now had its shot at the click. */
+        s_pendState = 2;
+        return;
+    }
+
+    if (s_pendState != 2)
+        return;
+
+    s_pendState = 0;
+
+    if (s_bestKind == PcPick_None)
+    {
+        Pc_Console_Print("nothing there to select");
+        return;
+    }
+
+    s_selKind    = s_bestKind;
+    s_selSlot    = s_bestSlot;
+    s_selCharaId = s_bestCharaId;
+
+    DescribeInto(s_selKind, s_selSlot, s_selCharaId, what, sizeof(what));
+
+    {
+        s_SubCharacter* c = (s_selKind == PcPick_Player)
+                          ? &g_SysWork.playerWork.player
+                          : &g_SysWork.npcs[s_selSlot];
+
+        snprintf(line, sizeof(line),
+                 "selected %s  hp %.1f  pos (%.1f, %.1f, %.1f)  scale %.2f",
+                 what, c->health / 4096.0f,
+                 c->position.vx / 4096.0f, c->position.vy / 4096.0f, c->position.vz / 4096.0f,
+                 Pc_Pick_GetScale() / 4096.0f);
+    }
+
+    Pc_Console_Print(line);
+}
