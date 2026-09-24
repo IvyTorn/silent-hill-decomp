@@ -40,6 +40,28 @@ built-in quick lists.
 | `about` / `credits` | PC port credits: build id plus the same block the staff roll appends. |
 | `pccredits [0\|1]` | Append the PC Port Credits block to the end of the staff roll (toggles if no arg). The roll's scroll rate is its length divided by its line count, so the extra lines tighten the step slightly and the roll still ends on the music. Config key `pc_port_credits`. **(saved)** |
 
+## Selecting things in the scene
+
+With the console open the pointer is live over the picture. **Left-click a character**
+below the console panel to select it; **right-click** anywhere to deselect. Both print
+to the console, and a selection carries the NPC slot so you can tell two of the same
+monster apart:
+
+```
+selected npc[3] GROANER  hp 1.0  pos (12.3, 0.0, -4.5)  scale 1.00
+deselected npc[3] GROANER
+```
+
+Only characters the game is currently drawing can be picked, and the nearest body wins
+when two overlap on screen. Harry is pickable like anything else.
+
+| Command | Description |
+|---|---|
+| `select` | Show the current selection. |
+| `select clear` | Drop it (same as right-click). |
+| `select player` | Select Harry without clicking, for the cameras that hide him. |
+| `scale <f>` | Resize the selected character, `0.05`..`20`. Bare `scale` reports the current value. Collision and hitboxes are **not** scaled, so a giant Groaner still has a normal-sized hitbox, and the model grows about its root bone rather than its feet. Per NPC slot, and forgotten when that slot is recycled into a different monster. |
+
 ## Cheats / items / flags
 
 | Command | Description |
