@@ -198,6 +198,35 @@ void Pc_Pick_Clear(int announce)
     s_selCharaId = -1;
 }
 
+int Pc_Pick_CollScale(const void* charaPtr)
+{
+    const s_SubCharacter* chara = (const s_SubCharacter*)charaPtr;
+    int                   i;
+
+    if (chara == NULL || !s_scalesInit)
+        return Q12(1.0f);
+
+    if (chara == &g_SysWork.playerWork.player)
+        return s_playerScale;
+
+    for (i = 0; i < NPC_COUNT_MAX; i++)
+    {
+        if (chara == &g_SysWork.npcs[i])
+        {
+            if (s_npcScale[i] != Q12(1.0f) && s_npcScaleChara[i] != chara->model.charaId)
+                return Q12(1.0f); /* slot recycled into another character */
+            return s_npcScale[i];
+        }
+    }
+
+    return Q12(1.0f);
+}
+
+int Pc_Pick_ScaleAbout(int origin, int v, int scaleQ12)
+{
+    return origin + (int)(((long long)(v - origin) * scaleQ12) >> 12);
+}
+
 void Pc_Pick_SelectPlayer(void)
 {
     s_selKind    = PcPick_Player;

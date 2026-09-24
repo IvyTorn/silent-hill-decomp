@@ -25,6 +25,15 @@ void Pc_Pick_RequestAt(int windowX, int windowY);
 /** Drop the selection. Prints what was dropped when `announce` is set. */
 void Pc_Pick_Clear(int announce);
 
+/** The Q12 scale a character is drawn at, 4096 (1.0) when it is not scaled.
+ * Collision reads its shape through this so a resized character is hittable
+ * and blocked at the size you can see. Read-site only: it never writes the
+ * collision fields, so it cannot compound or corrupt them. */
+int Pc_Pick_CollScale(const void* chara);
+
+/** Scale a span measured from a character origin: origin + (v - origin)*s. */
+int Pc_Pick_ScaleAbout(int origin, int v, int scaleQ12);
+
 /** Select the player without clicking, for the cameras that hide him. */
 void Pc_Pick_SelectPlayer(void);
 
