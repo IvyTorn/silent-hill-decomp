@@ -12,7 +12,8 @@ typedef enum
 {
     PcPick_None = 0,
     PcPick_Player,
-    PcPick_Npc
+    PcPick_Npc,
+    PcPick_Prop
 } e_PcPickKind;
 
 struct _SubCharacter;
@@ -52,6 +53,10 @@ int    Pc_Pick_GetScale(void);
  * character's console scale, and resolves a pending click against it.
  * `slot` is the NPC index, or -1 for the player. */
 void Pc_Pick_CharaPreDraw(struct _SubCharacter* chara, int slot, void* boneCoords);
+
+/** Once per frame, before a world object (prop) is drawn: applies its console
+ * scale to the coord being built, and resolves a pending click against it. */
+void Pc_Pick_WorldObjectPreDraw(const void* worldObject, void* coord);
 
 /** Once per frame from the console update: prints the result of a pick that the
  * frame just resolved. */

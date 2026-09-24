@@ -97,6 +97,10 @@ static int s_sel_a_line, s_sel_a_col; /* anchor */
 static int s_sel_b_line, s_sel_b_col; /* drag end */
 static int s_prev_lmb = 0;
 static int s_prev_rmb = 0;
+/* Hold TAB while the console is open: the panel stops drawing so the half of
+ * the screen it covers is clickable, while the pointer and picking stay live.
+ * Nothing about the console state changes -- it is purely a peek. */
+static int s_console_peek = 0;
 /* Panel hit-test geometry: the GL viewport the console was last drawn in
  * (window pixels, GL bottom-left origin). Captured in Render. */
 static int s_hit_vp[4];
@@ -1485,6 +1489,8 @@ void DbgOverlay_Update(void)
         }
     }
 
+    s_console_peek = (s_console_open && ks[SDL_SCANCODE_TAB]) ? 1 : 0;
+
     /* Scrollback while open: PgUp/PgDn (with hold-repeat) and the mouse wheel.
      * End jumps back to live. Clamped against the backlog in the texture build. */
     if (s_console_open) {
@@ -1540,6 +1546,9 @@ void DbgOverlay_Update(void)
                         line = idx;
                 }
             }
+
+            if (s_console_peek)
+                line = -2; /* panel hidden: the whole picture is clickable */
 
             if (lmb && !s_prev_lmb) {
                 if (line != -2) {
@@ -2129,9 +2138,10 @@ void DbgOverlay_Render(void)
 
         /* Backdrop first (full width), then the selection highlight, then the
          * text at its natural glyph scale, cropping to the rows in use. */
-        draw_panel(s_bg_tex, x0, y0, x1, y1);
+        if (!s_console_peek)
+            draw_panel(s_bg_tex, x0, y0, x1, y1);
 
-        if (s_sel_valid) {
+        if (s_sel_valid && !s_console_peek) {
             int fl, fc, ll, lc, r;
 
             console_sel_order(&fl, &fc, &ll, &lc);
@@ -2172,6 +2182,7 @@ void DbgOverlay_Render(void)
             }
         }
 
+        if (!s_console_peek)
         {
             /* Draw only the columns that fit the window at the natural 2x glyph
              * size, stretched from the left edge, so the text spans the full

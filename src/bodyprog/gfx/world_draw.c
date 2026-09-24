@@ -1,5 +1,8 @@
 #include "game.h"
 #ifdef SH_PC_PORT
+#include "pc_pick.h"
+#endif
+#ifdef SH_PC_PORT
 #include <stdio.h>
 #include "sh_log.h"
 #include "pc_config.h"
@@ -686,6 +689,9 @@ void Gfx_WorldObjectDraw(s_WorldObject* obj) // 0x8003CBA4
     rot.vz = Q10_TO_Q12(obj->rotationZ);
 
     Math_RotMatrixZxyNeg(&rot, &coord.coord);
+#ifdef SH_PC_PORT
+    Pc_Pick_WorldObjectPreDraw(obj, &coord);
+#endif
     Vw_CoordToWorldAndViewMatrices(&coord, &mats[1], &mats[0]);
 
     func_8003CC7C(obj->model, &mats[0], &mats[1]);

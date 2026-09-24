@@ -16,6 +16,7 @@
  *   FMV <name|number>    - play an FMV (fades out, plays, fades back in)
  *   FMV INTROn / ENDn    - alias for the nth intro (C*) / ending (Z*) movie
  *   (console open) left-click the scene to select a character,
+ *                  hold TAB to hide the panel and click through it,
  *                  right-click to deselect
  *   SELECT [clear|player] - show / clear / force the current selection
  *   SCALE <f>            - resize the selected character (0.05..20)
@@ -497,6 +498,7 @@ static const char* const HELP_LINES[] = {
     " playas [name]  play as another character (bare = list)",
     " minimapnomap [0|1]  minimap before the map is found: 0 hide, 1 empty panel",
     " select [clear|player]  show/clear the clicked selection",
+    " (hold TAB to hide the console and click through it)",
     " scale <f>      resize the selected character (click one first)",
     " about          PC port credits",
     " pccredits [0|1]  PC port credits block in the staff roll",

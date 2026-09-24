@@ -23,6 +23,7 @@
 
 #include "bodyprog/chara/chara.h"
 #include "bodyprog/collision/chara.h"
+#include "bodyprog/gfx/world_object.h"
 
 #include "pc_pick.h"
 #include "pc_mod_registry.h" /* Pc_Console_Print */
@@ -53,6 +54,24 @@ static s32 s_npcScaleChara[NPC_COUNT_MAX];
 static s32 s_playerScale;
 static int s_scalesInit;
 
+/* Props are submitted fresh every frame, so the draw list index is not an
+ * identity. A placement is static, so its model plus its packed position is:
+ * that pair is what a scaled prop is remembered by. */
+#define PICK_PROP_MAX 32
+
+typedef struct
+{
+    const void* model;
+    s32         x, y, z;
+    s32         scale;
+} s_PickProp;
+
+static s_PickProp s_props[PICK_PROP_MAX];
+static int        s_propCount;
+
+static const void* s_selPropModel;
+static s32         s_selPropX, s_selPropY, s_selPropZ;
+
 /* Pending click: 0 = none, 1 = armed (waiting for a frame), 2 = frame ran. */
 static int s_pendState;
 static int s_pendX, s_pendY;
@@ -60,6 +79,8 @@ static int s_bestKind;
 static int s_bestSlot;
 static s32 s_bestCharaId;
 static s32 s_bestDepth;
+static const void* s_bestPropModel;
+static s32 s_bestPropX, s_bestPropY, s_bestPropZ;
 
 static void ScalesInit(void)
 {
@@ -78,6 +99,30 @@ static void ScalesInit(void)
     s_scalesInit  = 1;
 }
 
+static s_PickProp* PropFind(const void* model, s32 x, s32 y, s32 z, int create)
+{
+    int i;
+
+    for (i = 0; i < s_propCount; i++)
+    {
+        if (s_props[i].model == model && s_props[i].x == x &&
+            s_props[i].y == y && s_props[i].z == z)
+        {
+            return &s_props[i];
+        }
+    }
+
+    if (!create || s_propCount >= PICK_PROP_MAX)
+        return NULL;
+
+    s_props[s_propCount].model = model;
+    s_props[s_propCount].x     = x;
+    s_props[s_propCount].y     = y;
+    s_props[s_propCount].z     = z;
+    s_props[s_propCount].scale = Q12(1.0f);
+    return &s_props[s_propCount++];
+}
+
 static s32* ScaleSlot(int kind, int slot)
 {
     ScalesInit();
@@ -86,6 +131,11 @@ static s32* ScaleSlot(int kind, int slot)
         return &s_playerScale;
     if (kind == PcPick_Npc && slot >= 0 && slot < NPC_COUNT_MAX)
         return &s_npcScale[slot];
+    if (kind == PcPick_Prop)
+    {
+        s_PickProp* pr = PropFind(s_selPropModel, s_selPropX, s_selPropY, s_selPropZ, 1);
+        return (pr != NULL) ? &pr->scale : NULL;
+    }
 
     return NULL;
 }
@@ -100,6 +150,13 @@ static void DescribeInto(int kind, int slot, s32 charaId, char* out, int outSize
     if (kind == PcPick_Player)
     {
         snprintf(out, (size_t)outSize, "player");
+        return;
+    }
+
+    if (kind == PcPick_Prop)
+    {
+        snprintf(out, (size_t)outSize, "prop @ (%.1f, %.1f, %.1f)",
+                 s_selPropX / 256.0f, s_selPropY / 256.0f, s_selPropZ / 256.0f);
         return;
     }
 
@@ -270,6 +327,7 @@ int Pc_Pick_GetScale(void)
 
 void Pc_Pick_Reset(void)
 {
+    s_propCount  = 0;
     s_scalesInit = 0;
     ScalesInit();
     s_selKind    = PcPick_None;
@@ -344,11 +402,38 @@ void Pc_Pick_CharaPreDraw(struct _SubCharacter* charaPtr, int slot, void* boneCo
         cx    = (x0 + x1) * 0.5f;
         cy    = (y0 + y1) * 0.5f;
         halfH = (y0 > y1) ? (y0 - y1) * 0.5f : (y1 - y0) * 0.5f;
-        if (halfH < 4.0f)
-            halfH = 4.0f;
-        halfW = halfH * 0.45f;
-        if (halfW < 4.0f)
-            halfW = 4.0f;
+
+        /* Width from the body cylinder rather than a fraction of the height:
+         * a Groaner is a low, wide dog, and a height-derived box made it a
+         * sliver that took several clicks to hit. */
+        {
+            q19_12 r = chara->collision.cylinder.field_2;
+            float  rx, ry;
+            s32    rd;
+
+            if (r < 0)
+                r = -r;
+            if (r < Q12(0.3f))
+                r = Q12(0.3f);
+
+            if (ProjectWorld(chara->position.vx + r, (yLo + yHi) / 2, chara->position.vz,
+                             &rx, &ry, &rd))
+            {
+                halfW = (rx > cx) ? (rx - cx) : (cx - rx);
+            }
+            else
+            {
+                halfW = halfH * 0.6f;
+            }
+        }
+
+        /* A few units of slop so a near-miss still counts. */
+        halfH += 6.0f;
+        halfW += 6.0f;
+        if (halfH < 10.0f)
+            halfH = 10.0f;
+        if (halfW < 10.0f)
+            halfW = 10.0f;
 
         if (curX < cx - halfW || curX > cx + halfW ||
             curY < cy - halfH || curY > cy + halfH)
@@ -365,6 +450,79 @@ void Pc_Pick_CharaPreDraw(struct _SubCharacter* charaPtr, int slot, void* boneCo
         s_bestSlot    = slot;
         s_bestCharaId = chara->model.charaId;
         s_bestDepth   = depth;
+    }
+}
+
+void Pc_Pick_WorldObjectPreDraw(const void* worldObject, void* coordPtr)
+{
+    const s_WorldObject* obj   = (const s_WorldObject*)worldObject;
+    GsCOORDINATE2*       coord = (GsCOORDINATE2*)coordPtr;
+    s32                  x, y, z;
+
+    if (obj == NULL || coord == NULL)
+        return;
+    if (s_propCount == 0 && s_pendState != 1)
+        return; /* nothing scaled and no click waiting: props cost nothing */
+
+    x = obj->positionX;
+    y = obj->positionY;
+    z = obj->positionZ;
+
+    if (s_propCount != 0)
+    {
+        s_PickProp* pr = PropFind(obj->model, x, y, z, 0);
+        if (pr != NULL && pr->scale != Q12(1.0f))
+        {
+            int i, j;
+            for (i = 0; i < 3; i++)
+                for (j = 0; j < 3; j++)
+                    coord->coord.m[j][i] = (s16)Q12_MULT_PRECISE(pr->scale, coord->coord.m[j][i]);
+            coord->flg = 0;
+        }
+    }
+
+    if (s_pendState != 1)
+        return;
+
+    /* Positions here are Q8; the projection wants Q12. A prop has no
+     * collision shape to size a box from, so use a fixed world-space reach
+     * about its origin: click on or near the thing. */
+    {
+        q19_12 wx = x << 4;
+        q19_12 wy = y << 4;
+        q19_12 wz = z << 4;
+        float  ox, oy, ex, ey, curX, curY, reach;
+        s32    d0, d1;
+
+        if (!ProjectWorld(wx, wy, wz, &ox, &oy, &d0))
+            return;
+        if (!ProjectWorld(wx + Q12(0.7f), wy, wz, &ex, &ey, &d1))
+            return;
+        if (!CursorPrimPos(s_pendX, s_pendY, &curX, &curY))
+            return;
+
+        reach = (ex > ox) ? (ex - ox) : (ox - ex);
+        if (reach < 8.0f)
+            reach = 8.0f;
+
+        if (curX < ox - reach || curX > ox + reach ||
+            curY < oy - reach || curY > oy + reach)
+        {
+            return;
+        }
+
+        /* A character under the same click wins ties: it is the more likely
+         * target, and props are everywhere. */
+        if (s_bestKind != PcPick_None && d0 >= s_bestDepth)
+            return;
+
+        s_bestKind  = PcPick_Prop;
+        s_bestSlot  = -1;
+        s_bestDepth = d0;
+        s_bestPropModel = obj->model;
+        s_bestPropX = x;
+        s_bestPropY = y;
+        s_bestPropZ = z;
     }
 }
 
@@ -394,9 +552,22 @@ void Pc_Pick_FrameEnd(void)
     s_selKind    = s_bestKind;
     s_selSlot    = s_bestSlot;
     s_selCharaId = s_bestCharaId;
+    if (s_bestKind == PcPick_Prop)
+    {
+        s_selPropModel = s_bestPropModel;
+        s_selPropX     = s_bestPropX;
+        s_selPropY     = s_bestPropY;
+        s_selPropZ     = s_bestPropZ;
+    }
 
     DescribeInto(s_selKind, s_selSlot, s_selCharaId, what, sizeof(what));
 
+    if (s_selKind == PcPick_Prop)
+    {
+        snprintf(line, sizeof(line), "selected %s  scale %.2f",
+                 what, Pc_Pick_GetScale() / 4096.0f);
+    }
+    else
     {
         s_SubCharacter* c = (s_selKind == PcPick_Player)
                           ? &g_SysWork.playerWork.player

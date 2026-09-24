@@ -52,15 +52,20 @@ selected npc[3] GROANER  hp 1.0  pos (12.3, 0.0, -4.5)  scale 1.00
 deselected npc[3] GROANER
 ```
 
-Only characters the game is currently drawing can be picked, and the nearest body wins
-when two overlap on screen. Harry is pickable like anything else.
+The panel covers the top of the screen, so **hold TAB** to hide it while keeping the
+pointer live: the whole picture becomes clickable, and releasing TAB brings the panel
+back exactly as it was.
+
+Characters and **props** (world objects) can both be picked. Only things the game is
+currently drawing are pickable, and the nearest one wins
+when two overlap; a character beats a prop at the same depth. Harry is pickable like anything else.
 
 | Command | Description |
 |---|---|
 | `select` | Show the current selection. |
 | `select clear` | Drop it (same as right-click). |
 | `select player` | Select Harry without clicking, for the cameras that hide him. |
-| `scale <f>` | Resize the selected character, `0.05`..`20`. Bare `scale` reports the current value. Collision and hitboxes are **not** scaled, so a giant Groaner still has a normal-sized hitbox, and the model grows about its root bone rather than its feet. Per NPC slot, and forgotten when that slot is recycled into a different monster. |
+| `scale <f>` | Resize the selected character or prop, `0.05`..`20`. Bare `scale` reports the current value. For a character the hit volume scales with it, so a giant Groaner is hittable over the body you can see and is blocked by walls at its own size. The model grows about its root bone rather than its feet. Per NPC slot, forgotten when that slot is recycled into a different monster; props are remembered by placement, up to 32 at a time. |
 
 ## Cheats / items / flags
 
