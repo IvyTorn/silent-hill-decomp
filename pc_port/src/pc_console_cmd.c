@@ -20,6 +20,8 @@
  *                  right-click to deselect
  *   SELECT [clear|player] - show / clear / force the current selection
  *   SCALE <f>            - resize the selected character (0.05..20)
+ *   BIND <key> <cmds>    - run one or more console commands from a key;
+ *                          BIND LIST / UNBIND <key> / UNBINDALL
  *   ABOUT                - PC port credits (same block the staff roll appends)
  *   PCCREDITS [0|1]      - toggle that block in the staff roll (persists)
  *   LOGA / LOGB          - stamp an incremental A#/B# position mark
@@ -47,6 +49,7 @@
 #include "pc_config.h"
 #include "pc_credits.h"
 #include "pc_pick.h"
+#include "pc_binds.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -497,6 +500,8 @@ static const char* const HELP_LINES[] = {
     " kf [n]         keyframe inspector: set/show frame (K key)",
     " playas [name]  play as another character (bare = list)",
     " minimapnomap [0|1]  minimap before the map is found: 0 hide, 1 empty panel",
+    " bind <key> <cmd>[;<cmd>...]  run console commands from a key",
+    " bind list / unbind <key> / unbindall",
     " select [clear|player]  show/clear the clicked selection",
     " (hold TAB to hide the console and click through it)",
     " scale <f>      resize the selected character (click one first)",
@@ -1166,6 +1171,12 @@ void Pc_ConsoleExec(const char* line)
             push_lines(DEBUG_PAGE1, (int)(sizeof(DEBUG_PAGE1) / sizeof(DEBUG_PAGE1[0])));
     } else if (strcmp(cmd, "AMBSFX") == 0) {
         cmd_ambsfx(arg);
+    } else if (strcmp(cmd, "BIND") == 0) {
+        PcBinds_CmdBind(arg);
+    } else if (strcmp(cmd, "UNBIND") == 0) {
+        PcBinds_CmdUnbind(arg);
+    } else if (strcmp(cmd, "UNBINDALL") == 0) {
+        PcBinds_CmdUnbindAll();
     } else if (strcmp(cmd, "SELECT") == 0 || strcmp(cmd, "SEL") == 0) {
         cmd_select(arg);
     } else if (strcmp(cmd, "SCALE") == 0) {

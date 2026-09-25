@@ -67,6 +67,41 @@ when two overlap; a character beats a prop at the same depth. Harry is pickable 
 | `select player` | Select Harry without clicking, for the cameras that hide him. |
 | `scale <f>` | Resize the selected character or prop, `0.05`..`20`. Bare `scale` reports the current value. For a character the hit volume scales with it, so a giant Groaner is hittable over the body you can see and is blocked by walls at its own size. The model grows about its root bone rather than its feet. Per NPC slot, forgotten when that slot is recycled into a different monster; props are remembered by placement, up to 32 at a time. |
 
+## Custom key binds
+
+`bind` runs console commands from a key. It is a **separate system** from the control
+binds in Options: a key already driving Harry can carry a bind, it is the same key in
+every camera mode, and editing or clearing the control binds never touches it.
+
+```
+bind k kill
+bind f give shotgun;give shotgunammo;spawn groaner;spawn groaner
+```
+
+Commands are separated by `;` and run in order on the key press. Binds are written to
+`config.cfg` in their own section, as the lines you typed, so a set can be copied out,
+pasted into a message, and pasted back:
+
+```
+# --- Custom key binds (console: bind / unbind / unbindall) ---
+bind K KILL
+bind F GIVE SHOTGUN;SPAWN GROANER
+```
+
+| Command | Description |
+|---|---|
+| `bind` | Usage. |
+| `bind <key> <cmd>[;<cmd>...]` | Bind a key, replacing any bind already on it. **(saved)** |
+| `bind list` | Show every bind. |
+| `unbind <key>` | Clear one. **(saved)** |
+| `unbindall` | Clear them all. **(saved)** |
+
+Refused: the console key, Escape, Enter, Backspace, Tab and the modifiers, and a bind
+may not contain `bind`/`unbind` (or pressing a key could silently rewrite your other
+binds). Up to 48 binds. They need `allow_debug_controls` on, same as the console, so a
+shared config cannot hand someone cheats they never switched on; `bind list` says so
+when it is off.
+
 ## Cheats / items / flags
 
 | Command | Description |

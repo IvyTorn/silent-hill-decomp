@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "pc_config.h"
+#include "pc_binds.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -486,6 +487,14 @@ void PcConfig_Load(const char* path)
 
         char key[64] = {0};
         char value[128] = {0};
+
+        /* Custom key binds are stored as the console line that made them,
+         * not as key = value, so they are taken before the = test. */
+        if (strncmp(p, "bind ", 5) == 0 || strncmp(p, "BIND ", 5) == 0)
+        {
+            PcBinds_ParseConfigLine(p + 5);
+            continue;
+        }
 
         char* eq = strchr(p, '=');
         if (!eq) continue;
@@ -1509,6 +1518,60 @@ void PcConfig_SaveKeyValues(const char* const* keys, const char* const* values, 
     {
         if (!found[k] && keys[k] != NULL && keys[k][0] != '\0' && values[k] != NULL)
             fprintf(f, "%s = %s\n", keys[k], values[k]);
+    }
+    fclose(f);
+}
+
+/* Custom key binds are not key = value lines, so they get their own writer:
+ * drop every existing bind line and its header, then re-append the section.
+ * They are written exactly as typed so a bind set can be copied out of the
+ * file, pasted into a message, and pasted back. */
+void PcConfig_SaveBindLines(const char* const* lines, int count)
+{
+    static char buf[1024][256];
+    int   n = 0;
+    int   i;
+    FILE* f;
+
+    f = fopen(s_configPath, "r");
+    if (!f)
+        return;
+    while (n < (int)(sizeof(buf) / sizeof(buf[0])) && fgets(buf[n], sizeof(buf[n]), f))
+    {
+        char* p = buf[n];
+        while (*p == 0x20 || *p == 0x09) p++;
+        if (strncmp(p, "bind ", 5) == 0 || strncmp(p, "BIND ", 5) == 0)
+            continue;
+        if (strncmp(p, "# --- Custom key binds", 22) == 0)
+            continue;
+        n++;
+    }
+    fclose(f);
+
+    /* Trim trailing blank lines so the section does not drift down the file
+     * every time it is rewritten. */
+    while (n > 0)
+    {
+        char* p = buf[n - 1];
+        while (*p == 0x20 || *p == 0x09 || *p == 0x0D || *p == 0x0A) p++;
+        if (*p != 0)
+            break;
+        n--;
+    }
+
+    f = fopen(s_configPath, "w");
+    if (!f)
+        return;
+    for (i = 0; i < n; i++)
+        fputs(buf[i], f);
+    if (count > 0)
+    {
+        fputs("\n# --- Custom key binds (console: bind / unbind / unbindall) ---\n", f);
+        for (i = 0; i < count; i++)
+        {
+            if (lines[i] != NULL && lines[i][0] != 0)
+                fprintf(f, "%s\n", lines[i]);
+        }
     }
     fclose(f);
 }

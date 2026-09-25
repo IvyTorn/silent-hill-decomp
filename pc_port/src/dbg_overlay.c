@@ -15,6 +15,7 @@
 #include "sh_log.h"
 #include "dbg_overlay.h"
 #include "pc_pick.h"
+#include "pc_binds.h"
 #include <PsyX/PsyX_backend.h>
 #include "screens/options.h" /* OptionsMenuState_* — Escape backs out of the brightness screen */
 #include "pc_config.h"
@@ -1489,6 +1490,14 @@ void DbgOverlay_Update(void)
     }
 
     s_console_peek = (s_console_open && ks[SDL_SCANCODE_TAB]) ? 1 : 0;
+
+    /* Custom key binds. Not while the console owns the keyboard, or typing a
+     * command would fire whatever its letters are bound to. */
+    {
+        extern int g_PcQuickOptionsActive;
+        if (!s_console_open && !g_PcQuickOptionsActive)
+            PcBinds_Update(ks);
+    }
 
     /* Scrollback while open: PgUp/PgDn (with hold-repeat) and the mouse wheel.
      * End jumps back to live. Clamped against the backlog in the texture build. */
