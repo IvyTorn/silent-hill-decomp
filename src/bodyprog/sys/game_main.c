@@ -1547,173 +1547,25 @@ void DebugCamera_Update(void)
 
     /* Numpad 1: (unbound — collision toggle moved to top-row 0) */
 
-    /* Top-row 0: toggle wall collision (noclip) */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_0];
-        if (cur && !prevKey) {
-            g_DebugNoWallCollision = !g_DebugNoWallCollision;
-            Sd_PlaySfx(g_DebugNoWallCollision ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 0: Wall collision: %s", g_DebugNoWallCollision ? "OFF (noclip)" : "ON");
-        }
-        prevKey = cur;
-    }
     /* (Third-person camera toggle moved out of debug controls: it's now the
      * rebindable Change-Camera action / control_style config, handled every
      * frame by Pc_ControlStyleUpdate.) */
 
     /* Kill Harry moved to the `kill` console command (was number key 1). */
-    /* Number keys 4/5: cycle the `map` config value (4 = previous, 5 = next,
-     * wrapping). Prints the new map + description and saves it to config.cfg so
-     * a warm-reset (Esc) + New Game loads the chosen map. */
-    {
-        static int prevKey4 = 0, prevKey5 = 0;
-        int cur4 = g_sdlKeyboardState[SDL_SCANCODE_4];
-        int cur5 = g_sdlKeyboardState[SDL_SCANCODE_5];
-        int dir  = 0;
-        if (cur5 && !prevKey5)      dir = 1;
-        else if (cur4 && !prevKey4) dir = -1;
-        if (dir != 0) {
-            int count = MapRegistry_Count();
-            int id    = MapRegistry_FindByName(g_PcConfig.mapName);
-            const char* name;
-            if (id < 0) id = 0;
-            id = (id + dir + count) % count;
-            name = MapRegistry_GetName(id);
-            strncpy(g_PcConfig.mapName, name, sizeof(g_PcConfig.mapName) - 1);
-            g_PcConfig.mapName[sizeof(g_PcConfig.mapName) - 1] = '\0';
-            PcConfig_SaveMapName(name);
-            SH_DBG_ECHO("[DEBUG] Map config value changed to %s - %s",
-                        name, MapRegistry_GetDescription(id));
-        }
-        prevKey4 = cur4;
-        prevKey5 = cur5;
-    }
 
-    /* Number key 6: kill every active enemy near Harry (debug). Each enemy's own
-     * update applies damage.amount to its health (health = MAX(health - amount, 0))
-     * and then runs its normal death path, so forcing a huge damage.amount routes
-     * the kill through each enemy's real death/cleanup — works for every type, and
-     * the value clears all per-enemy damage thresholds (e.g. Creeper needs >=200).
-     * Replaces the old (non-working) Grey Child spawn. */
-    {
-        static int prevKey6 = 0;
-        int cur6 = g_sdlKeyboardState[SDL_SCANCODE_6];
-        if (cur6 && !prevKey6) {
-            s_SubCharacter* hr   = &g_SysWork.playerWork.player;
-            s32             killed = 0;
-            s32             i;
-            for (i = 0; i < NPC_COUNT_MAX; i++) {
-                s_SubCharacter* npc = &g_SysWork.npcs[i];
-                if (npc->model.charaId == Chara_None || npc->model.charaId == Chara_Harry ||
-                    npc->health <= Q12(0.0f)) {
-                    continue;
-                }
-                if (ABS(npc->position.vx - hr->position.vx) > Q12(50.0f) ||
-                    ABS(npc->position.vz - hr->position.vz) > Q12(50.0f)) {
-                    continue;
-                }
-                npc->damage.amount = Q12(99999.0f);
-                killed++;
-            }
-            SH_DBG_ECHO("[DEBUG] Key 6: killed %d nearby enemies", (int)killed);
-        }
-        prevKey6 = cur6;
-    }
 
-    /* Top-row 7: toggle god mode (same shared g_PcGodMode flag as the `god` console cmd) */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_7];
-        if (cur && !prevKey) {
-            g_PcGodMode = !g_PcGodMode;
-            Sd_PlaySfx(g_PcGodMode ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 7: Invincibility: %s", g_PcGodMode ? "ON" : "OFF");
-        }
-        prevKey = cur;
-    }
-    /* Top-row 8: give 15 handgun bullets */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_8];
-        if (cur && !prevKey) {
-            Inventory_AddSpecialItem(0xC0, 15);
-            Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 8: Added 15 handgun bullets");
-        }
-        prevKey = cur;
-    }
-    /* Top-row 9: toggle no-target (enemies ignore Harry via CharaFlag_Unk4) */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_9];
-        if (cur && !prevKey) {
-            g_DebugNoTarget = !g_DebugNoTarget;
-            Sd_PlaySfx(g_DebugNoTarget ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 9: No-target: %s", g_DebugNoTarget ? "ON (enemies ignore Harry)" : "OFF");
-        }
-        prevKey = cur;
-    }
-    /* Top-row -: give Hunting Rifle (skip if owned) + a stack of rifle shells.
-     * Stands down while the K keyframe view is on — there - / = cycle the
-     * play-as character instead. */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_MINUS];
-        if (cur && !prevKey && !g_DebugAnimKfView) {
-            bool hasRifle = false;
-            for (int i = 0; i < INV_ITEM_COUNT_MAX; i++) {
-                if (g_SavegamePtr->items[i].id_0 == InvItemId_HuntingRifle) {
-                    hasRifle = true;
-                    break;
-                }
-            }
-            if (!hasRifle) Inventory_AddSpecialItem(InvItemId_HuntingRifle, 1);
-            Inventory_AddSpecialItem(InvItemId_RifleShells, 30);
-            Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key -: Added%s Rifle Shells x30", hasRifle ? "" : " Hunting Rifle +");
-        }
-        prevKey = cur;
-    }
-    /* Top-row =: give Shotgun (skip if owned) + a stack of shotgun shells.
-     * Stands down while the K keyframe view is on (see - above). */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_EQUALS];
-        if (cur && !prevKey && !g_DebugAnimKfView) {
-            bool hasShotgun = false;
-            for (int i = 0; i < INV_ITEM_COUNT_MAX; i++) {
-                if (g_SavegamePtr->items[i].id_0 == InvItemId_Shotgun) {
-                    hasShotgun = true;
-                    break;
-                }
-            }
-            if (!hasShotgun) Inventory_AddSpecialItem(InvItemId_Shotgun, 1);
-            Inventory_AddSpecialItem(InvItemId_ShotgunShells, 30);
-            Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key =: Added%s Shotgun Shells x30", hasShotgun ? "" : " Shotgun +");
-        }
-        prevKey = cur;
-    }
 
-    /* Keyframe inspector: K toggles freezing Harry's whole skeleton on one
-     * absolute keyframe; , / . step the keyframe down / up. Used to find the
+    /* Keyframe inspector scrub. The viewer itself is a Quick Options > Debug
+     * row now (the K key is gone); , / . step the keyframe down / up while it
+     * is on. Used to find the
      * exact authored pose index for the aim shim (e.g. the gun-forward frame).
      * The actual pose override + clamp to the anim header's keyframe count live
      * in Player_Update (player_control.c); here we just drive the index. */
     {
-        static int    prevK = 0, prevComma = 0, prevPeriod = 0;
+        static int    prevComma = 0, prevPeriod = 0;
         static Uint32 commaPress = 0, commaLast = 0, periodPress = 0, periodLast = 0;
-        int curK      = g_sdlKeyboardState[SDL_SCANCODE_K];
         int curComma  = g_sdlKeyboardState[SDL_SCANCODE_COMMA];
         int curPeriod = g_sdlKeyboardState[SDL_SCANCODE_PERIOD];
-        if (curK && !prevK) {
-            g_DebugAnimKfView = !g_DebugAnimKfView;
-            if (!g_DebugAnimKfView) g_DebugAnimPlaying = 0;
-            Sd_PlaySfx(g_DebugAnimKfView ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] K: Keyframe view: %s (KF %d)",
-                        g_DebugAnimKfView ? "ON" : "OFF", g_DebugAnimKf);
-        }
         if (g_DebugAnimKfView) {
             /* Hold , / . to scroll, accelerating up to 10/s the longer it's held.
              * Any manual scrub also stops loop playback. */
@@ -1732,34 +1584,10 @@ void DebugCamera_Update(void)
                 SH_DBG_ECHO("[DEBUG] KF %d", g_DebugAnimKf);
             }
         }
-        prevK      = curK;
         prevComma  = curComma;
         prevPeriod = curPeriod;
     }
 
-    /* - / = while the inspector is on: cycle the play-as character
-     * (Harry / Lisa / Cybil / Kaufmann / Dahlia). The swap is synchronous and
-     * sticks after K is turned off — that's how you pick who to play as. The
-     * rifle/shotgun give cheats on these keys stand down while K view is on. */
-    {
-        static int prevMinus = 0, prevEquals = 0;
-        int curMinus  = g_sdlKeyboardState[SDL_SCANCODE_MINUS];
-        int curEquals = g_sdlKeyboardState[SDL_SCANCODE_EQUALS];
-        if (g_DebugAnimKfView) {
-            int step = 0;
-            if (curMinus && !prevMinus)   step = -1;
-            if (curEquals && !prevEquals) step = 1;
-            if (step != 0) {
-                extern int         Pc_PlayAs_Cycle(int step);
-                extern const char* Pc_PlayAs_Label(int idx);
-                int idx = Pc_PlayAs_Cycle(step);
-                Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-                SH_DBG_ECHO("[PLAYAS] %s", Pc_PlayAs_Label(idx));
-            }
-        }
-        prevMinus  = curMinus;
-        prevEquals = curEquals;
-    }
 
     /* `/` while the inspector is on: cycle the equipped weapon's UPPER-BODY anims
      * (HARRY_BASE_ANIM_INFOS entries 56..75 = anim indices 28..37: aim / fire /

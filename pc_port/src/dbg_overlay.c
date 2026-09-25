@@ -169,7 +169,6 @@ static int    s_gl_inited = 0;
 static char   s_coll_lines[COLL_LINES][COLL_COLS];
 static int    s_coll_count = 0;
 static int    s_coll_on    = 0;
-static int    s_prev_apos  = 0;
 static GLuint s_coll_tex   = 0;
 
 /* Read by collision.c (func_8006B318) to capture the wall segments the player's
@@ -1740,17 +1739,12 @@ void DbgOverlay_Update(void)
         }
     }
 
-    /* `'` toggles the collision visualizer panel; gather data each frame while
-     * on. Handled before the showConsole gate so it works independently of the
-     * scrolling console's visibility. */
+    /* Collision visualizer. The `'` key is gone -- Quick Options > Debug owns
+     * the toggle, so the panel follows g_CollVisEnabled and gathers while it
+     * is on. Kept ahead of the showConsole gate so it works with the console
+     * closed. */
     {
-        int cur_apos = ks[SDL_SCANCODE_APOSTROPHE];
-        if (cur_apos && !s_prev_apos && g_PcAllowDebugControls) {
-            s_coll_on = !s_coll_on;
-            g_CollVisEnabled = s_coll_on;
-            SH_DBG_ECHO("[DEBUG] ' Collision visualizer: %s", s_coll_on ? "ON" : "OFF");
-        }
-        s_prev_apos = cur_apos;
+        s_coll_on = g_CollVisEnabled;
         if (s_coll_on)
             coll_gather();
     }

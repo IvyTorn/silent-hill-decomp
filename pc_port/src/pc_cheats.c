@@ -35,6 +35,9 @@ extern int  g_DebugAnimKfView;
 extern int  g_DebugCamEnabled;
 extern void Pc_FreeCam_Set(int on);
 /* main_pc.c / dbg_overlay.c */
+#include "map_registry.h"
+#include "pc_config.h"
+
 extern int  g_PcAllowDebugControls;
 extern int  g_PcUnlimitedEnemies;
 extern int  g_CollVisEnabled;
@@ -50,7 +53,7 @@ extern const char* Pc_PlayAs_Label(int idx);
 extern const char* Pc_PlayAs_Name(int idx);
 extern int         Pc_PlayAs_SetByName(const char* name, int save);
 
-enum { CH_TOGGLE = 0, CH_ACTION, CH_PLAYAS, CH_FREECAM, CH_DEBUGKEYS, CH_SPAWN };
+enum { CH_TOGGLE = 0, CH_ACTION, CH_PLAYAS, CH_FREECAM, CH_DEBUGKEYS, CH_SPAWN, CH_MAP };
 
 /* ---- big head mode ---------------------------------------------------- */
 
@@ -118,6 +121,33 @@ void Pc_BigHead_Apply(int charaId, GsCOORDINATE2* coords)
 }
 
 static int s_spawnIdx; /* CH_SPAWN: the browsed entry; confirm spawns it */
+
+/* CH_MAP: the map a New Game starts on. Replaces the old 4/5 debug keys.
+ * Unlike Spawn, browsing IS the change -- it writes config.cfg straight away,
+ * because the value only takes effect on the next New Game anyway. */
+static int MapRow_Current(void)
+{
+    int id = MapRegistry_FindByName(g_PcConfig.mapName);
+    return (id < 0) ? 0 : id;
+}
+
+static void MapRow_Set(int id)
+{
+    const char* name;
+    int         count = MapRegistry_Count();
+
+    if (count <= 0)
+        return;
+    if (id < 0)      id = count - 1;
+    if (id >= count) id = 0;
+
+    name = MapRegistry_GetName(id);
+    strncpy(g_PcConfig.mapName, name, sizeof(g_PcConfig.mapName) - 1);
+    g_PcConfig.mapName[sizeof(g_PcConfig.mapName) - 1] = (char)0;
+    PcConfig_SaveMapName(name);
+    Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+    SH_DBG_ECHO("[CHEAT] Starting map: %s - %s", name, MapRegistry_GetDescription(id));
+}
 
 typedef struct
 {
@@ -236,6 +266,7 @@ static const CheatRow s_debug[] = {
     { "Fast forward (Ctrl+F5)", CH_TOGGLE, &g_PcFastForward,     NULL },
     { "Wireframe (Ctrl+F1)",  CH_TOGGLE,  &g_dbg_wireframeMode,  NULL },
     { "No textures (Ctrl+F2)", CH_TOGGLE, &g_dbg_texturelessMode, NULL },
+    { "Starting map",         CH_MAP,     NULL, NULL },
     { "Spawn",                CH_SPAWN,   NULL, NULL },
     { "Log Harry position",   CH_ACTION,  NULL, act_log_position },
     { "Log camera shot",      CH_ACTION,  NULL, act_log_camera },
@@ -286,6 +317,13 @@ const char* Pc_Cheats_Label(int page, int idx, char* buf, int bufsz)
             snprintf(buf, bufsz, "< %s >%s", Pc_SpawnList_Name(s_spawnIdx),
                      Pc_SpawnList_Ready(s_spawnIdx) ? "" : "  (not in this map)");
             return buf;
+        case CH_MAP:
+        {
+            int id = MapRow_Current();
+            snprintf(buf, bufsz, "< %s >  %s", MapRegistry_GetName(id),
+                     MapRegistry_GetDescription(id));
+            return buf;
+        }
         default:           return "";
     }
 }
@@ -315,6 +353,9 @@ void Pc_Cheats_Adjust(int page, int idx, int dir)
             }
             break;
         }
+        case CH_MAP:
+            MapRow_Set(MapRow_Current() + (dir < 0 ? -1 : 1));
+            break;
         case CH_FREECAM:
             Pc_FreeCam_Set(!g_DebugCamEnabled);
             Sd_PlaySfx(g_DebugCamEnabled ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
@@ -365,24 +406,40 @@ void Pc_Cheats_Confirm(int page, int idx)
 int Pc_Cheats_ListCount(int page, int idx)
 {
     const CheatRow* r = row_at(page, idx, NULL);
+    if (r && r->kind == CH_MAP) return MapRegistry_Count();
     return (r && r->kind == CH_SPAWN) ? Pc_SpawnList_Count() : 0;
 }
 
 const char* Pc_Cheats_ListName(int page, int idx, int i)
 {
     const CheatRow* r = row_at(page, idx, NULL);
+
+    if (r && r->kind == CH_MAP)
+    {
+        /* Name plus as much of the description as the dropdown line fits. */
+        static char line[64];
+        snprintf(line, sizeof(line), "%s  %s", MapRegistry_GetName(i),
+                 MapRegistry_GetDescription(i));
+        return line;
+    }
     return (r && r->kind == CH_SPAWN) ? Pc_SpawnList_Name(i) : "";
 }
 
 int Pc_Cheats_ListGet(int page, int idx)
 {
     const CheatRow* r = row_at(page, idx, NULL);
+    if (r && r->kind == CH_MAP) return MapRow_Current();
     return (r && r->kind == CH_SPAWN) ? s_spawnIdx : 0;
 }
 
 void Pc_Cheats_ListSet(int page, int idx, int i)
 {
     const CheatRow* r = row_at(page, idx, NULL);
+    if (r && r->kind == CH_MAP && i >= 0 && i < MapRegistry_Count())
+    {
+        MapRow_Set(i);
+        return;
+    }
     if (r && r->kind == CH_SPAWN && i >= 0 && i < Pc_SpawnList_Count())
     {
         s_spawnIdx = i;

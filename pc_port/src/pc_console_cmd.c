@@ -539,24 +539,17 @@ int g_PsxBarOuter = 112;
 int g_PsxBarInner = 96;
 
 static const char* const DEBUG_PAGE1[] = {
-    "Debug keys (page 1/2) - cheats & tools:",
+    "Debug keys (page 1/2) - what is left on the keyboard:",
     " Esc     warm reset to the title screen",
-    " 0       noclip toggle (walk through walls)",
-    " 4 / 5   map config prev / next (loads on New Game)",
-    " 6       kill nearby enemies",
-    " 7       invincibility toggle",
-    " 8       +15 handgun bullets",
-    " 9       no-target toggle (enemies ignore Harry)",
-    " -       give Hunting Rifle + 30 shells (not in K view)",
-    " =       give Shotgun + 30 shells (not in K view)",
-    " '       collision visualizer panel",
-    " K       keyframe inspector; , . scrub (hold = faster)",
-    " - / =   in K view: cycle play-as character",
+    " , .     keyframe scrub while the viewer is on (hold = faster)",
     " [ / ]   drop A/B position markers into the log",
     " ~       console open/close (game pauses; PgUp/PgDn scroll)",
+    " TAB     with the console open: hide the panel, keep the cursor",
+    "The cheat/tool keys moved to F10 Quick Options > Cheats and",
+    "Debug: noclip, god, no-target, ammo/rifle/shotgun, kill nearby,",
+    "collision visualizer, keyframe viewer, play as, starting map.",
     "type DEBUG 2 for the camera keys",
 };
-
 static const char* const DEBUG_PAGE2[] = {
     "Debug keys (page 2/2) - camera:",
     " Num *        free debug camera on/off",
