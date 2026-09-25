@@ -226,6 +226,9 @@ void GameBoot_GameStartup(void) // 0x80034964
                 {
                     extern void Pc_CharaPool_OnMapLoad(void);
                     Pc_CharaPool_OnMapLoad();
+                    /* Console SCALE is per NPC slot and per prop placement,
+                     * neither of which survives a map change. */
+                    { extern void Pc_Pick_Reset(void); Pc_Pick_Reset(); }
                 }
 #endif
                 g_GameWork.gameStateSteps[0]++;

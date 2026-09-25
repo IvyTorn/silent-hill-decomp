@@ -997,6 +997,9 @@ void Collision_TargetCharaCollidingSlowDown(VECTOR3* offset, const s_CollisionCy
     q19_12          otherCharaBottom;
     q19_12          otherCharaTop;
     s_SubCharacter* curChara;
+#ifdef SH_PC_PORT
+    q19_12          charaScale;
+#endif
 
     offsetAlpha  = Q12(1.0f);
     headingAngle = ratan2(offset->vx, offset->vz);
@@ -1018,10 +1021,11 @@ void Collision_TargetCharaCollidingSlowDown(VECTOR3* offset, const s_CollisionCy
         curCharaTop      = curChara->collision.box.top    + curChara->position.vy;
         curCharaBottom   = curChara->collision.box.bottom + curChara->position.vy;
 #ifdef SH_PC_PORT
+        charaScale = Pc_Pick_CollScale(curChara); /* 1.0 unless console SCALE is on */
+        if (charaScale != Q12(1.0f))
         {
-            q19_12 cs = Pc_Pick_CollScale(curChara);
-            curCharaTop    = Pc_Pick_ScaleAbout(curChara->position.vy, curCharaTop,    cs);
-            curCharaBottom = Pc_Pick_ScaleAbout(curChara->position.vy, curCharaBottom, cs);
+            curCharaTop    = Pc_Pick_ScaleAbout(curChara->position.vy, curCharaTop,    charaScale);
+            curCharaBottom = Pc_Pick_ScaleAbout(curChara->position.vy, curCharaBottom, charaScale);
         }
 #endif
         otherCharaTop    = cylinder->top                  + cylinder->position.vy;
@@ -1038,7 +1042,9 @@ void Collision_TargetCharaCollidingSlowDown(VECTOR3* offset, const s_CollisionCy
         // Check if cylinders collide on XZ plane.
         dist = Vc_VectorMagnitudeCalc(cylinderOffsetX, Q12(0.0f), cylinderOffsetZ);
 #ifdef SH_PC_PORT
-        if ((((s32)(((s64)curChara->collision.cylinder.radius * Pc_Pick_CollScale(curChara)) >> 12) +
+        if (((((charaScale != Q12(1.0f))
+               ? (s32)(((s64)curChara->collision.cylinder.radius * charaScale) >> 12)
+               : curChara->collision.cylinder.radius) +
               cylinder->radius) + INTERSECTION_BUFFER) < dist)
 #else
         if (((curChara->collision.cylinder.radius + cylinder->radius) + INTERSECTION_BUFFER) < dist)

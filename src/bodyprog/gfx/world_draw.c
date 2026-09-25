@@ -1,8 +1,6 @@
 #include "game.h"
 #ifdef SH_PC_PORT
 #include "pc_pick.h"
-#endif
-#ifdef SH_PC_PORT
 #include <stdio.h>
 #include "sh_log.h"
 #include "pc_config.h"

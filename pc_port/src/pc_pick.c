@@ -54,6 +54,12 @@ static s32 s_npcScaleChara[NPC_COUNT_MAX];
 static s32 s_playerScale;
 static int s_scalesInit;
 
+/* Nothing is scaled in a normal session, and the collision read sites sit in
+ * hot loops, so every one of them is gated on this single test. Set when a
+ * scale other than 1.0 is applied; never cleared, because a stale 1 only
+ * costs the lookup it used to cost anyway. */
+static int s_anyScaled;
+
 /* Props are submitted fresh every frame, so the draw list index is not an
  * identity. A placement is static, so its model plus its packed position is:
  * that pair is what a scaled prop is remembered by. */
@@ -260,11 +266,15 @@ int Pc_Pick_CollScale(const void* charaPtr)
     const s_SubCharacter* chara = (const s_SubCharacter*)charaPtr;
     int                   i;
 
-    if (chara == NULL || !s_scalesInit)
+    if (!s_anyScaled || chara == NULL || !s_scalesInit)
         return Q12(1.0f);
 
+    /* The player is deliberately excluded. Scaling Harry's collision cylinder
+     * holds him that much further off every wall, so a 2x Harry could not get
+     * close enough to open a door and would not fit down a corridor. He still
+     * scales visually; only his collision stays vanilla. */
     if (chara == &g_SysWork.playerWork.player)
-        return s_playerScale;
+        return Q12(1.0f);
 
     for (i = 0; i < NPC_COUNT_MAX; i++)
     {
@@ -312,6 +322,8 @@ int Pc_Pick_SetScale(int scaleQ12)
         scaleQ12 = PICK_SCALE_MAX;
 
     *slot = scaleQ12;
+    if (scaleQ12 != Q12(1.0f))
+        s_anyScaled = 1;
     if (s_selKind == PcPick_Npc && s_selSlot >= 0 && s_selSlot < NPC_COUNT_MAX)
         s_npcScaleChara[s_selSlot] = s_selCharaId;
 
@@ -327,6 +339,7 @@ int Pc_Pick_GetScale(void)
 
 void Pc_Pick_Reset(void)
 {
+    s_anyScaled  = 0;
     s_propCount  = 0;
     s_scalesInit = 0;
     ScalesInit();
@@ -461,7 +474,7 @@ void Pc_Pick_WorldObjectPreDraw(const void* worldObject, void* coordPtr)
 
     if (obj == NULL || coord == NULL)
         return;
-    if (s_propCount == 0 && s_pendState != 1)
+    if ((!s_anyScaled || s_propCount == 0) && s_pendState != 1)
         return; /* nothing scaled and no click waiting: props cost nothing */
 
     x = obj->positionX;
