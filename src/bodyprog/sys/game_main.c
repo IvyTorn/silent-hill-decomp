@@ -1274,6 +1274,12 @@ void Pc_FreeCam_Set(int on)
         g_DebugCamSavedMapIdx    = g_SavegamePtr ? g_SavegamePtr->mapIdx     : -1;
         g_DebugCamSavedRoomIdx   = g_SavegamePtr ? g_SavegamePtr->mapRoomIdx : -1;
         SDL_GetRelativeMouseState(NULL, NULL); /* drop travel accumulated before capture */
+        /* Fog off by default. Outdoors the fog wall sits a few units past
+         * Harry, so a camera that flies anywhere useful is already behind it
+         * and the whole world renders as flat fog colour -- the grey void.
+         * Numpad . turns it back on when the fog itself is what you want to
+         * look at. */
+        g_DebugFogDisabled = 1;
         SH_DBG_ECHO("[FREECAM] on -- mouse look, W/A/S/D move, Space/C up/down, Shift fast, Ctrl slow");
     } else {
         /* Only hand back a snapshot that still belongs to the room Harry is in

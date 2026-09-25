@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -142,6 +142,18 @@ namespace SilentHillPC_Launcher
             return IsZip(p) || IsRar(p) || IsSevenZip(p);
         }
 
+        /// <summary>The folder a library zip extracts into. Windows drops a trailing
+        /// space or dot from a path component, so "dogsound .zip" asks for a folder named
+        /// "dogsound " and then looks for one under a name the filesystem never wrote --
+        /// the zip is reported pending forever and never unpacks. Derive the name once,
+        /// here, so the pending check and the extract cannot disagree.</summary>
+        private static string LibraryZipFolder(string zipPath)
+        {
+            string n = Path.GetFileNameWithoutExtension(zipPath) ?? "";
+            n = n.TrimEnd(' ', '.');
+            return n.Length > 0 ? n : "mod";
+        }
+
         private static bool IsDisabled(string p) { return p.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase); }
 
         private static string StripDisabled(string p)
@@ -231,7 +243,7 @@ namespace SilentHillPC_Launcher
         {
             if (!Directory.Exists(ModsDir)) return new string[0];
             return Directory.GetFiles(ModsDir, "*.zip", SearchOption.TopDirectoryOnly)
-                            .Where(z => !Directory.Exists(Path.Combine(ModsDir, Path.GetFileNameWithoutExtension(z))))
+                            .Where(z => !Directory.Exists(Path.Combine(ModsDir, LibraryZipFolder(z))))
                             .ToArray();
         }
 
@@ -262,7 +274,7 @@ namespace SilentHillPC_Launcher
                 if (cancelled != null && cancelled()) return;
 
                 string dest = it.IsLibraryZip
-                    ? Path.Combine(ModsDir, Path.GetFileNameWithoutExtension(it.Path))
+                    ? Path.Combine(ModsDir, LibraryZipFolder(it.Path))
                     : ArchiveActiveFolder(it.Path);
 
                 bool ok;
@@ -894,6 +906,7 @@ namespace SilentHillPC_Launcher
             {
                 int total = za.Entries.Count, i = 0;
                 string fullDest = Path.GetFullPath(dest);
+                string destPrefix = fullDest.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
                 Directory.CreateDirectory(dest);
                 foreach (var entry in za.Entries)
                 {
@@ -902,7 +915,7 @@ namespace SilentHillPC_Launcher
                     if (report != null) report(i, total, string.Format("Extracting {0}  ({1}/{2})",
                         Path.GetFileName(zip), i, total));
                     string outPath = Path.GetFullPath(Path.Combine(dest, entry.FullName));
-                    if (!outPath.StartsWith(fullDest, StringComparison.OrdinalIgnoreCase)) continue; // zip-slip guard
+                    if (!outPath.StartsWith(destPrefix, StringComparison.OrdinalIgnoreCase)) continue; // zip-slip guard
                     if (string.IsNullOrEmpty(entry.Name)) { Directory.CreateDirectory(outPath); continue; }
                     Directory.CreateDirectory(Path.GetDirectoryName(outPath));
                     entry.ExtractToFile(outPath, true);
