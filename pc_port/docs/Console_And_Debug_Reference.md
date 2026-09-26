@@ -56,7 +56,7 @@ The panel covers the top of the screen, so **hold TAB** to hide it while keeping
 pointer live: the whole picture becomes clickable, and releasing TAB brings the panel
 back exactly as it was.
 
-Characters and **props** (world objects) can both be picked. Only things the game is
+Characters and **props** can both be picked. A prop here means a world object: the map, flashlight, radio and knife pickups, map-event objects and cutscene props. Furniture baked into the room mesh is not a separate object to the engine, so it cannot be picked individually. Only things the game is
 currently drawing are pickable, and the nearest one wins
 when two overlap; a character beats a prop at the same depth. Harry is pickable like anything else.
 
@@ -65,6 +65,7 @@ when two overlap; a character beats a prop at the same depth. Harry is pickable 
 | `select` | Show the current selection. |
 | `select clear` | Drop it (same as right-click). |
 | `select player` | Select Harry without clicking, for the cameras that hide him. |
+| `select nearest` | Select the nearest live enemy to Harry. |
 | `scale <f>` | Resize the selected character or prop, `0.05`..`20`. Bare `scale` reports the current value. For a character the hit volume scales with it, so a giant Groaner is hittable over the body you can see and is blocked by walls at its own size. The model grows about its root bone rather than its feet. Per NPC slot, forgotten when that slot is recycled into a different monster; props are remembered by placement, up to 32 at a time. |
 
 ## Custom key binds
@@ -107,7 +108,7 @@ when it is off.
 | Command | Description |
 |---|---|
 | `give <item>` | Give a weapon/ammo/recovery/story item. See `help give` / `help give 2`. `give allweapons` = all melee + guns + ammo + gas. |
-| `kill` | Kill Harry (plays the death animation). |
+| `kill` | Kill the current selection: a selected enemy takes lethal damage and runs its own death path. With nothing selected (or Harry selected) it kills Harry, as before. |
 | `killall` | Kill all enemies within ~50 units of Harry. |
 | `spawn list` | List monsters loaded in the current map. |
 | `spawn <name> [state]` | Spawn a monster in front of Harry. |

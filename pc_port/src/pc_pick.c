@@ -294,6 +294,54 @@ int Pc_Pick_ScaleAbout(int origin, int v, int scaleQ12)
     return origin + (int)(((long long)(v - origin) * scaleQ12) >> 12);
 }
 
+int Pc_Pick_SelectNpc(int slot)
+{
+    s_SubCharacter* npc;
+
+    if (slot < 0 || slot >= NPC_COUNT_MAX)
+        return 0;
+
+    npc = &g_SysWork.npcs[slot];
+    if (npc->model.charaId == Chara_None)
+        return 0;
+
+    s_selKind    = PcPick_Npc;
+    s_selSlot    = slot;
+    s_selCharaId = npc->model.charaId;
+    return 1;
+}
+
+int Pc_Pick_NearestNpc(void)
+{
+    const s_SubCharacter* hr = &g_SysWork.playerWork.player;
+    int    best     = -1;
+    s64    bestDist = 0;
+    int    i;
+
+    for (i = 0; i < NPC_COUNT_MAX; i++)
+    {
+        const s_SubCharacter* npc = &g_SysWork.npcs[i];
+        s64 dx, dz, d;
+
+        if (npc->model.charaId == Chara_None || npc->model.charaId == Chara_Harry)
+            continue;
+        if (npc->health <= Q12(0.0f))
+            continue;
+
+        dx = (s64)npc->position.vx - hr->position.vx;
+        dz = (s64)npc->position.vz - hr->position.vz;
+        d  = dx * dx + dz * dz;
+
+        if (best < 0 || d < bestDist)
+        {
+            best     = i;
+            bestDist = d;
+        }
+    }
+
+    return best;
+}
+
 void Pc_Pick_SelectPlayer(void)
 {
     s_selKind    = PcPick_Player;

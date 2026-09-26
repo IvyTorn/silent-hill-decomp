@@ -18,7 +18,7 @@
  *   (console open) left-click the scene to select a character,
  *                  hold TAB to hide the panel and click through it,
  *                  right-click to deselect
- *   SELECT [clear|player] - show / clear / force the current selection
+ *   SELECT [clear|player|nearest] - show / clear / set the selection
  *   SCALE <f>            - resize the selected character (0.05..20)
  *   BIND <key> <cmds>    - run one or more console commands from a key;
  *                          BIND LIST / UNBIND <key> / UNBINDALL
@@ -484,7 +484,7 @@ static const char* const HELP_LINES[] = {
     " getflags       show ending flags",
     " setending <e>  bad | bad+ | good | good+",
     " setflag <n> 0|1  set any event flag",
-    " kill           kill Harry (death animation)",
+    " kill           kill the selection, or Harry if nothing is selected",
     " killall        kill all nearby enemies",
     " spawn list     list monsters loaded in this map",
     " spawn <name>   spawn a monster in front of Harry",
@@ -502,7 +502,7 @@ static const char* const HELP_LINES[] = {
     " minimapnomap [0|1]  minimap before the map is found: 0 hide, 1 empty panel",
     " bind <key> <cmd>[;<cmd>...]  run console commands from a key",
     " bind list / unbind <key> / unbindall",
-    " select [clear|player]  show/clear the clicked selection",
+    " select [clear|player|nearest]  show/clear/set the selection",
     " (hold TAB to hide the console and click through it)",
     " scale <f>      resize the selected character (click one first)",
     " about          PC port credits",
@@ -557,18 +557,14 @@ static const char* const DEBUG_PAGE1[] = {
 };
 static const char* const DEBUG_PAGE2[] = {
     "Debug keys (page 2/2) - camera:",
-    " Num *        free debug camera on/off",
-    " Num 2        third-person chase cam (mouse look)",
-    " Num 8/5/4/6  fly forward / back / strafe left / right",
-    " Num 7 / 9    turn left / right",
-    " Num + / -    tilt up / down",
-    " PgUp / PgDn  move up / down",
-    " Num /        print camera coordinates to the log",
-    " (with debug cam OFF the same numpad keys nudge the",
-    "  normal game camera - live camera tuning aid)",
-    " Num 3        reset cam nudge / in-game rescue teleport",
-    " Num 0        raw cam mode (zero all nudges)",
-    " Num .        log Harry position (+fog toggle in cam)",
+    " Num *        free camera on/off (also a Quick Options row)",
+    " Free camera: mouse look, W/A/S/D move, Space/C up/down,",
+    "              Shift fast, Ctrl slow. Fog starts off so the",
+    "              world is visible outdoors; Num . toggles it.",
+    " Num .        log Harry position (+ fog toggle in free cam)",
+    " Num 3        rescue teleport after falling through a floor",
+    "The old camera-nudge keys are gone; FPS eye tuning moved to",
+    "Quick Options > View (Head X/Y/Z).",
 };
 
 static void push_lines(const char* const* lines, int count)
@@ -1052,8 +1048,15 @@ static void cmd_select(const char* arg)
         Pc_Pick_Clear(1);
         return;
     }
-    if (strcmp(arg, "PLAYER") == 0)
+    if (strcmp(arg, "PLAYER") == 0) {
         Pc_Pick_SelectPlayer();
+    } else if (strcmp(arg, "NEAREST") == 0 || strcmp(arg, "NEAR") == 0) {
+        int slot = Pc_Pick_NearestNpc();
+        if (slot < 0 || !Pc_Pick_SelectNpc(slot)) {
+            cprintf("select: no live enemy in this room");
+            return;
+        }
+    }
 
     if (Pc_Pick_Kind() == PcPick_None) {
         cprintf("nothing selected - left-click a character in the scene");
@@ -1201,8 +1204,30 @@ void Pc_ConsoleExec(const char* line)
     } else if (strcmp(cmd, "GIVEMAP") == 0) {
         cmd_givemap(arg);
     } else if (strcmp(cmd, "KILL") == 0) {
-        g_SysWork.playerWork.player.health = -Q12(1.0f);
-        cprintf("killed Harry");
+        /* Acts on the click selection when there is one, so the same command
+         * kills whatever you picked; with nothing selected it still kills
+         * Harry, which is what it always did. */
+        if (Pc_Pick_Kind() == PcPick_Npc) {
+            char what[64];
+            s_SubCharacter* npc = &g_SysWork.npcs[Pc_Pick_Slot()];
+            Pc_Pick_Describe(what, sizeof(what));
+            if (npc->health <= Q12(0.0f)) {
+                cprintf("%s is already dead", what);
+            } else {
+                /* Lethal damage rather than health = 0: each enemy applies
+                 * damage.amount itself and then runs its own death path, so
+                 * the kill routes through the real cleanup for every type. */
+                npc->damage.amount = Q12(99999.0f);
+                cprintf("killed %s", what);
+            }
+        } else if (Pc_Pick_Kind() == PcPick_Prop) {
+            char what[64];
+            Pc_Pick_Describe(what, sizeof(what));
+            cprintf("%s cannot be killed (select an enemy, or nothing for Harry)", what);
+        } else {
+            g_SysWork.playerWork.player.health = -Q12(1.0f);
+            cprintf("killed Harry");
+        }
     } else if (strcmp(cmd, "KILLALL") == 0) {
         s_SubCharacter* hr   = &g_SysWork.playerWork.player;
         int             killed = 0;

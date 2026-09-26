@@ -35,6 +35,13 @@ int Pc_Pick_CollScale(const void* chara);
 /** Scale a span measured from a character origin: origin + (v - origin)*s. */
 int Pc_Pick_ScaleAbout(int origin, int v, int scaleQ12);
 
+/** Select an NPC slot directly. Returns 0 if the slot holds no live
+ * character. Used by "select nearest". */
+int Pc_Pick_SelectNpc(int slot);
+
+/** Nearest live NPC to the player, or -1. */
+int Pc_Pick_NearestNpc(void);
+
 /** Select the player without clicking, for the cameras that hide him. */
 void Pc_Pick_SelectPlayer(void);
 

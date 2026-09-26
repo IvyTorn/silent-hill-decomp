@@ -1530,26 +1530,6 @@ void DebugCamera_Update(void)
 
     /* Fog toggle moved to main loop (runs after game sets fog params) */
 
-    /* Numpad 0: cycle to next map overlay (edge-triggered)
-     * DISABLED: runtime map switching crashes (map data not safely teardown-able).
-     * Use config.cfg map= setting instead. */
-#if 0
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_KP_0];
-        if (cur && !prevKey) {
-            int curId = (int)g_SavegamePtr->mapIdx;
-            int nextId = (curId + 1) % (MapOverlayId_MAPX_S00 + 1);
-            g_SavegamePtr->mapIdx = nextId;
-            MapRegistry_Load((e_MapOverlayId)nextId);
-            extern void GameBoot_MapLoad(s32 mapIdx);
-            GameBoot_MapLoad(nextId);
-            SH_DBG("[DEBUG] Switched to map %s (overlay %d)",
-                MapRegistry_GetName(nextId), nextId);
-        }
-        prevKey = cur;
-    }
-#endif
 
     /* Numpad 1: (unbound — collision toggle moved to top-row 0) */
 
@@ -1824,48 +1804,6 @@ void DebugCamera_Update(void)
      * are unnecessary here. Re-add when an in-progress later-map test
      * needs an item that isn't in the world yet. */
 
-    /* ==== First-person eye tuning (numpad) ====
-     * Active only in FPS mode (not debug-cam). The eye sits at Harry's root +
-     * g_PcFpsOffset, a LOCAL offset in his BODY frame. Every key below is a
-     * straight-line nudge along one body axis — no rotation, no orbit — so the
-     * eye moves exactly where you'd expect. Press KP_5 to print values to bake:
-     *   KP_8/KP_2  move eye forward / back    (offset vz, held)
-     *   KP_6/KP_4  move eye right / left       (offset vx, held)
-     *   KP_9/KP_7  move eye up / down          (offset vy, held, coarse)
-     *   KP_+/KP_-  move eye up / down          (offset vy, held, fine)
-     *   KP_5       log g_PcFpsOffset (paste to bake) */
-    if (g_PcFpsCam && !g_DebugCamEnabled &&
-        g_GameWork.gameState == GameState_InGame)
-    {
-        #define FPS_MOVE_STEP 64
-        #define FPS_VFINE     12   /* fine vertical step for KP_- / KP_+ */
-
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_8]) g_PcFpsOffset.vz += FPS_MOVE_STEP; /* forward */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_2]) g_PcFpsOffset.vz -= FPS_MOVE_STEP; /* back */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_6]) g_PcFpsOffset.vx += FPS_MOVE_STEP; /* right */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_4]) g_PcFpsOffset.vx -= FPS_MOVE_STEP; /* left */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_9]) g_PcFpsOffset.vy -= FPS_MOVE_STEP; /* up (PSX +Y is down) */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_7]) g_PcFpsOffset.vy += FPS_MOVE_STEP; /* down */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_PLUS])  g_PcFpsOffset.vy -= FPS_VFINE; /* fine up */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_MINUS]) g_PcFpsOffset.vy += FPS_VFINE; /* fine down */
-
-        {
-            static int prev5 = 0;
-            int cur5 = g_sdlKeyboardState[SDL_SCANCODE_KP_5];
-            if (cur5 && !prev5) {
-                extern VECTOR3 g_PcFpsHeadRefDbg, g_PcFpsHeadLocalDbg;
-                SH_DBG_ECHO("[FPSCAM-TUNE] g_PcFpsOffset = { %d, %d, %d }",
-                            (int)g_PcFpsOffset.vx, (int)g_PcFpsOffset.vy, (int)g_PcFpsOffset.vz);
-                SH_DBG_ECHO("[FPSCAM-HEADREF] s_fpsHeadRef = { %d, %d, %d }  headLocal = { %d, %d, %d }",
-                            (int)g_PcFpsHeadRefDbg.vx, (int)g_PcFpsHeadRefDbg.vy, (int)g_PcFpsHeadRefDbg.vz,
-                            (int)g_PcFpsHeadLocalDbg.vx, (int)g_PcFpsHeadLocalDbg.vy, (int)g_PcFpsHeadLocalDbg.vz);
-            }
-            prev5 = cur5;
-        }
-
-        #undef FPS_MOVE_STEP
-        #undef FPS_VFINE
-    }
 
 
     /* If free-fly debug cam is off */
