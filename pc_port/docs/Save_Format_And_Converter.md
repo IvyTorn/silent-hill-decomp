@@ -96,11 +96,14 @@ The Japanese reissues keep the original serial in their save names, so all three
 
 The save contents have the same layout in every version: the decomp builds all five releases from one set of save structures with no per-version differences. Only the name and title differ, and each game only looks for its own name. A European PS1 does not see USA-named saves, and so on.
 
-The PC port's save code always uses the USA name, whichever disc it is running. The region is a compile-time setting (always USA on PC), and nothing in the save code checks the runtime disc region. Consequences:
+The PC port finds a save under any of the three names, whichever disc it is running, and keeps writing to a file under the name it was found under. Files the port creates take the name (and title) of the disc being played. So:
 
-- A USA DuckStation card works in the port as-is (rename it to `0.MCD`).
-- Europe and Japan saves must be renamed, or the port shows the card as having no Silent Hill saves. The converter does this.
+- A DuckStation or real card from any region works in the port as-is: rename it to `0.MCD`. Saves the player makes afterwards stay readable on their own console.
+- If one card holds the same FILE number under two names, the port shows the one matching the running disc (then USA, Europe, Japan). The other file is left untouched.
+- Builds before this change only read and wrote USA names. The converter still renames incoming saves to USA names so its output works with those builds too.
 - Going back, the converter needs to know which disc will play the saves. The .bat asks; the web page has a Disc selector. Merging into a card that already has Silent Hill saves reuses their region.
+
+The language picked on a PAL or Japanese disc in the port is a PC setting, not part of the save. The PAL options block has a language field, which the port ignores; set the language again after moving saves.
 
 ## Conversion rules
 
