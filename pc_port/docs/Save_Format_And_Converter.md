@@ -47,7 +47,7 @@ DuckStation and real-card images are byte-for-byte compatible. DexDrive `.gme` (
 
 The PC port's memory card backend (`PsyCross/src/psx/libapi.c`) reads and writes the same layout, with a simplified directory:
 
-- It does not write directory checksums, and writes `0` instead of `0xFFFF` as the next-block link.
+- Builds before PsyCross `f290785` did not write directory checksums, and wrote `0` instead of `0xFFFF` as the next-block link. Current builds write standard directories, so a card the port formats or saves to is readable by DuckStation and real hardware as-is. Older cards still load; the port ignores checksums and links when reading.
 - It reads a file's data from the block matching its directory slot, so a file must sit in consecutive blocks starting at its own slot. That always holds for Silent Hill, whose files are one block each.
 - PC-written files have a blank icon (`MemCard_SaveBlockInit` skips the icon copy on PC), and the title was written as UTF-8 with the file number patched in byte by byte, which leaves invalid text. The PS1 memory card screen shows these as garbage. The save data itself is unaffected.
 
@@ -55,7 +55,7 @@ The port reads fully standard cards without trouble, so the converter always wri
 
 ### Card numbering on the PC
 
-The game supports the multitap, so the PC port keeps up to eight cards, named by the PSX device number (`buXY` becomes `X*8+Y`):
+Card files are named by the PSX device number (`buXY` becomes `X*8+Y`). The game supports the multitap and checks all eight slots, but the PC has no multitap: only `0.MCD` and `8.MCD` are connected, and the other slots report "no card" like an empty console slot. Older builds reported all eight as present and created blank `1-3.MCD` / `9-11.MCD`. Empty ones can be deleted; one that holds saves stays connected so nothing is lost.
 
 | PC file | In game |
 |---------|---------|
