@@ -1,0 +1,91 @@
+# Save Format and the Save Converter
+
+How Silent Hill saves are stored on the PC port, in DuckStation and on a real PlayStation memory card, and how to move them between the three.
+
+## Tools
+
+All in `pc_port/tools/savecard/`:
+
+| File | What it is |
+|------|------------|
+| `SH Save Converter.bat` | Drag and drop entry point. Drop cards or the save folder onto it. |
+| `sh_savecard.ps1` | The command line behind the .bat (Windows PowerShell 5.1, no installs). |
+| `ShSaveCard.cs` | Converter core in C# 5. The .ps1 compiles it at run time; the launcher can include it as-is. |
+| `sh_savecard.html` + `sh_savecard_core.js` | Browser version. Works offline from disk or hosted on a website. |
+
+The C# and JS cores produce byte-identical output. Change them together.
+
+### Drag and drop
+
+| You drop | You get |
+|----------|---------|
+| One or more DuckStation / PS1 cards | `SH saves for PC\0.MCD` (then `8.MCD`, `1.MCD`...) next to the first file |
+| PC `N.MCD` files, or the whole `gamedata\save` folder | `SH saves for PSX\Silent Hill (USA)_1.mcd` (from `0.MCD`), `_2.mcd` (from `8.MCD`)... |
+| PC cards plus one PS1 card | A prompt: add the PC saves into a copy of the PS1 card, or the reverse |
+
+Inputs are never modified. Output goes to a new folder (`SH saves for PC (2)` and so on if one exists).
+
+### Command line
+
+```
+sh_savecard.ps1 [-Info] [-Mode auto|topc|topsx|pc-into-psx|psx-into-pc] [-Region usa|eur|jpn] [-OutDir dir] [-NoPause] paths...
+```
+
+`-Info` lists every file and save slot on the given cards without converting anything.
+
+## The three formats are one format
+
+A DuckStation `.mcd`, a real-card dump (`.mcr`, as used by SD-card memory cards) and a PC port `N.MCD` are all a raw 128 KB PlayStation memory card image:
+
+- 16 blocks of 8 KB. Block 0 is the header and directory, blocks 1 to 15 hold file data.
+- Block 0 is 64 frames of 128 bytes. Frame 0 is the `MC` header, frames 1 to 15 are directory entries (one per data block), frames 16 to 35 are the bad-sector relocation list, and frame 63 is a copy of frame 0.
+- A directory entry is `u32 state` (`0x51` first block of a file, `0x52` middle, `0x53` last, `0xA0` free), `u32 size`, `u16 next block` (`0xFFFF` ends the chain), a 20-character file name, and an XOR checksum of the first 127 bytes in byte 127.
+
+DuckStation and real-card images are byte-for-byte compatible. DexDrive `.gme` (0xF40-byte header) and PSP `.vmp` (0x80-byte header) wrap the same image; the converter reads both.
+
+### How the PC port differs
+
+The PC port's memory card backend (`PsyCross/src/psx/libapi.c`) reads and writes the same layout, with a simplified directory:
+
+- It does not write directory checksums, and writes `0` instead of `0xFFFF` as the next-block link.
+- It reads a file's data from the block matching its directory slot, so a file must sit in consecutive blocks starting at its own slot. That always holds for Silent Hill, whose files are one block each.
+- PC-written files have a blank icon (`MemCard_SaveBlockInit` skips the icon copy on PC), and the title was written as UTF-8 with the file number patched in byte by byte, which leaves invalid text. The PS1 memory card screen shows these as garbage. The save data itself is unaffected.
+
+The port reads fully standard cards without trouble, so the converter always writes standard cards. The same output file works in the PC port, DuckStation and on hardware.
+
+### Card numbering on the PC
+
+The game supports the multitap, so the PC port keeps up to eight cards, named by the PSX device number (`buXY` becomes `X*8+Y`):
+
+| PC file | In game |
+|---------|---------|
+| `0.MCD` | Memory Card 1 |
+| `1.MCD` to `3.MCD` | Memory Card 1-B to 1-D (multitap) |
+| `8.MCD` | Memory Card 2 |
+| `9.MCD` to `11.MCD` | Memory Card 2-B to 2-D (multitap) |
+
+## Inside a Silent Hill file
+
+Each file is named `BASLUS-00707SILENTnn` (USA), `BESLES-01514SILENTnn` (Europe) or `BISLPM-86192SILENTnn` (Japan), where `nn` is `00` to `14`. The game shows it as FILE01 to FILE15. The PC port always uses the USA name whatever disc it runs, so the converter renames Europe and Japan saves on the way in.
+
+A file is exactly one block. All values are little-endian:
+
+| Offset | Size | Contents |
+|--------|------|----------|
+| `0x000` | 512 | PSX title block: `SC`, icon flags `0x11`, block count 1, Shift-JIS title (`SILENT HILL  FILE01`), 16-colour icon palette at `0x60`, 16x16 4bpp icon at `0x80` |
+| `0x200` | 256 | Save header (`s_MemCard_SaveHeader`): 12 bytes of metadata per slot for the save screen |
+| `0x300` | 128 | Options (`s_Savegame_OptionsConfig`) |
+| `0x380` | 11 x 640 | Save slots (`s_Savegame_Container`: 636-byte `s_Savegame` + footer) |
+| `0x1F00` | 256 | Unused |
+
+Each of the header, options and slot records ends in a 4-byte footer: the 8-bit XOR of the whole record (taken with the two checksum bytes at zero) written twice, then the magic `0xDCDC`. A slot is in use when its metadata has a non-zero `totalSavegameCount`.
+
+Capacity: 11 saves per file, 15 files per card, so 165 saves per card and up to 1320 across all eight PC cards.
+
+The `s_Savegame` and options layouts contain no pointers, and every record's checksum and footer lands at the same offset in PC-written and PS1-written files. The save data is portable in both directions without translation. Only the title block and the directory wrapper change.
+
+## Conversion rules
+
+- PS1 to PC: only Silent Hill files are copied. Data is copied unchanged. Other games' files are left out.
+- PC to PS1: data is copied unchanged. The title block is rewritten in Shift-JIS for the chosen region and a blank icon is replaced by the disc's icon.
+- Merging: every file already on the target card is kept, from any game. An incoming Silent Hill file whose FILE number is taken moves to the next free number, and its title is renumbered to match.
