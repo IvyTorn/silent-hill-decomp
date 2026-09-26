@@ -54,7 +54,23 @@ function Card-Region($card) {
         $r = [ShSaveCard.Region]::Usa; $i = 0
         if ([ShSaveCard.ShFile]::Parse($f.Name, [ref]$r, [ref]$i)) { return $r }
     }
-    [ShSaveCard.Region]::Usa
+    $null
+}
+
+# Each region's game only sees saves named for it (BASLUS / BESLES / BISLPM), so ask
+# rather than silently defaulting a Japanese or European player to USA names.
+function Ask-Region {
+    if ($Region) { return Region-Of $Region }
+    if (-not $interactive) { return [ShSaveCard.Region]::Usa }
+    Write-Host 'Which Silent Hill disc will play these saves?'
+    Write-Host '  1) USA (SLUS-00707)   [Enter]'
+    Write-Host '  2) Europe (SLES-01514)'
+    Write-Host '  3) Japan (SLPM-86192 and its reissues)'
+    switch (Read-Host 'Choose 1, 2 or 3') {
+        '2' { return [ShSaveCard.Region]::Eur }
+        '3' { return [ShSaveCard.Region]::Jpn }
+        default { return [ShSaveCard.Region]::Usa }
+    }
 }
 
 Write-Host 'Silent Hill save converter (PSX / DuckStation <-> PC port)'
@@ -154,7 +170,7 @@ switch ($Mode) {
         Write-Host 'Back up that folder first: a same-named card there will be replaced.'
     }
     'topsx' {
-        $reg = if ($Region) { Region-Of $Region } else { $usa }
+        $reg = Ask-Region
         $out = New-OutDir $firstDir 'SH saves for PSX'
         $written = 0
         foreach ($src in $pcFiles) {
@@ -179,6 +195,7 @@ switch ($Mode) {
     'pc-into-psx' {
         $base = $psxFiles[0]
         $reg = if ($Region) { Region-Of $Region } else { Card-Region $psxCards[$base] }
+        if ($null -eq $reg) { $reg = Ask-Region }
         $adds = @($pcFiles | ForEach-Object { $pcCards[$_] })
         $labels = @($pcFiles | ForEach-Object { [IO.Path]::GetFileName($_) })
         $res = [ShSaveCard.Converter]::Merge($psxCards[$base], [IO.Path]::GetFileName($base), $adds, $labels, $reg, $true)

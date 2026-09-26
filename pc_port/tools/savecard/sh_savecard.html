@@ -163,7 +163,7 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
       </div>
       <div class="action">
         <h3>PC saves → PSX cards</h3>
-        <p>Builds one card per PC card, named the way DuckStation names per-game cards. Titles and icons are fixed so the PS1 memory card screen shows them properly.</p>
+        <p>Builds one card per PC card, named the way DuckStation names per-game cards. Titles and icons are fixed so the PS1 memory card screen shows them properly. Pick the disc you will play: each region's game only sees saves named for it.</p>
         <div class="row">
           <label for="region">Disc <select id="region">
             <option value="usa">USA (SLUS-00707)</option>
@@ -175,7 +175,7 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
       </div>
       <div class="action">
         <h3>Add saves into an existing card</h3>
-        <p>Copies the Silent Hill saves from every other loaded card into a copy of the card you pick. Its own saves, from any game, stay. Clashing file numbers get the next free number.</p>
+        <p>Copies the Silent Hill saves from every other loaded card into a copy of the card you pick. Its own saves, from any game, stay. Clashing file numbers get the next free number. Saves added to a PSX card take the region of the Silent Hill saves already on it, or the disc picked under "PC saves → PSX cards" if it has none.</p>
         <div class="row">
           <label for="base">Into <select id="base"></select></label>
           <button type="button" class="primary" id="do-merge">Merge</button>
@@ -450,7 +450,7 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
     if (!base) return;
     const adds = state.cards.filter(c => c.card && c !== base);
     const toPcCard = base.kind === 'pc';
-    const region = toPcCard ? 'usa' : S.cardRegion(base.card);
+    const region = toPcCard ? 'usa' : (S.cardRegion(base.card) || $('region').value);
     const r = S.merge(base.card, base.fileName, adds.map(c => c.card), adds.map(c => c.fileName), region, !toPcCard);
     const name = base.fileName.split(/[\\/]/).pop();
     const folder = toPcCard ? 'SH saves for PC' : 'SH saves for PSX';

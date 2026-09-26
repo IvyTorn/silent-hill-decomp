@@ -84,6 +84,24 @@ Capacity: 11 saves per file, 15 files per card, so 165 saves per card and up to 
 
 The `s_Savegame` and options layouts contain no pointers, and every record's checksum and footer lands at the same offset in PC-written and PS1-written files. The save data is portable in both directions without translation. Only the title block and the directory wrapper change.
 
+## Regions
+
+| Disc | Save file name | Title on the PS1 card screen |
+|------|----------------|------------------------------|
+| USA (SLUS-00707) | `BASLUS-00707SILENTnn` | SILENT HILL  FILEnn |
+| Europe (SLES-01514, all five languages) | `BESLES-01514SILENTnn` | SILENT HILL  FILEnn |
+| Japan (SLPM-86192, and the SLPM-86498 / SLPM-87029 reissues) | `BISLPM-86192SILENTnn` | サイレントヒル　ファイルnn |
+
+The Japanese reissues keep the original serial in their save names, so all three Japanese discs share saves.
+
+The save contents have the same layout in every version: the decomp builds all five releases from one set of save structures with no per-version differences. Only the name and title differ, and each game only looks for its own name. A European PS1 does not see USA-named saves, and so on.
+
+The PC port's save code always uses the USA name, whichever disc it is running. The region is a compile-time setting (always USA on PC), and nothing in the save code checks the runtime disc region. Consequences:
+
+- A USA DuckStation card works in the port as-is (rename it to `0.MCD`).
+- Europe and Japan saves must be renamed, or the port shows the card as having no Silent Hill saves. The converter does this.
+- Going back, the converter needs to know which disc will play the saves. The .bat asks; the web page has a Disc selector. Merging into a card that already has Silent Hill saves reuses their region.
+
 ## Conversion rules
 
 - PS1 to PC: only Silent Hill files are copied. Data is copied unchanged. Other games' files are left out.

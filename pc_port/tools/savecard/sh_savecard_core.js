@@ -296,9 +296,10 @@
     return { card, log };
   }
 
+  /** Region of the first Silent Hill file on the card, or null when it has none. */
   function cardRegion(card) {
     for (const f of card.files) { const sh = parseShName(f.name); if (sh) return sh.region; }
-    return 'usa';
+    return null;
   }
 
   function isPcCardFileName(fileName) {
