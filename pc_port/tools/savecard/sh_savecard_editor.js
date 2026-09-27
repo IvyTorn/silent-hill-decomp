@@ -10,7 +10,7 @@
   const FLAG_COUNT = SG.eventFlagWords * 32;
 
   let panel, hooks, ctx = null, tab = 'overview';
-  const flagView = { q: '', show: 'all', map: '', named: false, compare: '' };
+  const flagView = { mode: 'map', q: '', show: 'all', kind: '', map: '', named: false, compare: '' };
 
   // ---- small DOM helpers ----
   function h(tag, attrs, ...kids) {
@@ -118,6 +118,7 @@
       h('div', null, h('h3', null, label), h('div', { class: 'hint' }, `${ctx.entry.fileName}${slot ? ' · ' + S.formatTime(slot.seconds) + (slot.valid ? '' : ' · checksum bad') : ''}`)),
       h('div', { class: 'row' },
         moveControls(),
+        ctx.entry.modified ? h('button', { type: 'button', class: 'primary', onclick: e => hooks.download(ctx.entry, e.target) }, 'Download edited card') : null,
         h('button', { type: 'button', onclick: close }, 'Close')));
   }
 
@@ -223,10 +224,13 @@
         })),
         num('Continues', null, 'u8', SG.continueCount),
         num('Games cleared', 'Range 0 to 99.', 'u8', SG.clearGameCount, { max: 99 }),
-        field('Special items', 'Picked-up special item count (5 bits; upper bits also pick the Hyper Blaster colour).', h('input', {
-          type: 'number', min: 0, max: 31, value: bits() >> 3,
-          onchange: e => { const v = parseInt(e.target.value, 10); if (v >= 0 && v <= 31) { setBits(0xF8, 3, v); commit(); } },
+        field('Special items picked up', 'Rock Drill, Chainsaw, Katana, Hyper Blaster, Gasoline Tank and Channeling Stone each add one. Counts toward the ending rank. Range 0 to 7.', h('input', {
+          type: 'number', min: 0, max: 7, value: (bits() >> 3) & 7,
+          onchange: e => { const v = parseInt(e.target.value, 10); if (v >= 0 && v <= 7) { setBits(0x38, 3, v); commit(); } },
         })),
+        select('Hyper Blaster colour', 'Beam colour and damage. The results screen awards yellow for an 80+ rank and green for 100. On USA and European discs the results screen also miscounts yellow as one extra special item (a game bug fixed in later Japanese releases).',
+          [[0, 'Red (default)'], [1, 'Yellow (3\u00d7 damage)'], [2, 'Green (about 5\u00d7 damage)'], [3, 'Unused value 3 (no colour or damage coded)']],
+          () => bits() >> 6, v => setBits(0xC0, 6, v)),
       ),
       h('h4', null, 'Flags'),
       h('div', { class: 'chks' },
@@ -298,80 +302,181 @@
     return out;
   }
 
+  const PICKUP_RE = /Pickup|Bullets|Shells|HealthDrink|FirstAid|Ampoule|Map\d*$/;
+  function flagKind(f) {
+    if (!f.named) return 'unnamed';
+    if (f.name.startsWith('MapMark_')) return 'marking';
+    if (PICKUP_RE.test(f.name)) return 'pickup';
+    return 'event';
+  }
+  function prettyFlag(f) {
+    if (!f.named) return `Unnamed flag ${f.i}`;
+    return f.name.replace(/^MapMark_/, '').replace(/^M\dS\d\d_/, '').replace(/^Pickup/, '')
+      .split('_').map(part => part.replace(/(?<=[a-z])(?=[A-Z])|(?<=[0-9])(?=[A-Z][a-z])/g, ' ').replace(/(?<=[a-z])(?=\d)/g, ' ')).join(' \u00b7 ');
+  }
+  /** Map a flag belongs to: its name prefix (M1S01_...) or else the maps whose code uses it. */
+  function flagMaps(f) {
+    const m = /^M(\d)S(\d\d)_/.exec(f.name);
+    const out = new Set(f.maps);
+    if (m) out.add(`MAP${m[1]}_S${m[2]}`);
+    return [...out];
+  }
+
+  let allInfos = null;
+  function infosAll() {
+    if (!allInfos) {
+      allInfos = [];
+      for (let i = 1; i < FLAG_COUNT; i++) {
+        const f = Object.assign({ i }, flagInfo(i));
+        f.kind = flagKind(f);
+        f.pretty = prettyFlag(f);
+        f.mapIds = flagMaps(f);
+        allInfos.push(f);
+      }
+    }
+    return allInfos;
+  }
+
+  /** One flag as an on/off switch. `after` runs once the flag has changed. */
+  function flagSwitch(f, cmpValue, after) {
+    const on = !!S.getFlag(blk(), ctx.s, f.i);
+    const diff = cmpValue !== null && !!cmpValue !== on;
+    const btn = h('button', {
+      type: 'button', role: 'switch', 'aria-checked': String(on),
+      class: 'fsw' + (on ? ' on' : '') + (diff ? ' diff' : '') + (f.named ? '' : ' unnamed'),
+      title: f.tip + (cmpValue !== null ? `\nCompared save: ${cmpValue ? 'on' : 'off'}` : '') + '\nClick to turn ' + (on ? 'off.' : 'on.'),
+      onclick: () => {
+        const now = !S.getFlag(blk(), ctx.s, f.i);
+        S.setFlag(blk(), ctx.s, f.i, now);
+        commit();
+        btn.classList.toggle('on', now);
+        btn.setAttribute('aria-checked', String(now));
+        btn.querySelector('.pill').textContent = now ? 'ON' : 'OFF';
+        after && after();
+      },
+    }, h('span', { class: 'pill' }, on ? 'ON' : 'OFF'), h('span', { class: 'fn' }, f.pretty), h('span', { class: 'fi' }, '#' + f.i));
+    return btn;
+  }
+
   function flags(body) {
+    const infos = infosAll();
     const targets = compareTargets();
     const cmp = targets.find(t => t.key === flagView.compare);
     const other = i => cmp ? S.getFlag(cmp.entry.card.files[cmp.fi].data, cmp.s, i) : null;
-    const infos = [];
-    for (let i = 1; i < FLAG_COUNT; i++) infos.push(Object.assign({ i }, flagInfo(i)));
+    const isOn = f => !!S.getFlag(blk(), ctx.s, f.i);
 
-    const list = h('div', { class: 'flaglist' });
-    const count = h('span', { class: 'hint' });
-    const shown = [];
-    function draw() {
-      list.innerHTML = '';
-      shown.length = 0;
-      const q = flagView.q.toLowerCase();
-      for (const f of infos) {
-        const on = S.getFlag(blk(), ctx.s, f.i);
-        if (flagView.named && !f.named) continue;
-        if (flagView.show === 'set' && !on) continue;
-        if (flagView.show === 'unset' && on) continue;
-        if (flagView.show === 'diff' && (!cmp || other(f.i) === on)) continue;
-        if (flagView.map === '-' && f.maps.length) continue;
-        if (flagView.map && flagView.map !== '-' && !f.maps.includes(flagView.map)) continue;
-        if (q && !(String(f.i) === q || f.name.toLowerCase().includes(q) || f.tip.toLowerCase().includes(q))) continue;
-        shown.push(f.i);
-        const id = `flag${f.i}`;
-        const diff = cmp && other(f.i) !== on;
-        list.append(h('label', { class: 'flag' + (on ? ' on' : '') + (diff ? ' diff' : '') + (f.named ? '' : ' unnamed'), for: id, title: f.tip + (cmp ? `\nCompared save: ${other(f.i) ? 'set' : 'clear'}` : '') },
-          h('input', { type: 'checkbox', id, checked: !!on, onchange: e => { S.setFlag(blk(), ctx.s, f.i, e.target.checked); commit(); drawSummary(); e.target.parentElement.classList.toggle('on', e.target.checked); } }),
-          h('span', { class: 'fi' }, f.i), h('span', { class: 'fn' }, f.label)));
-      }
-      count.textContent = `${shown.length} shown · ${infos.filter(f => S.getFlag(blk(), ctx.s, f.i)).length} of ${FLAG_COUNT - 1} set`;
-    }
-
-    // Per-map summary: how many of the flags each map's code touches are set.
-    const summary = h('div', { class: 'scroll mapsum' });
-    function drawSummary() {
-      const rows = D.maps.filter(m => infos.some(f => f.maps.includes(m.id))).map(m => {
-        const mine = infos.filter(f => f.maps.includes(m.id));
-        const set = mine.filter(f => S.getFlag(blk(), ctx.s, f.i)).length;
-        const picks = mine.filter(f => /Pickup|Bullets|Shells|Drink|FirstAid|Ampoule|Map$/.test(f.name));
-        const pickSet = picks.filter(f => S.getFlag(blk(), ctx.s, f.i)).length;
-        return h('tr', { class: flagView.map === m.id ? 'sel' : null, onclick: () => { flagView.map = flagView.map === m.id ? '' : m.id; mapSel.value = flagView.map; drawSummary(); draw(); } },
-          h('td', { class: 'mono' }, m.id), h('td', null, m.desc), h('td', null, `${set} / ${mine.length}`),
-          h('td', { title: 'Flags whose names mark an item pickup.' }, picks.length ? `${pickSet} / ${picks.length}` : ''));
-      });
-      summary.innerHTML = '';
-      summary.append(h('table', null, h('thead', null, h('tr', null, h('th', null, 'Map'), h('th', null, ''), h('th', null, 'Flags set'), h('th', null, 'Pickups'))), h('tbody', null, rows)));
-    }
-
-    const search = h('input', { type: 'search', placeholder: 'Search name, number or map', value: flagView.q, 'aria-label': 'Search flags', oninput: e => { flagView.q = e.target.value; draw(); } });
-    const showSel = h('select', { 'aria-label': 'Show', onchange: e => { flagView.show = e.target.value; draw(); } },
-      [['all', 'All flags'], ['set', 'Set only'], ['unset', 'Clear only'], ['diff', 'Different from compared save']].map(([v, t]) => h('option', { value: v }, t)));
-    showSel.value = flagView.show;
-    const mapSel = h('select', { 'aria-label': 'Map', onchange: e => { flagView.map = e.target.value; drawSummary(); draw(); } },
-      h('option', { value: '' }, 'Any map'), h('option', { value: '-' }, 'Not referenced in code'),
-      D.maps.map(m => h('option', { value: m.id }, `${m.id} · ${m.desc}`)));
-    mapSel.value = flagView.map;
     const cmpSel = h('select', { 'aria-label': 'Compare with', onchange: e => { flagView.compare = e.target.value; render(); } },
-      h('option', { value: '' }, 'Compare with… (none)'), targets.map(t => h('option', { value: t.key }, t.label)));
+      h('option', { value: '' }, 'Compare with another save\u2026'), targets.map(t => h('option', { value: t.key }, t.label)));
     cmpSel.value = cmp ? flagView.compare : '';
-    const bulk = on => { for (const i of shown) S.setFlag(blk(), ctx.s, i, on); commit(); drawSummary(); draw(); };
+    const modeBtn = (mode, text) => h('button', { type: 'button', class: flagView.mode === mode ? 'on' : null, 'aria-pressed': String(flagView.mode === mode),
+      onclick: () => { flagView.mode = mode; render(); } }, text);
 
     body.append(
-      h('p', { class: 'note' }, 'Hover a flag for what the decomp knows: its name, notes and which maps use it. Unnamed flags are real but not yet identified; the map list still shows where they matter. Pick a map row to filter.'),
-      summary,
-      h('div', { class: 'row filters' }, search, showSel, mapSel,
+      h('div', { class: 'row' }, h('div', { class: 'seg' }, modeBtn('map', 'By map'), modeBtn('all', 'All flags')), cmpSel),
+      h('p', { class: 'note' }, 'Every switch below is one flag stored in this save; click it to turn it on or off. The change is written to this slot straight away (the card is marked "edited"); download the card when you are done. Hover a flag for everything the decomp knows about it.'));
+
+    const content = h('div', { class: 'ed-body' });
+    body.append(content);
+    if (flagView.mode === 'all') allFlagsView(content, infos, other, isOn);
+    else mapFlagsView(content, infos, other, isOn);
+  }
+
+  function mapFlagsView(body, infos, other, isOn) {
+    const withFlags = D.maps.filter(m => infos.some(f => f.mapIds.includes(m.id)));
+    if (!flagView.map || !withFlags.some(m => m.id === flagView.map)) {
+      const cur = D.maps.find(m => m.idx === rd.s8(SG.mapIdx));
+      flagView.map = cur && withFlags.includes(cur) ? cur.id : withFlags[0].id;
+    }
+    const mapSel = h('select', { 'aria-label': 'Map', onchange: e => { flagView.map = e.target.value; render(); } },
+      withFlags.map(m => h('option', { value: m.id }, `${m.id} \u00b7 ${m.desc}`)));
+    mapSel.value = flagView.map;
+
+    const progress = h('details', { class: 'progress' }, h('summary', null, 'Progress on every map'),
+      h('div', { class: 'scroll mapsum' }, h('table', null,
+        h('thead', null, h('tr', null, h('th', null, 'Map'), h('th', null, ''), h('th', null, 'Pickups taken'), h('th', null, 'Map notes'), h('th', null, 'Events'))),
+        h('tbody', null, withFlags.map(m => {
+          const mine = infos.filter(f => f.mapIds.includes(m.id));
+          const frac = kind => { const k = mine.filter(f => f.kind === kind); return k.length ? `${k.filter(isOn).length} / ${k.length}` : ''; };
+          return h('tr', { class: m.id === flagView.map ? 'sel' : null, onclick: () => { flagView.map = m.id; render(); } },
+            h('td', { class: 'mono' }, m.id), h('td', null, m.desc), h('td', null, frac('pickup')), h('td', null, frac('marking')), h('td', null, frac('event')));
+        })))));
+
+    body.append(h('div', { class: 'row' }, h('label', { for: mapSel.id = nextId() }, 'Map'), mapSel), progress);
+
+    const mine = infos.filter(f => f.mapIds.includes(flagView.map));
+    const SECTIONS = [
+      ['pickup', 'Item pickups', 'On = already picked up: the item is gone from the world. It does not add the item to the inventory; use the Inventory tab for that.', 'taken'],
+      ['marking', 'Paper map notes', 'On = the note or arrow is drawn on the paper map.', 'drawn'],
+      ['event', 'Story and events', 'Named event flags: doors opened, cutscenes seen, puzzle steps.', 'on'],
+      ['unnamed', 'Unnamed flags used on this map', 'Real flags this map\'s code reads or writes, not yet named by the decomp. Hover for the functions that use them.', 'on'],
+    ];
+    for (const [kind, title, hint, word] of SECTIONS) {
+      const list = mine.filter(f => f.kind === kind);
+      if (!list.length) continue;
+      const head = h('h4', { title: hint });
+      const grid = h('div', { class: 'fgrid' });
+      const update = () => { head.textContent = `${title} \u00b7 ${list.filter(isOn).length} of ${list.length} ${word}`; };
+      const fill = () => { grid.innerHTML = ''; for (const f of list) grid.append(flagSwitch(f, other(f.i), update)); update(); };
+      const setAll = on => { for (const f of list) S.setFlag(blk(), ctx.s, f.i, on); commit(); fill(); };
+      body.append(h('div', { class: 'fsec' },
+        h('div', { class: 'row' }, head,
+          h('button', { type: 'button', class: 'small', onclick: () => setAll(true) }, 'All on'),
+          h('button', { type: 'button', class: 'small', onclick: () => setAll(false) }, 'All off')),
+        h('p', { class: 'hint' }, hint), grid));
+      fill();
+    }
+  }
+
+  function allFlagsView(body, infos, other, isOn) {
+    const grid = h('div', { class: 'fgrid tall' });
+    const count = h('span', { class: 'hint' });
+    const bulkRow = h('div', { class: 'row' });
+    let shown = [];
+    let pending = null;
+    function draw() {
+      grid.innerHTML = '';
+      const q = flagView.q.toLowerCase();
+      shown = infos.filter(f => {
+        const on = isOn(f);
+        if (flagView.named && !f.named) return false;
+        if (flagView.show === 'set' && !on) return false;
+        if (flagView.show === 'unset' && on) return false;
+        if (flagView.show === 'diff' && (other(f.i) === null || !!other(f.i) === on)) return false;
+        if (flagView.kind && f.kind !== flagView.kind) return false;
+        return !q || String(f.i) === q || f.pretty.toLowerCase().includes(q) || f.tip.toLowerCase().includes(q);
+      });
+      for (const f of shown) grid.append(flagSwitch(f, other(f.i), recount));
+      recount();
+      drawBulk();
+    }
+    function recount() { count.textContent = `${shown.length} listed \u00b7 ${infos.filter(isOn).length} of ${FLAG_COUNT - 1} on in this save`; }
+    function drawBulk() {
+      bulkRow.innerHTML = '';
+      bulkRow.append(count);
+      if (!shown.length) return;
+      if (pending === null) {
+        bulkRow.append(
+          h('button', { type: 'button', class: 'small', onclick: () => { pending = true; drawBulk(); } }, `Turn all ${shown.length} listed on`),
+          h('button', { type: 'button', class: 'small', onclick: () => { pending = false; drawBulk(); } }, `Turn all ${shown.length} listed off`));
+      } else {
+        bulkRow.append(
+          h('button', { type: 'button', class: 'small danger', onclick: () => { for (const f of shown) S.setFlag(blk(), ctx.s, f.i, pending); pending = null; commit(); draw(); } },
+            `Confirm: turn ${shown.length} flags ${pending ? 'on' : 'off'}`),
+          h('button', { type: 'button', class: 'small', onclick: () => { pending = null; drawBulk(); } }, 'Cancel'));
+      }
+    }
+    const search = h('input', { type: 'search', placeholder: 'Search name, number or map', value: flagView.q, 'aria-label': 'Search flags', oninput: e => { flagView.q = e.target.value; pending = null; draw(); } });
+    const showSel = h('select', { 'aria-label': 'Show', onchange: e => { flagView.show = e.target.value; pending = null; draw(); } },
+      [['all', 'On and off'], ['set', 'On only'], ['unset', 'Off only'], ['diff', 'Different from compared save']].map(([v, t]) => h('option', { value: v }, t)));
+    showSel.value = flagView.show;
+    const kindSel = h('select', { 'aria-label': 'Kind', onchange: e => { flagView.kind = e.target.value; pending = null; draw(); } },
+      [['', 'Every kind'], ['pickup', 'Item pickups'], ['marking', 'Paper map notes'], ['event', 'Story and events'], ['unnamed', 'Unnamed']].map(([v, t]) => h('option', { value: v }, t)));
+    kindSel.value = flagView.kind || '';
+    body.append(
+      h('div', { class: 'row filters' }, search, showSel, kindSel,
         h('label', { class: 'chk', for: 'flag-named' },
-          h('input', { type: 'checkbox', id: 'flag-named', checked: flagView.named, onchange: e => { flagView.named = e.target.checked; draw(); } }), 'Named only'),
-        cmpSel),
-      h('div', { class: 'row' }, count,
-        h('button', { type: 'button', onclick: () => bulk(true), title: 'Sets every flag in the current list.' }, 'Set shown'),
-        h('button', { type: 'button', onclick: () => bulk(false), title: 'Clears every flag in the current list.' }, 'Clear shown')),
-      list);
-    drawSummary();
+          h('input', { type: 'checkbox', id: 'flag-named', checked: flagView.named, onchange: e => { flagView.named = e.target.checked; pending = null; draw(); } }), 'Named only')),
+      bulkRow, grid);
     draw();
   }
 

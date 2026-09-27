@@ -175,6 +175,24 @@ table.inv select { max-width: 17em; }
 .flag.unnamed .fn { color: var(--muted); font-style: italic; }
 .flag.on { background: var(--accent-soft); }
 .flag.diff { box-shadow: inset 3px 0 0 var(--warn); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: none; color: var(--muted); }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+button.small { padding: 3px 9px; font-size: 0.82rem; }
+.fsec { display: grid; gap: 6px; }
+.fsec h4 { margin: 0; }
+.progress summary { color: var(--muted); font-size: 0.9rem; }
+.progress[open] summary { margin-bottom: 8px; }
+.fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 4px 8px; }
+.fgrid.tall { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
+.fsw { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; text-align: left; padding: 4px 8px; font-size: 0.86rem; background: var(--bg); }
+.fsw .pill { flex: none; width: 2.9em; text-align: center; font: 600 0.68rem var(--mono); letter-spacing: 0.04em; padding: 2px 0; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.fsw.on { border-color: var(--accent); background: var(--accent-soft); }
+.fsw.on .pill { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.fsw .fn { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fsw .fi { flex: none; font: 0.72rem var(--mono); color: var(--muted); }
+.fsw.unnamed .fn { color: var(--muted); font-style: italic; }
+.fsw.diff { box-shadow: inset 3px 0 0 var(--warn); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -263,9 +281,9 @@ table.inv select { max-width: 17em; }
 
 <!-- Bump ?v= whenever any of these files change: web hosts cache .js for a day,
      and a new page running against an old core breaks. -->
-<script src="sh_savecard_core.js?v=2026-09-27"></script>
-<script src="sh_savecard_data.js?v=2026-09-27"></script>
-<script src="sh_savecard_editor.js?v=2026-09-27"></script>
+<script src="sh_savecard_core.js?v=2026-09-27b"></script>
+<script src="sh_savecard_data.js?v=2026-09-27b"></script>
+<script src="sh_savecard_editor.js?v=2026-09-27b"></script>
 <script>
 (function () {
   'use strict';
@@ -339,10 +357,7 @@ table.inv select { max-width: 17em; }
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'primary';
       btn.textContent = 'Download edited card';
-      btn.addEventListener('click', () => {
-        const name = entry.fileName.split(/[\\/]/).pop();
-        saveFile(name.replace(/\.[^.]*$/, '') + ' (edited).zip', S.zip([{ name, data: S.toImage(entry.card) }]), btn);
-      });
+      btn.addEventListener('click', () => downloadEdited(entry, btn));
       const note = document.createElement('span');
       note.className = 'hint';
       note.textContent = 'The zip holds the card under its original name. Back up the original first.';
@@ -472,6 +487,11 @@ table.inv select { max-width: 17em; }
     wrap.className = 'slots';
     wrap.appendChild(table);
     return wrap;
+  }
+
+  function downloadEdited(entry, btn) {
+    const name = entry.fileName.split(/[\\/]/).pop();
+    saveFile(name.replace(/\.[^.]*$/, '') + ' (edited).zip', S.zip([{ name, data: S.toImage(entry.card) }]), btn);
   }
 
   function markEdited(entry) {
@@ -629,6 +649,7 @@ table.inv select { max-width: 17em; }
   window.SHEditor.mount($('editor'), {
     onChange: entry => markEdited(entry),
     onClose: () => render(),
+    download: (entry, btn) => downloadEdited(entry, btn),
     entries: () => state.cards.filter(c => c.card && !c.example),
   });
 
