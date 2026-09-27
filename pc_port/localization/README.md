@@ -13,6 +13,8 @@ tooling to regenerate it and (later) import a finished translation back.
 | `import_translation.py` | Turns a filled-in file back into a runtime pack (`../assets/gamedata/lang/<code>.lang`). |
 | `make_ru_template.py` | Writes `SilentHill_RU_for_review.txt`: the same file with an `RU:` line pre-filled from the Team Raccoon (ViT Co / Metallist) Russian disc, voiced-line subtitles from the same team's text-only release, and the port's own Russian menus where no disc has them. PC-port menus stay blank for the translator. |
 | `SilentHill_RU_for_review.txt` | That output, for the Russian reviewer. |
+| `make_update_template.py` | `python make_update_template.py pl` writes `SilentHill_PL_for_update.txt`: the template pre-filled from a shipping pack, so a translator only fills the empty lines (text added since their last pass). |
+| `SilentHill_PL_for_update.txt` | That output for Polish: the Quick Options, Controls panel and the newer PC Options rows are left to translate. |
 
 ## What's covered (1851 entries)
 
@@ -28,6 +30,16 @@ Not included on purpose: bare numbers (`30`, `2x`, `5.1`), map ids and monster/c
 
 Text baked into images (e.g. the title logo, some signs) is **not** here; that's
 handled separately as texture/art work.
+
+## Where the PC overlays get their text
+
+The quick menu, the controls panel and the confirm boxes draw with a TrueType
+font, so they take UTF-8 rather than the game font's bytes.
+`pc_port/src/lang_quick.c` serves them, picking the language the same way the
+menus do: a Russian-patched disc first, then a pack (`QUICK.` keys, and the
+UTF-8 copy the loader keeps of every `MENU.` value), then the German / French /
+Spanish / Italian columns (`lang_quick_pal.inc` for `QUICK.` text, `s_MenuTr`
+for PC Options rows). Japanese discs keep English.
 
 ## Source of truth
 
@@ -62,6 +74,10 @@ pipeline above is realised by:
 |------|---------|
 | `import_translation.py` | Re-import: `SilentHill_PL_translation.txt` (+`_raw.json`) → `../assets/gamedata/lang/pl.lang` (the runtime pack). Run: `python import_translation.py --in <translated.txt> --code pl --name Polish --menu POLISH`. |
 | `add_polish_glyphs.py` | Adds the Polish letterforms to an HD-font pack's `FONT16.png` so the HD font and Polish work together (see below). |
+
+The shipped `pl.lang` is the translator's own revised pack (Sep 2026 pass)
+merged with the PC Options rows added in August; it is maintained as a pack,
+not regenerated from a .txt, so their hand-wrapped lines stay as written.
 
 The pack is loaded by `pc_port/src/lang_pack.c`; the extra letters (ą ę ł ż ó
 ć ś ń ź + capitals) are drawn by `font_region.c` - most compose from the
