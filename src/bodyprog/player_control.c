@@ -2075,6 +2075,48 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
                         g_Player_HeadingAngle = heading;
                         g_SysWork.playerWork.player.properties.player.headingAngle = heading;
                     }
+#ifdef SH_PC_PORT
+                    /* FPS look-around catch-up. The camera clamps the look to
+                     * +-90 deg of the body, which on a PC is rarely met because
+                     * the player is usually moving -- but a drag-to-look on a
+                     * touchscreen runs into it and the view simply stops. Near the
+                     * edge the body turns in place to face the camera, playing the
+                     * stock turn-in-place step so it reads as Harry turning rather
+                     * than spinning under the view, and carries the clamp with it.
+                     * Only the animation reads the turn flags on this path; the
+                     * native turn delta is zeroed for the alt cameras. */
+                    {
+                        static int s_fpsCatchUp = 0;
+
+                        if (fpsIdleLook)
+                        {
+                            q3_12 diff = Math_AngleNormalizeSigned(g_TpsCamYaw - player->rotation.vy);
+                            q3_12 rate = TIMESTEP_SCALE_30_FPS(g_DeltaTime, Q12_ANGLE(8.0f));
+                            q3_12 step = diff;
+
+                            if (ABS(diff) >= Q12_ANGLE(80.0f))
+                                s_fpsCatchUp = 1;
+
+                            if (s_fpsCatchUp)
+                            {
+                                if (step >  rate) step =  rate;
+                                if (step < -rate) step = -rate;
+                                player->rotation.vy = Q12_ANGLE_NORM_U(player->rotation.vy + step + Q12_ANGLE(360.0f));
+
+                                if (ABS(diff - step) <= Q12_ANGLE(3.0f))
+                                    s_fpsCatchUp = 0;
+                                else if (step > 0)
+                                    g_Player_IsTurningRight = 1;
+                                else
+                                    g_Player_IsTurningLeft = 1;
+                            }
+                        }
+                        else
+                        {
+                            s_fpsCatchUp = 0;
+                        }
+                    }
+#endif
                 } else {
                     /* Non-TPS: after cutscenes, Player_Controller's `*2 & 0x3` shift
                      * register can leave stale bits in g_Player_IsMovingForward that
