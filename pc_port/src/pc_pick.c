@@ -269,12 +269,8 @@ int Pc_Pick_CollScale(const void* charaPtr)
     if (!s_anyScaled || chara == NULL || !s_scalesInit)
         return Q12(1.0f);
 
-    /* The player is deliberately excluded. Scaling Harry's collision cylinder
-     * holds him that much further off every wall, so a 2x Harry could not get
-     * close enough to open a door and would not fit down a corridor. He still
-     * scales visually; only his collision stays vanilla. */
     if (chara == &g_SysWork.playerWork.player)
-        return Q12(1.0f);
+        return s_playerScale;
 
     for (i = 0; i < NPC_COUNT_MAX; i++)
     {
@@ -287,6 +283,14 @@ int Pc_Pick_CollScale(const void* charaPtr)
     }
 
     return Q12(1.0f);
+}
+
+int Pc_Pick_MoveScale(const void* charaPtr)
+{
+    if (charaPtr == (const void*)&g_SysWork.playerWork.player)
+        return Q12(1.0f);
+
+    return Pc_Pick_CollScale(charaPtr);
 }
 
 int Pc_Pick_ScaleAbout(int origin, int v, int scaleQ12)

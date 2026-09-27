@@ -380,6 +380,11 @@ void GameState_InGame_Update(void) // 0x80038BD4
         Game_NpcUpdate();
         func_8005E89C();
         Ipd_CloseRangeChunksInit();
+#ifdef SH_PC_PORT
+        /* Last point in the gameplay update, so every map/event caller has had
+         * its chance to write a positional sfx this frame. */
+        { extern void Pc_3dAudio_SustainPositionalLoops(void); Pc_3dAudio_SustainPositionalLoops(); }
+#endif
         Gfx_InGameDraw(1);
 #ifdef SH_PC_PORT
         /* The world is in the OT for this frame, so the fog-colored clear behind

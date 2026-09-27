@@ -516,10 +516,13 @@ bool Collision_CharaCollisionSetup(s_CollisionResult* collResult, const VECTOR3*
     cylinder.collisionState = chara->collision.state;
 
 #ifdef SH_PC_PORT
-    /* Console SCALE: a resized character is blocked by walls at its own
-     * size. Local query only -- the stored shape is untouched. */
+    /* Console SCALE: a resized character is blocked by walls at its own size.
+     * Local query only -- the stored shape is untouched. MoveScale, not
+     * CollScale: this is the cylinder that decides how a body fits through the
+     * world, and the player is held at 1.0 there so doors and corridors keep
+     * working. */
     {
-        q19_12 cs = Pc_Pick_CollScale(chara);
+        q19_12 cs = Pc_Pick_MoveScale(chara);
         if (cs != Q12(1.0f))
         {
             cylinder.top    = (s32)(((s64)cylinder.top    * cs) >> 12);

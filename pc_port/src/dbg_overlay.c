@@ -1410,8 +1410,6 @@ void DbgOverlay_Update(void)
     /* A click parked last frame has had a frame of drawing to resolve. */
     Pc_Pick_FrameEnd();
 
-    static int s_mark_a = 0;
-    static int s_mark_b = 0;
     static int s_prev_tilde = 0;
     VECTOR3 hpos, cpos;
     s_SubCharacter* player;

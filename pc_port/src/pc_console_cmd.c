@@ -547,7 +547,7 @@ static const char* const DEBUG_PAGE1[] = {
     "Debug keys (page 1/2) - what is left on the keyboard:",
     " Esc     warm reset to the title screen",
     " , .     keyframe scrub while the viewer is on (hold = faster)",
-    " [ / ]   drop A/B position markers into the log",
+    " [ / ]   graphics effect intensity down / up (key_gfx_prev/next)",
     " ~       console open/close (game pauses; PgUp/PgDn scroll)",
     " TAB     with the console open: hide the panel, keep the cursor",
     "The cheat/tool keys moved to F10 Quick Options > Cheats and",

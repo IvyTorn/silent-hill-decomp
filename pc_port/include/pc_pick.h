@@ -32,6 +32,12 @@ void Pc_Pick_Clear(int announce);
  * collision fields, so it cannot compound or corrupt them. */
 int Pc_Pick_CollScale(const void* chara);
 
+/** As above, but for the MAP-collision cylinder only, which always reports 1.0
+ * for the player: a scaled cylinder holds Harry that much further off every
+ * wall, so he could not reach a door or fit down a corridor. His combat
+ * volumes do scale -- only how he fits through the world stays vanilla. */
+int Pc_Pick_MoveScale(const void* chara);
+
 /** Scale a span measured from a character origin: origin + (v - origin)*s. */
 int Pc_Pick_ScaleAbout(int origin, int v, int scaleQ12);
 
