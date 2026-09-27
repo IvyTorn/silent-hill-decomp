@@ -215,8 +215,20 @@ trigger it, which **programs** reference it, and an **Also in** column (see §4.
 - **Play** / **Stop** audition the selected sample. **Preview rate** is *Auto (in-game)* by
   default, which uses the rate the game's own sound table plays that sample at rather than
   guessing one for the whole bank. The fixed rates are there for samples no sound id claims.
-- **Bank slot** (*base*, *weapon*, *ambient*, *music*) narrows the sound-id matching. A bank
-  file does not record which slot it gets loaded into, so this is your call.
+- **Bank slot** defaults to *This bank's*, the slot the sound system loads this bank into.
+  The other settings (*Any*, *base*, *weapon*, *ambient*, *music*) are there for a bank the
+  game never requests, or to see what a different slot's ids would reach.
+
+**Reading the Sound ids column.** A sound id names a *slot* and a program, never a bank. The
+game keeps four slots filled and their occupants change as you play: the weapon slot follows
+the equipped weapon, the ambient slot follows the map. So the ids listed are the ones that
+play this sample **while this bank is the loaded bank for its slot**. In an area that loads a
+different bank, the same id plays that bank's sample, untouched by your replacement. Every
+map's ambient bank shares one program and note grid, which is why a sample there answers to
+dozens of ids; the tool lists the ones fewest other banks share first, and the rest are in the
+row's tooltip with a count of how many banks share each. An id shown as `+2` keys on two more
+samples at the same time, so this sample is one layer of that sound. Replacing a sample never
+silences a sound: every id listed keeps playing, with the new audio.
 - **Export WAV…**, **Export raw VAG…** and **Export all…** write
   `<BANK>.<NNN>.wav` / `.vag`, numbered one-based to match the list. That name is
   deliberate: it is exactly what the runtime looks for in `gamedata/load/SND/`, so

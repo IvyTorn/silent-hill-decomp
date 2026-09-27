@@ -141,6 +141,7 @@ namespace SilentHillPC_Launcher
             _list.Columns.Add("Loops", 52, HorizontalAlignment.Center);
             _list.Columns.Add("In-game rate", 88, HorizontalAlignment.Right);
             _list.Columns.Add("Sound ids", 240, HorizontalAlignment.Left);
+            _list.ShowItemToolTips = true;
             _list.Columns.Add("Also in", 170, HorizontalAlignment.Left);
             _list.Columns.Add("Programs", 76, HorizontalAlignment.Left);
             _list.Columns.Add("Centre note", 82, HorizontalAlignment.Right);
@@ -176,7 +177,7 @@ namespace SilentHillPC_Launcher
             _slot.Location = new Point(628, y - 28);
             _slot.Size = new Size(88, 22);
             _slot.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-            _slot.Items.AddRange(new object[] { "Any", "base", "weapon", "ambient", "music" });
+            _slot.Items.AddRange(new object[] { "This bank's", "Any", "base", "weapon", "ambient", "music" });
             _slot.SelectedIndex = 0;
             _slot.SelectedIndexChanged += (s, e) => { if (_vab != null) Open(_vab.Path); };
             Controls.Add(_slot);
@@ -232,7 +233,15 @@ namespace SilentHillPC_Launcher
         /// not record its own slot, so this is the user's call.</summary>
         private int SlotFilter
         {
-            get { return _slot.SelectedIndex <= 0 ? -1 : _slot.SelectedIndex - 1; }
+            get
+            {
+                // Default: the slot the sound system loads THIS bank into. A row names
+                // only a slot, so without it every id aimed at the weapon or music slot
+                // that happens to share a program and note shows up under an ambient
+                // bank as well.
+                if (_slot.SelectedIndex == 0) return _vab == null ? -1 : VabFile.SlotOfBank(BaseName);
+                return _slot.SelectedIndex <= 1 ? -1 : _slot.SelectedIndex - 2;
+            }
         }
 
         /// <summary>Fixed rate the user picked, or 0 for "use each sample's own in-game
@@ -311,6 +320,8 @@ namespace SilentHillPC_Launcher
             if (_index == null || !_index.SameDirs(indexDirs)) _index = SndSampleIndex.Build(indexDirs);
             LoadOriginals(v, path);
 
+            SfxAnswerIndex answers = SfxAnswerIndex.For(_sndDir);
+
             _matches.Clear();
             _dupes.Clear();
             _list.BeginUpdate();
@@ -330,6 +341,17 @@ namespace SilentHillPC_Launcher
                 progs.Sort();
 
                 List<SfxMatch> hits = v.MatchesFor(vag.Index, SlotFilter);
+                // Ids only this bank answers first: with an ambient bank most of the
+                // list is ids shared with every other map's bank, and those say least
+                // about the sample.
+                if (answers != null)
+                {
+                    hits.Sort(delegate(SfxMatch a, SfxMatch b)
+                    {
+                        int c = answers.BanksAnswering(a.Row.Id).CompareTo(answers.BanksAnswering(b.Row.Id));
+                        return c != 0 ? c : a.Row.Id.CompareTo(b.Row.Id);
+                    });
+                }
                 _matches[vag.Index] = hits;
                 if (hits.Count > 0) identified++;
 
@@ -341,6 +363,7 @@ namespace SilentHillPC_Launcher
 
                 var names = new List<string>();
                 var rates = new List<string>();
+                int layered = 0;
                 foreach (SfxMatch m in hits)
                 {
                     // The slot is part of the identity when the filter is off: the same
@@ -348,6 +371,11 @@ namespace SilentHillPC_Launcher
                     string label = SlotFilter >= 0
                         ? m.Label
                         : m.Label + " (" + SfxMatch.SlotName(m.Row.Slot) + ")";
+                    if (m.Layers > 1)
+                    {
+                        label += " +" + (m.Layers - 1);
+                        layered++;
+                    }
                     if (!names.Contains(label)) names.Add(label);
                     string r = Math.Round(m.RateHz).ToString("N0");
                     if (!rates.Contains(r)) rates.Add(r);
@@ -360,21 +388,25 @@ namespace SilentHillPC_Launcher
                 it.SubItems.Add(vag.Loops ? "yes" : "");
                 it.SubItems.Add(rates.Count == 0 ? "-" :
                     (rates.Count == 1 ? rates[0] + " Hz" : string.Join(" / ", rates.ToArray()) + " Hz"));
-                it.SubItems.Add(names.Count == 0 ? "" : string.Join(", ", names.ToArray()));
+                it.SubItems.Add(IdSummary(names));
                 it.SubItems.Add(BankSummary(others));
                 it.SubItems.Add(progs.Count == 0 ? "(unused)" : string.Join(", ", progs.ConvertAll(x => x.ToString()).ToArray()));
                 it.SubItems.Add(centre < 0 ? "-" : centre.ToString());
                 it.Tag = vag;
+                it.ToolTipText = RowTip(vag, hits, names, layered, answers);
                 if (progs.Count == 0) it.ForeColor = SystemColors.GrayText;
                 _list.Items.Add(it);
             }
             _list.EndUpdate();
 
+            int slot = SlotFilter;
             _info.Text = string.Format(
-                "{0} samples, {1} programs, {2} tones — bank id {3}, {4:N0} bytes. " +
-                "{5} identified from the game's sound table; the rest are in the bank but no " +
-                "sound id in this slot reaches them.",
-                v.VagCount, v.ProgramCount, v.Tones.Count, v.VabId, v.DeclaredSize, identified);
+                "{0} samples, {1} programs, {2} tones — bank id {3}, {4:N0} bytes. {5} are reached " +
+                "by a sound id. An id names a SLOT, not a bank, so these are the ids that play this " +
+                "sample while this bank is the loaded {6} bank; the same id plays another bank's " +
+                "sample elsewhere, and replacing here changes nothing there.",
+                v.VagCount, v.ProgramCount, v.Tones.Count, v.VabId, v.DeclaredSize, identified,
+                slot >= 0 ? SfxMatch.SlotName(slot) : "");
 
             if (_edited.Count > 0)
             {
@@ -504,6 +536,66 @@ namespace SilentHillPC_Launcher
             if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return false;
             try { return Directory.GetFiles(dir, "*.vab").Length > 0; }
             catch { return false; }
+        }
+
+        /// <summary>Four ids and a count. A sample in an ambient bank answers to dozens
+        /// of them, and a wall of Sfx_Unk numbers in a 240px column says nothing; the
+        /// first few are the ones fewest other banks share.</summary>
+        private static string IdSummary(List<string> names)
+        {
+            if (names.Count == 0) return "";
+            if (names.Count <= 3) return string.Join(", ", names.ToArray());
+            return string.Join(", ", names.GetRange(0, 3).ToArray()) + ", +" + (names.Count - 3) + " more";
+        }
+
+        private const int TipIdCap = 24;
+
+        /// <summary>The row's ids in full, up to a readable cap, with what an id means
+        /// here spelled out: how many banks answer the same id, and whether the id keys
+        /// on other samples at the same time.</summary>
+        private string RowTip(VabVag vag, List<SfxMatch> hits, List<string> names, int layered, SfxAnswerIndex answers)
+        {
+            var sb = new System.Text.StringBuilder();
+            int slot = SlotFilter;
+            sb.Append("Sample ").Append(vag.Index);
+            if (_edited.Contains(vag.Index)) sb.Append(" (already changed from the disc)");
+            sb.AppendLine();
+
+            if (hits.Count == 0)
+            {
+                sb.Append("No sound id reaches this sample");
+                if (slot >= 0) sb.Append(" from the ").Append(SfxMatch.SlotName(slot)).Append(" slot");
+                sb.Append('.');
+                return sb.ToString();
+            }
+
+            sb.Append("Played by ").Append(names.Count).Append(names.Count == 1 ? " id" : " ids")
+              .Append(" while this bank is loaded:").AppendLine();
+
+            var seen = new List<string>();
+            int shown = 0;
+            foreach (SfxMatch m in hits)
+            {
+                string label = m.Label;
+                if (seen.Contains(label)) continue;
+                seen.Add(label);
+                if (shown >= TipIdCap) continue;
+
+                sb.Append("  ").Append(label);
+                if (m.Layers > 1) sb.Append(" (+").Append(m.Layers - 1).Append(" more samples at once)");
+                int banks = answers == null ? 0 : answers.BanksAnswering(m.Row.Id);
+                if (banks == 1) sb.Append(" — only this bank answers it");
+                else if (banks > 1) sb.Append(" — shared with ").Append(banks - 1).Append(" other bank")
+                                     .Append(banks == 2 ? "" : "s");
+                sb.AppendLine();
+                shown++;
+            }
+            if (seen.Count > shown) sb.Append("  ... and ").Append(seen.Count - shown).Append(" more").AppendLine();
+
+            sb.Append("A shared id plays whichever bank is loaded in the ")
+              .Append(slot >= 0 ? SfxMatch.SlotName(slot) : "same").Append(" slot at the time, so replacing ")
+              .Append("this sample changes that sound only where this bank is loaded.");
+            return sb.ToString();
         }
 
         /// <summary>Distinct bank names, shortened past four so the column stays a
@@ -951,6 +1043,19 @@ namespace SilentHillPC_Launcher
                 "Several tones can share one sample, which is why the same sound can appear",
                 "at more than one pitch. A sample listed as \"(unused)\" is in the bank but",
                 "no tone references it.",
+                "",
+                "Sound ids: a sound id names a SLOT and a program, never a bank. The game",
+                "keeps four slots filled, and their occupants change as you play: the",
+                "weapon slot follows the equipped weapon, the ambient slot follows the",
+                "map. So the ids listed are the ones that play this sample while THIS",
+                "bank is the loaded bank for its slot. In an area that loads another",
+                "bank, the same id plays that bank's sample instead, and your",
+                "replacement here does not affect it. Replacing a sample never removes",
+                "a sound: every id listed keeps playing, with the new audio.",
+                "",
+                "The list is long for a sound many ids can trigger. Hover a row to see",
+                "all of them. An id shown as \"+2\" keys on two further samples at the",
+                "same time, so this sample is one layer of that sound.",
                 "",
                 "Preview rate: the SPU plays a sample at 44100 Hz when it is triggered at",
                 "the tone's own centre note, and the game shifts the pitch per sound from",
