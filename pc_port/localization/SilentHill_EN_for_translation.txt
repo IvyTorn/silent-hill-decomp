@@ -4,7 +4,7 @@
  Every visible in-game English string that is NOT baked into an image:
  story/cutscene dialogue, examine/pickup prompts, the original menus, the PC
  port's own menus (PC Options, the F10 Quick Options menu, the Controls
- panel), item names and item descriptions.  Total entries: 1851.
+ panel), item names and item descriptions.  Total entries: 1869.
 
  HOW TO USE
  ----------
@@ -530,6 +530,31 @@ TR:
 EN: Both
 TR: 
 
+[MENU.Can't_use_it_here.]
+EN: Can't use it here.
+TR: 
+
+[MENU.Too_dark_to_look_at
+		the_item_here.]
+EN: Too dark to look at the item here.
+TR: 
+
+[MENU.Stock:]
+EN: Stock:
+TR: 
+
+[MENU.--On--]
+EN: ==On==
+TR: 
+
+[MENU.--Off--]
+EN: ==Off==
+TR: 
+
+[MENU.Fuel:]
+EN: Fuel:
+TR: 
+
 [MENU.Too_dark_to_look_at
 		the_map_here.]
 EN: Too dark to look at the map here.
@@ -538,32 +563,6 @@ TR:
 [MENU.I_don't_have_the_map
 		for_this_place.]
 EN: I don't have the map for this place.
-TR: 
-
-[MENU.Can't_use_it_here.]
-NOTE: inventory prompt
-EN: Can't use it here.
-TR: 
-
-[MENU.Too_dark_to_look_at
-		the_item_here.]
-NOTE: inventory prompt
-EN: Too dark to look at the item here.
-TR: 
-
-[MENU.Stock:]
-NOTE: inventory label, max ~10 characters
-EN: Stock:
-TR: 
-
-[MENU.--On--]
-NOTE: inventory label, max ~10 characters
-EN: ==On==
-TR: 
-
-[MENU.--Off--]
-NOTE: inventory label, max ~10 characters
-EN: ==Off==
 TR: 
 
 [MENU.--Use_OK--]
@@ -581,9 +580,100 @@ NOTE: inventory label, max ~10 characters
 EN: ==Use NG==
 TR: 
 
-[MENU.Fuel:]
-NOTE: inventory label, max ~10 characters
-EN: Fuel:
+
+
+################################################################################
+##  RESULTS SCREEN  (after the credits: play statistics and rank)
+################################################################################
+
+[MENU.GAME_RESULT]
+NOTE: results screen title, max ~20 characters
+EN: GAME RESULT
+TR: 
+
+[MENU.Mode]
+NOTE: results screen label, the difficulty follows, max ~18 characters
+EN: Mode
+TR: 
+
+[MENU.Saves]
+NOTE: results screen label, a number follows, max ~20 characters
+EN: Saves
+TR: 
+
+[MENU.Continues]
+NOTE: results screen label, a number follows, max ~20 characters
+EN: Continues
+TR: 
+
+[MENU.Total_time]
+NOTE: results screen label, the play time follows, max ~13 characters
+EN: Total time
+TR: 
+
+[MENU.Walking_distance]
+NOTE: results screen label, a distance follows, max ~16 characters
+EN: Walking distance
+TR: 
+
+[MENU.Running_distance]
+NOTE: results screen label, a distance follows, max ~16 characters
+EN: Running distance
+TR: 
+
+[MENU.Items]
+NOTE: results screen label, "found / total" follows, max ~16 characters
+EN: Items
+TR: 
+
+[MENU.Game_clear]
+NOTE: results screen label, the number of clears follows, max ~20 characters
+EN: Game clear
+TR: 
+
+[MENU.Ending]
+NOTE: results screen label, the ending name follows, max ~19 characters
+EN: Ending
+TR: 
+
+[MENU.--Your_rank--]
+NOTE: results screen label, the rank stars follow on the same line, max ~13 characters
+EN: ==Your rank==
+TR: 
+
+[MENU.Defeated_enemy_by_shooting]
+NOTE: results screen label, a number follows, max ~23 characters
+EN: Defeated enemy by shooting
+TR: 
+
+[MENU.Defeated_enemy_by_fighting]
+NOTE: results screen label, a number follows, max ~23 characters
+EN: Defeated enemy by fighting
+TR: 
+
+[MENU.Shooting_style]
+NOTE: results screen heading over the four rows below, max ~20 characters
+EN: Shooting style
+TR: 
+
+[MENU.Short_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Short range shots
+TR: 
+
+[MENU.Middle_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Middle range shots
+TR: 
+
+[MENU.Long_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Long range shots
+TR: 
+
+[MENU.No_aiming_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: No aiming shots
 TR: 
 
 
@@ -658,7 +748,7 @@ EN: Back
 TR: 
 
 [MENU.Flashlight]
-NOTE: row name, System page, max ~15 characters
+NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Flashlight
 TR: 
 
@@ -673,7 +763,7 @@ EN: Beam Size
 TR: 
 
 [MENU.Fog_Strength]
-NOTE: row name, System page, max ~15 characters
+NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Fog Strength
 TR: 
 
@@ -693,7 +783,7 @@ EN: FMV Movie Vol
 TR: 
 
 [MENU.Weather_Rate]
-NOTE: row name, System page, max ~15 characters
+NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Weather Rate
 TR: 
 
@@ -743,62 +833,62 @@ EN: First Person FOV
 TR: 
 
 [MENU.Third_Person_FOV]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: Third Person FOV
 TR: 
 
 [MENU.OTS_FOV]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: OTS FOV
 TR: 
 
 [MENU.Aim_Zoom]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: Aim Zoom
 TR: 
 
 [MENU.OTS_Aim_Zoom]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: OTS Aim Zoom
 TR: 
 
 [MENU.OTS_Aim_In_TPS]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: OTS Aim In TPS
 TR: 
 
 [MENU.Camera_Collision]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: Camera Collision
 TR: 
 
 [MENU.Minimap]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap
 TR: 
 
 [MENU.Minimap_Scale]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Scale
 TR: 
 
 [MENU.Minimap_Corner]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Corner
 TR: 
 
 [MENU.Minimap_Opacity]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Opacity
 TR: 
 
 [MENU.Minimap_Reqs_Map]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Reqs Map
 TR: 
 
 [MENU.Low_HP_Glow]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Low HP Glow
 TR: 
 
@@ -808,7 +898,7 @@ EN: Crosshair
 TR: 
 
 [MENU.Crosshair_Size]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Crosshair Size
 TR: 
 
@@ -838,7 +928,7 @@ EN: On
 TR: 
 
 [MENU.Dither]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Dither
 TR: 
 
@@ -848,7 +938,7 @@ EN: Bilinear
 TR: 
 
 [MENU.Trilinear]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Trilinear
 TR: 
 
@@ -928,52 +1018,52 @@ EN: Filmic
 TR: 
 
 [MENU.Classic]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Classic
 TR: 
 
 [MENU.C_+_Shadows]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: C + Shadows
 TR: 
 
 [MENU.Modern]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Modern
 TR: 
 
 [MENU.M_+_Shadows]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: M + Shadows
 TR: 
 
 [MENU.Top_L]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Top L
 TR: 
 
 [MENU.Top_R]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Top R
 TR: 
 
 [MENU.Bottom_L]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Bottom L
 TR: 
 
 [MENU.Bottom_R]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Bottom R
 TR: 
 
 [MENU.Square]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Square
 TR: 
 
 [MENU.Circle]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Circle
 TR: 
 

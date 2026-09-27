@@ -275,6 +275,32 @@ static const s_MenuTranslation s_MenuTr[] = {
     { "==Off==",           { "==Aus==",            "==Non==",             "==No==",             "==No=="          } },
     { "Fuel:",             { "Benzin:",            "Essence_:",           "Gasolina:",          "Benzina:"        } },
 
+    /* --- Results screen (ranking.c Results_DisplayInfo). Labels start at
+     * x=24 and their values are drawn at fixed x, so each stays inside the
+     * room before its value: Total_time 13 glyphs, the distances and Items
+     * 16, the shot rows (from x=72) 19, the rank 13 (its stars share the
+     * line), the Defeated rows 23. --- */
+    { "GAME_RESULT",        { "SPIELERGEBNIS",      "R\xC9SULTATS",        "RESULTADOS",         "RISULTATI"          } },
+    { "Mode",               { "Modus",              NULL,                  "Modo",               "Modalit\xE0"        } },
+    { "Saves",              { "Speicherungen",      "Sauvegardes",         "Partidas_guardadas", "Salvataggi"         } },
+    { "Continues",          { "Fortsetzungen",      "Reprises",            "Continuaciones",     "Continue"           } },
+    { "Total_time",         { "Gesamtzeit",         "Temps_total",         "Tiempo_total",       "Tempo_totale"       } },
+    { "Walking_distance",   { "Strecke_gehend",     "Distance_march\xE9" "e", "Dist._andada",   "Distanza_a_piedi"   } },
+    { "Running_distance",   { "Strecke_rennend",    "Distance_courue",     "Dist._corrida",      "Distanza_corsa"     } },
+    { "Items",              { "Gegenst\xE4nde",     "Objets",              "Objetos",            "Oggetti"            } },
+    { "Game_clear",         { "Durchgespielt",      "Parties_finies",      "Partidas_completadas", "Partite_completate" } },
+    { "Ending",             { "Ende",               "Fin",                 "Final",              "Finale"             } },
+    { "==Your_rank==",      { "==Rang==",           "==Rang==",            "==Rango==",          "==Grado=="          } },
+    { "Defeated_\x01\x01" "enemy_\x01\x01" "by_\x01\x01shooting",
+                            { "Gegner_erschossen",  "Ennemis_abattus_(tir)", "Abatidos_a_tiros", "Nemici_uccisi_(sparo)" } },
+    { "Defeated_\x01\x01" "enemy_\x01\x01" "by_\x01\x01" "fighting",
+                            { "Gegner_im_Nahkampf", "Ennemis_abattus_(m\xEAl\xE9" "e)", "Abatidos_a_golpes", "Nemici_uccisi_(lotta)" } },
+    { "Shooting_style",     { "Schie\xDFstil",      "Style_de_tir",        "Estilo_de_tiro",     "Stile_di_tiro"      } },
+    { "Short_range_shots",  { "Nahdistanz",         "Courte_port\xE9" "e", "A_corta_distancia",  "Corto_raggio"       } },
+    { "Middle_range_shots", { "Mitteldistanz",      "Moyenne_port\xE9" "e", "A_media_distancia", "Medio_raggio"       } },
+    { "Long_range_shots",   { "Ferndistanz",        "Longue_port\xE9" "e", "A_larga_distancia",  "Lungo_raggio"       } },
+    { "No_aiming_shots",    { "Ohne_Zielen",        "Sans_viser",          "Sin_apuntar",        "Senza_mirare"       } },
+
     /* --- Paper-map prompts --- */
     { "Too_dark_to_look_at\n\t\tthe_map_here.",
         { "Zu_dunkel,_um_die\n\t\tKarte_zu_lesen.",

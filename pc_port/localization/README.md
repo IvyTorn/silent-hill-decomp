@@ -14,9 +14,9 @@ tooling to regenerate it and (later) import a finished translation back.
 | `make_ru_template.py` | Writes `SilentHill_RU_for_review.txt`: the same file with an `RU:` line pre-filled from the Team Raccoon (ViT Co / Metallist) Russian disc, voiced-line subtitles from the same team's text-only release, and the port's own Russian menus where no disc has them. PC-port menus stay blank for the translator. |
 | `SilentHill_RU_for_review.txt` | That output, for the Russian reviewer. |
 | `make_update_template.py` | `python make_update_template.py pl` writes `SilentHill_PL_for_update.txt`: the template pre-filled from a shipping pack, so a translator only fills the empty lines (text added since their last pass). |
-| `SilentHill_PL_for_update.txt` | That output for Polish: the Quick Options, Controls panel and the newer PC Options rows are left to translate. |
+| `SilentHill_PL_translation.txt` | The Polish master the shipped `pl.lang` is built from. |
 
-## What's covered (1851 entries)
+## What's covered (1869 entries)
 
 - **Story / cutscene dialogue**: every `MAP_MESSAGES[]` across all 40 map scenes (`MAP<n>_S<nn>.<index>`).
 - **Common messages**: Yes/No, item-pickup prompts, door messages (`COMMON.<index>`), from `include/maps/shared/map_msg_common.h`.
@@ -24,6 +24,7 @@ tooling to regenerate it and (later) import a finished translation back.
 - **PC Options menu**: every row name and value label of the five PC Options pages in `src/screens/options/options.c`. The game looks these up by their English text exactly like the menus above, so they share the `MENU.<text>` keys. `NOTE:` lines give each one's character budget (label and value share a line).
 - **Quick Options menu (F10)**, its **Cheats/Debug pages**, the **Controls panel** (key binding screen) and the **confirm boxes**: `pc_quick_options.c`, `pc_cheats.c`, `pc_bind_panel.c`, `control_style.c`, `pc_confirm_dialog.c`. Keys `QUICK.<text>` (spaces as `_`, `=` as `-`). These overlays draw with a TrueType font, so they take real spaces and any Unicode letter, and `{n}`/`{key}`/`{name}`/`{action}`/`{camera}` placeholders are filled in by the game.
 - **Item names** and **item descriptions**: `INVENTORY_ITEM_NAMES[]` / `g_ItemDescriptions[]` in `src/bodyprog/items/item_screens_3.c`. Keys `ITEM_NAME.<index>` / `ITEM_DESC.<index>` (index = item id).
+- **Results screen** after the credits (`ranking.c`): play statistics and rank. `MENU.<text>` keys, with the room before each value as the budget.
 - **Inventory prompts and labels** drawn by `Gfx_Inventory_ItemDescriptionDraw` ("Can't use it here.", Stock:, Fuel:, ==On==...). They go through the same menu lookup, so they are `MENU.<text>` keys (`=` written as `-`). The old `MISC.0`/`MISC.1` keys were hand-typed stand-ins the game never read; the importer maps them onto the real keys.
 
 Not included on purpose: bare numbers (`30`, `2x`, `5.1`), map ids and monster/character names on the debug pages, and keyboard key names.
@@ -72,12 +73,14 @@ pipeline above is realised by:
 
 | File | Purpose |
 |------|---------|
-| `import_translation.py` | Re-import: `SilentHill_PL_translation.txt` (+`_raw.json`) → `../assets/gamedata/lang/pl.lang` (the runtime pack). Run: `python import_translation.py --in <translated.txt> --code pl --name Polish --menu POLISH`. |
+| `import_translation.py` | Re-import: `SilentHill_PL_translation.txt` (+`_raw.json`) → `../assets/gamedata/lang/pl.lang` (the runtime pack). Run: `python import_translation.py --in <translated.txt> --code pl --name Polish --menu Polish`. |
 | `add_polish_glyphs.py` | Adds the Polish letterforms to an HD-font pack's `FONT16.png` so the HD font and Polish work together (see below). |
 
-The shipped `pl.lang` is the translator's own revised pack (Sep 2026 pass)
-merged with the PC Options rows added in August; it is maintained as a pack,
-not regenerated from a .txt, so their hand-wrapped lines stay as written.
+`SilentHill_PL_translation.txt` is the Polish master: the translator's
+September pass (Quick Options, Controls panel, PC Options and a revision of
+the script) plus the results screen. Regenerate the pack from it:
+
+    python import_translation.py --in SilentHill_PL_translation.txt --code pl --name Polish --menu Polish
 
 The pack is loaded by `pc_port/src/lang_pack.c`; the extra letters (ą ę ł ż ó
 ć ś ń ź + capitals) are drawn by `font_region.c` - most compose from the

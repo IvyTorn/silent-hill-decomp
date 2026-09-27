@@ -158,12 +158,15 @@ def follow(d, kind, pos):
 
 def disc_menu_text(us_files, ru_files, literal):
     """Patched bytes for one US menu literal, or None."""
-    needle = b'\0' + literal + b'\0'
+    needle = literal + b'\0'
     for name, (d, base) in us_files.items():
+        # A string starts after a NUL, or word-aligned straight after data
+        # (the results table follows a pointer array with no padding).
         off = d.find(needle)
+        while off > 0 and d[off - 1] != 0 and off % 4 != 0:
+            off = d.find(needle, off + 1)
         if off < 0:
             continue
-        off += 1
         rd, rbase = ru_files[name]
         refs = references(d, base + off)
         for kind, pos in refs:
@@ -308,7 +311,7 @@ def disc_text(ru_disc, us_files):
     # Original menus.
     ru_files = menu_files(ru_disc)
     for sec, key, raw, rd, note in tmpl.records:
-        if sec not in ('MENU', 'PCOPT', 'MISC'):
+        if sec not in ('MENU', 'RESULTS', 'PCOPT'):
             continue
         s = disc_menu_text(us_files, ru_files, raw.encode('latin-1'))
         if s:

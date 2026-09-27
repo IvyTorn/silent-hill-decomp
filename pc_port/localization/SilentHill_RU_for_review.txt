@@ -4,7 +4,7 @@
  This is the full English script of the PC port with a Russian line under
  every entry. The Russian is PRE-FILLED from the Team Raccoon / ViT Co /
  Metallist fan translation ("Silent Hill (ViT Co_Metallist) (Team
- Raccoon)"), read straight off that disc.  Total entries: 1851.
+ Raccoon)"), read straight off that disc.  Total entries: 1869.
 
  WHAT TO DO
  ----------
@@ -168,14 +168,12 @@ EN: HARD
 RU: СЛОЖНО
 
 [MENU.OPTION_S]
-NOTE: not on the disc, written by the port team
 EN: OPTION S
 RU: ОПЦИИ
 
 [MENU.EXTRA_OPTION_S]
-NOTE: not on the disc, written by the port team
 EN: EXTRA OPTION S
-RU: ДОП. ОПЦИИ
+RU: ДОПОЛНИТЕЛЬНО
 
 [MENU.Exit]
 EN: Exit
@@ -297,14 +295,12 @@ EN: PAUSE
 RU: ПАУЗА
 
 [MENU.PAUSED]
-NOTE: not on the disc, written by the port team
 EN: PAUSED
 RU: ПАУЗА
 
 [MENU.Is_it_OK_to_save?]
-NOTE: not on the disc, written by the port team
 EN: Is it OK to save?
-RU: Сохранить игру?
+RU:  Сохранить?
 
 [MENU.Yes_____________No]
 EN: Yes No
@@ -315,9 +311,8 @@ EN: NEXT GAME MODE
 RU: Следующий режим
 
 [MENU.Is_it_OK_to_overwrite?]
-NOTE: not on the disc, written by the port team
 EN: Is it OK to overwrite?
-RU: Перезаписать?
+RU:  Переписать?
 
 [MENU.Is_it_OK_to_format?]
 EN: Is it OK to format?
@@ -477,9 +472,8 @@ EN: Next fear
 RU: Новый страх
 
 [MENU.Use]
-NOTE: not on the disc, written by the port team
 EN: Use
-RU: Исп.
+RU: Применить
 
 [MENU.Equip]
 EN: Equip
@@ -551,42 +545,40 @@ NOTE: not on the disc, written by the port team
 EN: Both
 RU: Оба
 
-[MENU.Too_dark_to_look_at
-		the_map_here.]
-NOTE: not on the disc, written by the port team
-EN: Too dark to look at the map here.
-RU: Слишком темно, чтобы смотреть на карту.
-
-[MENU.I_don't_have_the_map
-		for_this_place.]
-EN: I don't have the map for this place.
-RU: У меня нет карты этого места.
-
 [MENU.Can't_use_it_here.]
-NOTE: inventory prompt
 EN: Can't use it here.
 RU: Это здесь не применить.
 
 [MENU.Too_dark_to_look_at
 		the_item_here.]
-NOTE: inventory prompt
 EN: Too dark to look at the item here.
 RU: Слишком темно, чтобы осматривать вещи.
 
 [MENU.Stock:]
-NOTE: inventory label, max ~10 characters
 EN: Stock:
 RU: х
 
 [MENU.--On--]
-NOTE: inventory label, max ~10 characters
 EN: ==On==
 RU: -Вкл-
 
 [MENU.--Off--]
-NOTE: inventory label, max ~10 characters
 EN: ==Off==
 RU: -Выкл-
+
+[MENU.Fuel:]
+EN: Fuel:
+RU: Топливо:
+
+[MENU.Too_dark_to_look_at
+		the_map_here.]
+EN: Too dark to look at the map here.
+RU: Слишком темно, чтобы разглядеть что-нибудь на карте.
+
+[MENU.I_don't_have_the_map
+		for_this_place.]
+EN: I don't have the map for this place.
+RU: У меня нет карты этого места.
 
 [MENU.--Use_OK--]
 NOTE: inventory label, max ~10 characters
@@ -603,10 +595,101 @@ NOTE: inventory label, max ~10 characters
 EN: ==Use NG==
 RU: 
 
-[MENU.Fuel:]
-NOTE: inventory label, max ~10 characters
-EN: Fuel:
-RU: Топливо:
+
+
+################################################################################
+##  RESULTS SCREEN  (after the credits: play statistics and rank)
+################################################################################
+
+[MENU.GAME_RESULT]
+NOTE: results screen title, max ~20 characters
+EN: GAME RESULT
+RU: РЕЗУЛЬТАТЫ
+
+[MENU.Mode]
+NOTE: results screen label, the difficulty follows, max ~18 characters
+EN: Mode
+RU: Режим
+
+[MENU.Saves]
+NOTE: results screen label, a number follows, max ~20 characters
+EN: Saves
+RU: Сохранений
+
+[MENU.Continues]
+NOTE: results screen label, a number follows, max ~20 characters
+EN: Continues
+RU: Продолжений
+
+[MENU.Total_time]
+NOTE: results screen label, the play time follows, max ~13 characters
+EN: Total time
+RU: Общее время
+
+[MENU.Walking_distance]
+NOTE: results screen label, a distance follows, max ~16 characters
+EN: Walking distance
+RU: Расстояние пешком
+
+[MENU.Running_distance]
+NOTE: results screen label, a distance follows, max ~16 characters
+EN: Running distance
+RU: Расстояние бегом
+
+[MENU.Items]
+NOTE: results screen label, "found / total" follows, max ~16 characters
+EN: Items
+RU: Собрано вещей
+
+[MENU.Game_clear]
+NOTE: results screen label, the number of clears follows, max ~20 characters
+EN: Game clear
+RU: Прохождений
+
+[MENU.Ending]
+NOTE: results screen label, the ending name follows, max ~19 characters
+EN: Ending
+RU: Окончание
+
+[MENU.--Your_rank--]
+NOTE: results screen label, the rank stars follow on the same line, max ~13 characters
+EN: ==Your rank==
+RU: -Ваш ранг-
+
+[MENU.Defeated_enemy_by_shooting]
+NOTE: results screen label, a number follows, max ~23 characters
+EN: Defeated enemy by shooting
+RU: Застрелено врагов
+
+[MENU.Defeated_enemy_by_fighting]
+NOTE: results screen label, a number follows, max ~23 characters
+EN: Defeated enemy by fighting
+RU: Убито врагов в драке
+
+[MENU.Shooting_style]
+NOTE: results screen heading over the four rows below, max ~20 characters
+EN: Shooting style
+RU: Стиль стрельбы:
+
+[MENU.Short_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Short range shots
+RU: В упор
+
+[MENU.Middle_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Middle range shots
+RU: С расстояния
+
+[MENU.Long_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Long range shots
+RU: Издалека
+
+[MENU.No_aiming_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: No aiming shots
+RU: Не целясь
 
 
 
@@ -680,7 +763,7 @@ EN: Back
 RU: 
 
 [MENU.Flashlight]
-NOTE: row name, System page, max ~15 characters
+NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Flashlight
 RU: Фонарик
 
@@ -695,7 +778,7 @@ EN: Beam Size
 RU: 
 
 [MENU.Fog_Strength]
-NOTE: row name, System page, max ~15 characters
+NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Fog Strength
 RU: 
 
@@ -715,7 +798,7 @@ EN: FMV Movie Vol
 RU: 
 
 [MENU.Weather_Rate]
-NOTE: row name, System page, max ~15 characters
+NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Weather Rate
 RU: 
 
@@ -765,62 +848,62 @@ EN: First Person FOV
 RU: 
 
 [MENU.Third_Person_FOV]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: Third Person FOV
 RU: 
 
 [MENU.OTS_FOV]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: OTS FOV
 RU: 
 
 [MENU.Aim_Zoom]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: Aim Zoom
 RU: 
 
 [MENU.OTS_Aim_Zoom]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: OTS Aim Zoom
 RU: 
 
 [MENU.OTS_Aim_In_TPS]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: OTS Aim In TPS
 RU: 
 
 [MENU.Camera_Collision]
-NOTE: row name, Camera page, max ~17 characters
+NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: Camera Collision
 RU: 
 
 [MENU.Minimap]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap
 RU: 
 
 [MENU.Minimap_Scale]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Scale
 RU: 
 
 [MENU.Minimap_Corner]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Corner
 RU: 
 
 [MENU.Minimap_Opacity]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Opacity
 RU: 
 
 [MENU.Minimap_Reqs_Map]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Reqs Map
 RU: 
 
 [MENU.Low_HP_Glow]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Low HP Glow
 RU: 
 
@@ -830,7 +913,7 @@ EN: Crosshair
 RU: 
 
 [MENU.Crosshair_Size]
-NOTE: row name, HUD page, max ~17 characters
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Crosshair Size
 RU: 
 
@@ -860,7 +943,7 @@ EN: On
 RU: Вкл
 
 [MENU.Dither]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Dither
 RU: 
 
@@ -870,7 +953,7 @@ EN: Bilinear
 RU: 
 
 [MENU.Trilinear]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Trilinear
 RU: 
 
@@ -950,52 +1033,52 @@ EN: Filmic
 RU: 
 
 [MENU.Classic]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Classic
 RU: 
 
 [MENU.C_+_Shadows]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: C + Shadows
 RU: 
 
 [MENU.Modern]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Modern
 RU: 
 
 [MENU.M_+_Shadows]
-NOTE: setting value, max ~11 characters
+NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: M + Shadows
 RU: 
 
 [MENU.Top_L]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Top L
 RU: 
 
 [MENU.Top_R]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Top R
 RU: 
 
 [MENU.Bottom_L]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Bottom L
 RU: 
 
 [MENU.Bottom_R]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Bottom R
 RU: 
 
 [MENU.Square]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Square
 RU: 
 
 [MENU.Circle]
-NOTE: setting value, max ~8 characters
+NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Circle
 RU: 
 

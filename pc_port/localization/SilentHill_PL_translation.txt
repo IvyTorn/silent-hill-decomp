@@ -4,12 +4,7 @@
  Every visible in-game English string that is NOT baked into an image:
  story/cutscene dialogue, examine/pickup prompts, the original menus, the PC
  port's own menus (PC Options, the F10 Quick Options menu, the Controls
- panel), item names and item descriptions.  Total entries: 1851.
-
- UPDATING AN EXISTING TRANSLATION
- --------------------------------
- The PL: lines already hold the current PL translation. Fill in the
- EMPTY ones (text added to the game since) and correct anything else.
+ panel), item names and item descriptions.  Total entries: 1869.
 
  HOW TO USE
  ----------
@@ -78,11 +73,11 @@ PL: Nie
 
 [COMMON.2]
 EN: Someday, someone may experience ~N these bizarre events. Hopefully, ~N they will find my notes useful. ~E
-PL: Któregoś dnia, ktoś może ~N doświadczyć tych dziwnych ~N wydarzeń. Mam nadzieję, ~N że moje notatki komuś ~N się przydadzą. ~E
+PL: Któregoś dnia, ktoś może ~N doświadczyć tych dziwnych wydarzeń. ~N Mam nadzieję, że moje notatki komuś ~N się przydadzą. ~E
 
 [COMMON.3]
 EN: ~D I don't have the map ~N for this place.~E
-PL: ~D Nie mam mapy ~N tego miejsca. ~E
+PL: ~D Nie mam mapy tego miejsca. ~E
 
 [COMMON.4]
 EN: ~D Too dark to look ~N at the map here. ~E
@@ -192,7 +187,7 @@ PL: Wibracje
 
 [MENU.Auto_Load]
 EN: Auto Load
-PL: Auto Wczyt.
+PL: Auto Wczytywanie
 
 [MENU.Language]
 EN: Language
@@ -320,7 +315,7 @@ PL: PLIK
 
 [MENU.Data]
 EN: Data
-PL: Dane
+PL: Nr
 
 [MENU.Save]
 EN: Save
@@ -546,19 +541,91 @@ PL: Za ciemno, żeby to obejrzeć.
 
 [MENU.Stock:]
 EN: Stock:
-PL: 
+PL: Ilość:
 
 [MENU.--On--]
 EN: ==On==
-PL: 
+PL: ==Wł==
 
 [MENU.--Off--]
 EN: ==Off==
-PL: 
+PL: ==Wył==
 
 [MENU.Fuel:]
 EN: Fuel:
-PL: 
+PL: Paliwo:
+
+[MENU.GAME_RESULT]
+EN: GAME RESULT
+PL: WYNIKI GRY
+
+[MENU.Mode]
+EN: Mode
+PL: Tryb
+
+[MENU.Saves]
+EN: Saves
+PL: Zapisy
+
+[MENU.Continues]
+EN: Continues
+PL: Kontynuacje
+
+[MENU.Total_time]
+EN: Total time
+PL: Łączny czas
+
+[MENU.Walking_distance]
+EN: Walking distance
+PL: Dystans pieszo
+
+[MENU.Running_distance]
+EN: Running distance
+PL: Dystans biegiem
+
+[MENU.Items]
+EN: Items
+PL: Przedmioty
+
+[MENU.Game_clear]
+EN: Game clear
+PL: Ukończenia gry
+
+[MENU.Ending]
+EN: Ending
+PL: Zakończenie
+
+[MENU.--Your_rank--]
+EN: ==Your rank==
+PL: ==Ranga==
+
+[MENU.Defeated_enemy_by_shooting]
+EN: Defeated enemy by shooting
+PL: Wrogowie zastrzeleni
+
+[MENU.Defeated_enemy_by_fighting]
+EN: Defeated enemy by fighting
+PL: Zabici w walce wręcz
+
+[MENU.Shooting_style]
+EN: Shooting style
+PL: Styl strzelania
+
+[MENU.Short_range_shots]
+EN: Short range shots
+PL: Z bliska
+
+[MENU.Middle_range_shots]
+EN: Middle range shots
+PL: Ze średniej odl.
+
+[MENU.Long_range_shots]
+EN: Long range shots
+PL: Z daleka
+
+[MENU.No_aiming_shots]
+EN: No aiming shots
+PL: Bez celowania
 
 [MENU.Too_dark_to_look_at
 		the_map_here.]
@@ -573,17 +640,17 @@ PL: Nie mam mapy tego miejsca.
 [MENU.--Use_OK--]
 NOTE: inventory label, max ~10 characters
 EN: ==Use OK==
-PL: 
+PL: ==OK==
 
 [MENU.--Use_OK?--]
 NOTE: inventory label, max ~10 characters
 EN: ==Use OK?==
-PL: 
+PL: ==OK?==
 
 [MENU.--Use_NG--]
 NOTE: inventory label, max ~10 characters
 EN: ==Use NG==
-PL: 
+PL: ==NG==
 
 
 
@@ -599,7 +666,7 @@ PL: Opcje PC
 [MENU.[R]_Reset]
 NOTE: hint beside the heading, keep [R]
 EN: [R] Reset
-PL: 
+PL: [R] Resetuj
 
 [MENU.Resolution]
 NOTE: row name, Graphics page, max ~14 characters (also used in the original menus)
@@ -614,7 +681,7 @@ PL: Tryb Okna
 [MENU.VSync]
 NOTE: row name, Graphics page, max ~14 characters
 EN: VSync
-PL: 
+PL: Synch. Pion.
 
 [MENU.Texture_Filter]
 NOTE: row name, Graphics page, max ~14 characters (also used in the original menus)
@@ -664,22 +731,22 @@ PL: Latarka
 [MENU.Beam_Intensity]
 NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Beam Intensity
-PL: Int. Wiązki
+PL: Intens. Wiązki
 
 [MENU.Beam_Size]
 NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Beam Size
-PL: Roz. Wiązki
+PL: Rozmiar Wiązki
 
 [MENU.Fog_Strength]
 NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Fog Strength
-PL: 
+PL: Intens. Mgły
 
 [MENU.Disable_Culling]
 NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Disable Culling
-PL: Wył. Culling
+PL: Wyłącz Culling
 
 [MENU.FPS_Limit]
 NOTE: row name, System page, max ~15 characters (also used in the original menus)
@@ -694,7 +761,7 @@ PL: Głośność FMV
 [MENU.Weather_Rate]
 NOTE: row name, System page, max ~15 characters (also used in the original menus)
 EN: Weather Rate
-PL: 
+PL: Odśwież. Pogody
 
 [MENU.Prev_Page]
 NOTE: row name, System page, max ~15 characters (also used in the original menus)
@@ -704,7 +771,7 @@ PL: Poprz. Strona
 [MENU.2D_Controls]
 NOTE: row name, Controls page, max ~17 characters (also used in the original menus)
 EN: 2D Controls
-PL: Ster. 2D
+PL: Sterowanie 2D
 
 [MENU.Mouse_Sensitivity]
 NOTE: row name, Controls page, max ~17 characters (also used in the original menus)
@@ -729,7 +796,7 @@ PL: Odwr. Oś Y Kontr.
 [MENU.Bullet_Decals]
 NOTE: row name, Controls page, max ~17 characters (also used in the original menus)
 EN: Bullet Decals
-PL: Ślady kul
+PL: Ślady po Kulach
 
 [MENU.Aim_Assist]
 NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
@@ -754,12 +821,12 @@ PL:
 [MENU.Aim_Zoom]
 NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: Aim Zoom
-PL: Zoom podczas cel.
+PL: Zoom Celowania
 
 [MENU.OTS_Aim_Zoom]
 NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
 EN: OTS Aim Zoom
-PL: 
+PL: Zoom Celowania OTS
 
 [MENU.OTS_Aim_In_TPS]
 NOTE: row name, Camera page, max ~17 characters (also used in the original menus)
@@ -774,32 +841,32 @@ PL: Kolizja Kamery
 [MENU.Minimap]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap
-PL: 
+PL: Minimapa
 
 [MENU.Minimap_Scale]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Scale
-PL: 
+PL: Wielkość Minimapy
 
 [MENU.Minimap_Corner]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Corner
-PL: 
+PL: Pozycja Minimapy
 
 [MENU.Minimap_Opacity]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Opacity
-PL: 
+PL: Przezr. Minimapy
 
 [MENU.Minimap_Reqs_Map]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Minimap Reqs Map
-PL: 
+PL: Wymaga Mapy w Ekw.
 
 [MENU.Low_HP_Glow]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Low HP Glow
-PL: 
+PL: Pośw. Niskiego HP
 
 [MENU.Crosshair]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
@@ -809,7 +876,7 @@ PL: Celownik
 [MENU.Crosshair_Size]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Crosshair Size
-PL: 
+PL: Rozmiar Celownika
 
 [MENU.Windowed]
 NOTE: setting value, max ~11 characters (also used in the original menus)
@@ -849,7 +916,7 @@ PL: Dwuliniowe
 [MENU.Trilinear]
 NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Trilinear
-PL: 
+PL: Trójliniowe
 
 [MENU.Aniso_2x]
 NOTE: setting value, max ~11 characters
@@ -949,32 +1016,32 @@ PL: N + Cienie
 [MENU.Top_L]
 NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Top L
-PL: 
+PL: L Górny
 
 [MENU.Top_R]
 NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Top R
-PL: 
+PL: P Górny
 
 [MENU.Bottom_L]
 NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Bottom L
-PL: 
+PL: L Dolny
 
 [MENU.Bottom_R]
 NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Bottom R
-PL: 
+PL: P Dolny
 
 [MENU.Square]
 NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Square
-PL: 
+PL: Kwadrat.
 
 [MENU.Circle]
 NOTE: setting value, max ~8 characters (also used in the original menus)
 EN: Circle
-PL: 
+PL: Okrągła
 
 [MENU.30_Hz]
 NOTE: setting value, max ~11 characters
@@ -995,37 +1062,37 @@ PL:
 [QUICK.Graphics]
 NOTE: page name (title bar and Previous / Next row)
 EN: Graphics
-PL: 
+PL: Grafika
 
 [QUICK.Lighting_&_Effects]
 NOTE: page name (title bar and Previous / Next row)
 EN: Lighting & Effects
-PL: 
+PL: Oświetlenie i Efekty
 
 [QUICK.HUD]
 NOTE: page name (title bar and Previous / Next row)
 EN: HUD
-PL: 
+PL: Interfejs
 
 [QUICK.Audio]
 NOTE: page name (title bar and Previous / Next row)
 EN: Audio
-PL: 
+PL: Dźwięk
 
 [QUICK.View]
 NOTE: page name (title bar and Previous / Next row)
 EN: View
-PL: 
+PL: Widok
 
 [QUICK.Cheats]
 NOTE: page name (title bar and Previous / Next row)
 EN: Cheats
-PL: 
+PL: Oszustwa
 
 [QUICK.Cheat_Actions]
 NOTE: page name (title bar and Previous / Next row)
 EN: Cheat Actions
-PL: 
+PL: Akcje Oszustw
 
 [QUICK.Debug]
 NOTE: page name (title bar and Previous / Next row)
@@ -1035,97 +1102,97 @@ PL:
 [QUICK.Debug_Actions]
 NOTE: page name (title bar and Previous / Next row)
 EN: Debug Actions
-PL: 
+PL: Akcje Debug
 
 [QUICK.Controls]
 NOTE: page name (title bar and Previous / Next row)
 EN: Controls
-PL: 
+PL: Sterowanie
 
 [QUICK.QUICK_OPTIONS]
 NOTE: title bar, before the page name
 EN: QUICK OPTIONS
-PL: 
+PL: SZYBKIE OPCJE
 
 [QUICK.Classic]
 NOTE: camera name in the View page title
 EN: Classic
-PL: 
+PL: Klasyczny
 
 [QUICK.Thirdperson]
 NOTE: camera name in the View page title
 EN: Thirdperson
-PL: 
+PL: Trzecioosobowy
 
 [QUICK.Over-the-Shoulder]
 NOTE: camera name in the View page title
 EN: Over-the-Shoulder
-PL: 
+PL: Z Nad Ramienia (OTS)
 
 [QUICK.Firstperson]
 NOTE: camera name in the View page title
 EN: Firstperson
-PL: 
+PL: Pierwszoosobowy
 
 [QUICK.Previous]
 NOTE: page row: go to the previous page
 EN: Previous
-PL: 
+PL: Poprzednia
 
 [QUICK.Next]
 NOTE: page row: go to the next page
 EN: Next
-PL: 
+PL: Następna
 
 [QUICK.Close]
 NOTE: bottom row: close the menu
 EN: Close
-PL: 
+PL: Zamknij
 
 [QUICK.Shadow_Resolution]
 NOTE: row name
 EN: Shadow Resolution
-PL: 
+PL: Rozdzielczość Cieni
 
 [QUICK.Dream_Blur]
 NOTE: row name
 EN: Dream Blur
-PL: 
+PL: Rozmazanie Snów
 
 [QUICK.Dream_Blur_Strength]
 NOTE: row name
 EN: Dream Blur Strength
-PL: 
+PL: Moc Rozmazania Snów
 
 [QUICK.Speaker_Layout]
 NOTE: row name
 EN: Speaker Layout
-PL: 
+PL: Ustawienie Głośników
 
 [QUICK.Music_Volume]
 NOTE: row name
 EN: Music Volume
-PL: 
+PL: Głośność Muzyki
 
 [QUICK.Effects_Volume]
 NOTE: row name
 EN: Effects Volume
-PL: 
+PL: Głośność Efektów
 
 [QUICK.Disable_D-pad_for_Movement]
 NOTE: row name
 EN: Disable D-pad for Movement
-PL: 
+PL: Wyłącz D-pad dla Poruszania Się
 
 [QUICK.Edit_Keybinds]
 NOTE: row name
 EN: Edit Keybinds
-PL: 
+PL: Zmień Przypisane Klawisze
 
 [QUICK.Control_Type]
 NOTE: row name
 EN: Control Type
-PL: 
+PL: Typ Kontroli
 
 [QUICK.Aspect_Trim]
 NOTE: row name
@@ -1150,7 +1217,7 @@ PL:
 [QUICK.Reset_View_Settings]
 NOTE: row name
 EN: Reset View Settings
-PL: 
+PL: Zresetuj Ustawienia Widoku
 
 [QUICK.Horizontal_FOV]
 NOTE: row name
@@ -1170,57 +1237,57 @@ PL:
 [QUICK.OTS_Aim_(while_in_TPS)]
 NOTE: row name
 EN: OTS Aim (while in TPS)
-PL: 
+PL: Celowanie OTS (podczas gry w TPS)
 
 [QUICK.Aim_Zoom]
 NOTE: row name
 EN: Aim Zoom
-PL: 
+PL: Zoom w Trakcie Celowania
 
 [QUICK.Rest_X_(left/right)]
 NOTE: row name
 EN: Rest X (left/right)
-PL: 
+PL: Domyślna pozycja X (lewo/prawo)
 
 [QUICK.Rest_Y_(up/down)]
 NOTE: row name
 EN: Rest Y (up/down)
-PL: 
+PL: Domyślna pozycja Y (góra/dół)
 
 [QUICK.Aim_X_(left/right)]
 NOTE: row name
 EN: Aim X (left/right)
-PL: 
+PL: Pozycja Podczas Celowania X (lewo/prawo)
 
 [QUICK.Aim_Y_(up/down)]
 NOTE: row name
 EN: Aim Y (up/down)
-PL: 
+PL: Pozycja Podczas Celowania Y (góra/dół)
 
 [QUICK.Head_X_(left/right)]
 NOTE: row name
 EN: Head X (left/right)
-PL: 
+PL: Pozycja Głowy X (lewo/prawo)
 
 [QUICK.Head_Y_(up/down)]
 NOTE: row name
 EN: Head Y (up/down)
-PL: 
+PL: Pozycja Głowy Y (góra/dół)
 
 [QUICK.Head_Z_(fwd/back)]
 NOTE: row name
 EN: Head Z (fwd/back)
-PL: 
+PL: Pozycja Głowy Z (przód/tył)
 
 [QUICK.Melee_Swing_Pullback]
 NOTE: row name
 EN: Melee Swing Pullback
-PL: 
+PL: Cofnięcie Podczas Zamachu Br. Białą
 
 [QUICK.Auto]
 NOTE: Speaker Layout value
 EN: Auto
-PL: 
+PL: Automatyczne
 
 [QUICK.Stereo]
 NOTE: Speaker Layout value
@@ -1240,62 +1307,62 @@ PL:
 [QUICK.Simple]
 NOTE: Control Type value
 EN: Simple
-PL: 
+PL: Prosty
 
 [QUICK.Advanced]
 NOTE: Control Type value
 EN: Advanced
-PL: 
+PL: Zaawansowany
 
 [QUICK.{n}_rows]
 NOTE: value, e.g. "+2 rows" (screen rows). Keep {n}
 EN: {n} rows
-PL: 
+PL: {n} rzędów
 
 [QUICK.(default)]
 NOTE: shown after a FOV value that is the default
 EN: (default)
-PL: 
+PL: (domyślna)
 
 [QUICK.(off)]
 NOTE: shown after Dream Blur Strength while Dream Blur is off
 EN: (off)
-PL: 
+PL: (wył.)
 
 [QUICK.(simple)]
 NOTE: shown after Aspect Trim when it only applies to Simple
 EN: (simple)
-PL: 
+PL: (prosty)
 
 [QUICK.Up/Down_select]
 NOTE: help line at the bottom. Keep key names and {key}
 EN: Up/Down select
-PL: 
+PL: Góra/Dół wybierz
 
 [QUICK.Left/Right_adjust]
 NOTE: help line at the bottom. Keep key names and {key}
 EN: Left/Right adjust
-PL: 
+PL: Lewo/Prawo dostosuj
 
 [QUICK.Q/E_or_PgUp/PgDn_page]
 NOTE: help line at the bottom. Keep key names and {key}
 EN: Q/E or PgUp/PgDn page
-PL: 
+PL: Q/E lub PgUp/PgDn strona
 
 [QUICK.Drag_the_title_to_move]
 NOTE: help line at the bottom. Keep key names and {key}
 EN: Drag the title to move
-PL: 
+PL: Przeciągnij tytuł żeby przesunąć
 
 [QUICK.{key}_or_Esc_close]
 NOTE: help line at the bottom. Keep key names and {key}
 EN: {key} or Esc close
-PL: 
+PL: {key} lub Esc zamknij
 
 [QUICK.*_needs_restart]
 NOTE: help line at the bottom. Keep key names and {key}
 EN: * needs restart
-PL: 
+PL: * wymaga restartu
 
 
 
@@ -1306,92 +1373,92 @@ PL:
 [QUICK.God_mode]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: God mode
-PL: 
+PL: Nieśmiertelność
 
 [QUICK.Noclip]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Noclip
-PL: 
+PL: Noclip
 
 [QUICK.Enemies_ignore_Harry]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Enemies ignore Harry
-PL: 
+PL: Wrogowie ingorują Harry'ego
 
 [QUICK.Unlimited_enemies]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Unlimited enemies
-PL: 
+PL: Nieskonczoność wrogów
 
 [QUICK.Big_head_mode]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Big head mode
-PL: 
+PL: Tryb wielkiej głowy
 
 [QUICK.Handgun_bullets_+15]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Handgun bullets +15
-PL: 
+PL: Naboje do pistoletu +15
 
 [QUICK.Hunting_rifle_+30]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Hunting rifle +30
-PL: 
+PL: Naboje do karabinu +15
 
 [QUICK.Shotgun_+30]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Shotgun +30
-PL: 
+PL: Naboje do strzelby +30
 
 [QUICK.Kill_nearby_enemies]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Kill nearby enemies
-PL: 
+PL: Zabij pobliskich wrogów
 
 [QUICK.Play_as]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Play as
-PL: 
+PL: Graj jako
 
 [QUICK.Free_camera]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Free camera
-PL: 
+PL: Wolna kamera
 
 [QUICK.Allow_console]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Allow console
-PL: 
+PL: Zezwól na użycie konsoli
 
 [QUICK.Collision_visualizer]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Collision visualizer
-PL: 
+PL: Wizualizacja kolizji
 
 [QUICK.Keyframe_viewer_(K)]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Keyframe viewer (K)
-PL: 
+PL: Przegląd. Klatek Animacji (K)
 
 [QUICK.Fast_forward_(Ctrl+F5)]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Fast forward (Ctrl+F5)
-PL: 
+PL: Przewiń do przodu (Ctrl+F5)
 
 [QUICK.Wireframe_(Ctrl+F1)]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Wireframe (Ctrl+F1)
-PL: 
+PL: Siatka modeli (Ctrl+F1)
 
 [QUICK.No_textures_(Ctrl+F2)]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: No textures (Ctrl+F2)
-PL: 
+PL: Brak tekstur (Ctrl+F2)
 
 [QUICK.Starting_map]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Starting map
-PL: 
+PL: Mapa startowa
 
 [QUICK.Spawn]
 NOTE: cheat / debug row. Keep key names in brackets
@@ -1401,22 +1468,22 @@ PL:
 [QUICK.Log_Harry_position]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Log Harry position
-PL: 
+PL: Zapisz pozycję Harry'ego
 
 [QUICK.Log_camera_shot]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Log camera shot
-PL: 
+PL: Zapisz ujęcie kamery
 
 [QUICK.Kill_Harry]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Kill Harry
-PL: 
+PL: Zabij Harry'ego
 
 [QUICK.(not_in_this_map)]
 NOTE: after a Spawn name that cannot appear here
 EN: (not in this map)
-PL: 
+PL: (nie na tej mapie)
 
 
 
@@ -1427,353 +1494,353 @@ PL:
 [QUICK.CONTROLS]
 NOTE: panel title
 EN: CONTROLS
-PL: 
+PL: STEROWANIE
 
 [QUICK.Move_Up]
 NOTE: game action
 EN: Move Up
-PL: 
+PL: Do Przodu
 
 [QUICK.Move_Down]
 NOTE: game action
 EN: Move Down
-PL: 
+PL: Do Tyłu
 
 [QUICK.Turn_Left]
 NOTE: game action
 EN: Turn Left
-PL: 
+PL: Obrót w Lewo
 
 [QUICK.Turn_Right]
 NOTE: game action
 EN: Turn Right
-PL: 
+PL: Obrót w Prawo
 
 [QUICK.Action_/_Shoot]
 NOTE: game action
 EN: Action / Shoot
-PL: 
+PL: Akcja / Strzał
 
 [QUICK.Flashlight]
 NOTE: game action
 EN: Flashlight
-PL: 
+PL: Latarka
 
 [QUICK.Map]
 NOTE: game action
 EN: Map
-PL: 
+PL: Mapa
 
 [QUICK.Run]
 NOTE: game action
 EN: Run
-PL: 
+PL: Sprint
 
 [QUICK.Sidestep_Left]
 NOTE: game action
 EN: Sidestep Left
-PL: 
+PL: Krok w Lewo
 
 [QUICK.Sidestep_Right]
 NOTE: game action
 EN: Sidestep Right
-PL: 
+PL: Krok w Prawo
 
 [QUICK.Aim]
 NOTE: game action
 EN: Aim
-PL: 
+PL: Celowanie
 
 [QUICK.Pause]
 NOTE: game action
 EN: Pause
-PL: 
+PL: Pauza
 
 [QUICK.Inventory]
 NOTE: game action
 EN: Inventory
-PL: 
+PL: Ekwipunek
 
 [QUICK.Reload]
 NOTE: game action
 EN: Reload
-PL: 
+PL: Przeładowanie
 
 [QUICK.Cycle_Weapons]
 NOTE: game action
 EN: Cycle Weapons
-PL: 
+PL: Zmiana Broni
 
 [QUICK.Quick_Heal]
 NOTE: game action
 EN: Quick Heal
-PL: 
+PL: Szybkie Uleczenie
 
 [QUICK.Quick_Turn]
 NOTE: game action
 EN: Quick Turn
-PL: 
+PL: Szybki Zwrot
 
 [QUICK.Rear_Look]
 NOTE: game action
 EN: Rear Look
-PL: 
+PL: Spojrzenie w Tył
 
 [QUICK.Change_Camera]
 NOTE: game action
 EN: Change Camera
-PL: 
+PL: Zmiana Kamery
 
 [QUICK.Swap_Shoulder]
 NOTE: game action
 EN: Swap Shoulder
-PL: 
+PL: Zmiana Ramienia
 
 [QUICK.Quick_Options]
 NOTE: game action
 EN: Quick Options
-PL: 
+PL: Szybkie Opcje
 
 [QUICK.Quick_Save]
 NOTE: game action
 EN: Quick Save
-PL: 
+PL: Szybki Zapis
 
 [QUICK.Quick_Load]
 NOTE: game action
 EN: Quick Load
-PL: 
+PL: Szybkie Wczytanie
 
 [QUICK.Classic_(Default)]
 NOTE: camera name
 EN: Classic (Default)
-PL: 
+PL: Klasyczna (Domyślna)
 
 [QUICK.Thirdperson_Shooter]
 NOTE: camera name
 EN: Thirdperson Shooter
-PL: 
+PL: Strzelanka Trzecioosobowa
 
 [QUICK.Over_the_Shoulder]
 NOTE: camera name
 EN: Over the Shoulder
-PL: 
+PL: Z Nad Ramienia (OTS)
 
 [QUICK.First_Person]
 NOTE: camera name
 EN: First Person
-PL: 
+PL: Pierwszoosobowa
 
 [QUICK.Editing:_alternate_camera_binds_(current_camera:_{camera})]
 NOTE: Keep {camera}
 EN: Editing: alternate camera binds (current camera: {camera})
-PL: 
+PL: Zmieniasz: klawisze alternatywnej kamery (obecnie wybrany tryb: {camera})
 
 [QUICK.Editing:_classic_camera_binds]
 EN: Editing: classic camera binds
-PL: 
+PL: Zmieniasz: klawisze klasycznej kamery
 
 [QUICK.Controller:_{name}]
 NOTE: Keep {name} (the controller model)
 EN: Controller: {name}
-PL: 
+PL: Kontroler: {name}
 
 [QUICK.Controller:_none_connected]
 EN: Controller: none connected
-PL: 
+PL: Kontroler: nie podłączono żadnego
 
 [QUICK.Action]
 NOTE: column heading
 EN: Action
-PL: 
+PL: Akcja
 
 [QUICK.Keyboard]
 NOTE: column heading
 EN: Keyboard
-PL: 
+PL: Klawiatura
 
 [QUICK.Keyboard_2]
 NOTE: column heading
 EN: Keyboard 2
-PL: 
+PL: Klawiatura 2
 
 [QUICK.Controller]
 NOTE: column heading
 EN: Controller
-PL: 
+PL: Kontroler
 
 [QUICK.Controller_2]
 NOTE: column heading
 EN: Controller 2
-PL: 
+PL: Kontroler 2
 
 [QUICK.Reset_to_Defaults]
 NOTE: button
 EN: Reset to Defaults
-PL: 
+PL: Zresetuj do Ustawień Domyślnych
 
 [QUICK.Press_a_key...]
 NOTE: in the cell being rebound
 EN: Press a key...
-PL: 
+PL: Wciśnij klawisz...
 
 [QUICK.Press_a_button...]
 NOTE: in the cell being rebound
 EN: Press a button...
-PL: 
+PL: Wciśnij przycisk...
 
 [QUICK.more_above]
 NOTE: scroll hint
 EN: more above
-PL: 
+PL: więcej wyżej
 
 [QUICK.more_below]
 NOTE: scroll hint
 EN: more below
-PL: 
+PL: więcej niżej
 
 [QUICK.Press_a_key_for_{action}]
 NOTE: Keep {action}
 EN: Press a key for {action}
-PL: 
+PL: Wciśnij klawisz dla {action}
 
 [QUICK.Press_a_key_or_mouse_button_for_{action}]
 NOTE: Keep {action}
 EN: Press a key or mouse button for {action}
-PL: 
+PL: Wciśnij klawisz lub przycisk myszy dla {action}
 
 [QUICK.Press_a_controller_button_for_{action}]
 NOTE: Keep {action}
 EN: Press a controller button for {action}
-PL: 
+PL: Wciśnij przycisk na kontrolerze dla {action}
 
 [QUICK.Esc_to_cancel]
 EN: Esc to cancel
-PL: 
+PL: Esc żeby anulować
 
 [QUICK.Esc,_or_wait_a_few_seconds,_to_cancel]
 EN: Esc, or wait a few seconds, to cancel
-PL: 
+PL: Esc, lub poczekaj kilka sekund, aby anulować
 
 [QUICK.Enter_/_A:_rebind]
 NOTE: help line. Keep key names
 EN: Enter / A: rebind
-PL: 
+PL: Enter / A: zmień
 
 [QUICK.Delete_/_X:_clear]
 NOTE: help line. Keep key names
 EN: Delete / X: clear
-PL: 
+PL: Delete / X: usuń
 
 [QUICK.Esc_/_B:_back]
 NOTE: help line. Keep key names
 EN: Esc / B: back
-PL: 
+PL: Esc / B: wstecz
 
 [QUICK.Mouse:_click_a_bind_to_change_it,_right-click_to_clear._Orange_-_used_twice.]
 NOTE: help line
 EN: Mouse: click a bind to change it, right-click to clear. Orange = used twice.
-PL: 
+PL: Mysze: kliknij lewym na pole aby zmienić przypisany klawisz, kliknij prawym aby usunąć. Pomarańczowy = użyty dwa razy.
 
 [QUICK.Left_Stick]
 NOTE: controller input name
 EN: Left Stick
-PL: 
+PL: Lewa Gałka
 
 [QUICK.Left_Mouse]
 NOTE: mouse button name
 EN: Left Mouse
-PL: 
+PL: Lewy Przycisk Myszy
 
 [QUICK.Right_Mouse]
 NOTE: mouse button name
 EN: Right Mouse
-PL: 
+PL: Prawy Przycisk Myszy
 
 [QUICK.Middle_Mouse]
 NOTE: mouse button name
 EN: Middle Mouse
-PL: 
+PL: Środkowy Przycisk Myszy
 
 [QUICK.Wheel_Up]
 NOTE: mouse wheel
 EN: Wheel Up
-PL: 
+PL: Kółko w Górę
 
 [QUICK.Wheel_Down]
 NOTE: mouse wheel
 EN: Wheel Down
-PL: 
+PL: Kółko w Dół
 
 [QUICK.D-pad_Up]
 NOTE: controller input name
 EN: D-pad Up
-PL: 
+PL: D-pad w Górę
 
 [QUICK.D-pad_Down]
 NOTE: controller input name
 EN: D-pad Down
-PL: 
+PL: D-pad w Dół
 
 [QUICK.D-pad_Left]
 NOTE: controller input name
 EN: D-pad Left
-PL: 
+PL: D-pad w Lewo
 
 [QUICK.D-pad_Right]
 NOTE: controller input name
 EN: D-pad Right
-PL: 
+PL: D-pad w Prawo
 
 [QUICK.RESET_CONTROLS]
 NOTE: confirm box title
 EN: RESET CONTROLS
-PL: 
+PL: ZRESETUJ STEROWANIE
 
 [QUICK.Reset_the_classic_camera_binds_to_their_defaults?]
 NOTE: confirm box
 EN: Reset the classic camera binds to their defaults?
-PL: 
+PL: Zresetować klawisze klasycznej kamery do ustawień domyślnych?
 
 [QUICK.Reset_the_alternate_camera_binds_to_their_defaults?]
 NOTE: confirm box
 EN: Reset the alternate camera binds to their defaults?
-PL: 
+PL: Zresetować klawisze alternatywnej kamery do ustawień domyślnych?
 
 [QUICK.RESET_SETTINGS]
 NOTE: confirm box title
 EN: RESET SETTINGS
-PL: 
+PL: ZRESETUJ USTAWIENIA
 
 [QUICK.Reset_all_PC_options_to_their_defaults?]
 NOTE: confirm box
 EN: Reset all PC options to their defaults?
-PL: 
+PL: Zresetować wszystkie opcje PC do ustawień domyślnych?
 
 [QUICK.Yes]
 NOTE: confirm box button
 EN: Yes
-PL: 
+PL: Tak
 
 [QUICK.No]
 NOTE: confirm box button
 EN: No
-PL: 
+PL: Nie
 
 [QUICK.Left/Right_select]
 NOTE: confirm box help. Keep key names
 EN: Left/Right select
-PL: 
+PL: Lewo/Prawo wybierz
 
 [QUICK.[OK]_confirm]
 NOTE: confirm box help. Keep the brackets
 EN: [OK] confirm
-PL: 
+PL: [OK] zatwierdź
 
 [QUICK.[Cancel]_back]
 NOTE: confirm box help. Keep the brackets
 EN: [Cancel] back
-PL: 
+PL: [Anuluj] wstecz
 
 
 
@@ -2047,7 +2114,7 @@ PL: Pistolet
 
 [ITEM_NAME.129]
 EN: Hunting rifle
-PL: Karabin myśliwski
+PL: Karabin
 
 [ITEM_NAME.130]
 EN: Shotgun
@@ -2059,15 +2126,15 @@ PL:
 
 [ITEM_NAME.160]
 EN: Handgun bullets
-PL: Naboje do pistoletu
+PL: Naboje do pist.
 
 [ITEM_NAME.161]
 EN: Rifle shells
-PL: Naboje do karabinu
+PL: Naboje do kara.
 
 [ITEM_NAME.162]
 EN: Shotgun shells
-PL: Naboje do strzelby
+PL: Naboje do strz.
 
 [ITEM_NAME.192]
 EN: Flashlight
@@ -2075,7 +2142,7 @@ PL: Latarka
 
 [ITEM_NAME.193]
 EN: Pocket radio
-PL: Radio kieszonkowe
+PL: Radio kieszon.
 
 [ITEM_NAME.194]
 EN: Gasoline tank
@@ -2105,7 +2172,7 @@ PL: Klucz do drzwi w holu. Znalazłem go w szatni.
 
 [ITEM_DESC.33]
 EN: The house key hidden in the dog house.
-PL: Klucz do domu znaleziony w budzie dla psów.
+PL: Klucz do domu znaleziony w budzie dla psa.
 
 [ITEM_DESC.34]
 EN: The key to the garden of the house. Found in patrol car's trunk.
@@ -2185,11 +2252,11 @@ PL: [Psia buda] oraz [ul. Levina] napisane pismem Cheryl.
 
 [ITEM_DESC.53]
 EN: A rectangular card with a picture of a key. Found on a desk in a classroom.
-PL: Prostokątna karta z rysunkiem klucza. Znaleziona na biurku w klasie.
+PL: Prostokątna karta z rysunkiem klucza. Znaleziona na stole w klasie.
 
 [ITEM_DESC.55]
 EN: Key to exit from the sewer to the resort area, which was dropped in the water.
-PL: Klucz umożliwiający wyjście z kanału do strefy wypoczynkowej, który wpadł do wody.
+PL: Klucz umożliwiający wyjście z kanału do strefy wypoczynkowej, pływał w wodzie.
 
 [ITEM_DESC.56]
 EN: A mystical stone possessing power. If used somewhere, the result will be...?
@@ -2197,7 +2264,7 @@ PL: Mistyczny kamień obdarzony mocą. Jeśli zostanie gdzieś użyty, to co si�
 
 [ITEM_DESC.64]
 EN: The label reads, [Concentrated hydrochloric acid.] Found in the lab equipment room.
-PL: Na etykiecie widnieje napis: [Skoncentrowany kwas chlorowodorowy]. Znaleziono w pomieszczeniu ze sprzętem laboratoryjnym.
+PL: Na etykiecie widnieje napis: [Skoncentrowany kwas chlorowodorowy]. Znaleziono w laboratorium.
 
 [ITEM_DESC.65]
 EN: A picture of a clock tower is engraved on the surface. Found in the chemistry lab.
@@ -2257,7 +2324,7 @@ PL: Pusta etykieta. Znaleziono na drugim piętrze piwnicy szpitala.
 
 [ITEM_DESC.80]
 EN: A [3] is written on the tag. The key was thought to have been dropped by Kaufmann.
-PL: Na przywieszce widnieje cyfra [3]. Chyba ten klucz zgubił Kaufmann.
+PL: Na przywieszce widnieje cyfra [3]. Klucz ten prawdopodobnie zgubił Kaufmann.
 
 [ITEM_DESC.81]
 EN: Receipt from General Store, thought to have been dropped by Kaufmann.
@@ -2269,7 +2336,7 @@ PL: Klucz do sejfu, znaleziony w sklepie Indian Runner.
 
 [ITEM_DESC.83]
 EN: Long, thin magnetic rod with a string attached, in the motel office.
-PL: Długi, cienki pręt magnetyczny z przymocowanym sznurkiem, z recepcji motelu.
+PL: Długi, cienki magnetyczny pręt z przymocowanym sznurkiem, z recepcji motelu.
 
 [ITEM_DESC.84]
 EN: Key to an old motorcycle, which was dropped between the floorboards in the motel room.
@@ -2305,7 +2372,7 @@ PL: Amulet w kształcie gwiazdy o sześciu ramionach, nazwany na cześć staroż
 
 [ITEM_DESC.92]
 EN: Snake in the symbol of mercury signifies alchemy.
-PL: Wąż w symbolu Merkurego oznacza alchemię.
+PL: Wąż w symbolu Merkurego, oznacza on alchemię.
 
 [ITEM_DESC.93]
 EN: Elliptical talisman with a cross inside.
@@ -2353,7 +2420,7 @@ PL: Pistolet otrzymany od Cybil. Mieści do 15 naboji.
 
 [ITEM_DESC.129]
 EN: Holds up to 6 rounds.
-PL: Mieści do 6 naboji.
+PL: Karabin myśliwski. Mieści do 6 naboji.
 
 [ITEM_DESC.130]
 EN: Fires in a wide radius. Holds up to 6 rounds.
@@ -2369,7 +2436,7 @@ PL: Amunicja do pistoletu.
 
 [ITEM_DESC.161]
 EN: Ammo for the hunting rifle.
-PL: Amunicja do karabinu myśliwskiego.
+PL: Amunicja do karabinu.
 
 [ITEM_DESC.162]
 EN: Ammo for the shotgun.
@@ -2407,7 +2474,7 @@ PL: ~J0(2.0) Jest cicho. Za cicho.
 
 [MAP0_S00.18]
 EN: ~J0(3.0) This place is ~N like a ghost town. ~E
-PL: ~J0(3.0) To miejsce jest ~N jak miasto-widmo. ~E
+PL: ~J0(3.0) To miejsce jest jak miasto-widmo. ~E
 
 [MAP0_S00.19]
 EN: ~J0(3.0) Cheryl. ~E
@@ -2435,7 +2502,7 @@ PL: Lepiej pójdę za Cheryl... ~E
 
 [MAP0_S00.25]
 EN: That's strange, ~N it's getting darker. ~E
-PL: Dziwne, ~N robi się ciemno. ~E
+PL: Dziwne, robi się ciemno. ~E
 
 [MAP0_S00.26]
 EN: A dead end? ~N What the hell!? ~E
@@ -2471,7 +2538,7 @@ PL: Zepsuty wózek inwalidzki? ~N Co on tu robi? ~E
 
 [MAP0_S00.34]
 EN: What the..? ~N What is it? ~E
-PL: Co do..? ~N Co to jest? ~E
+PL: Co do..? Co to jest? ~E
 
 [MAP0_S00.35]
 EN: The street is blocked.
@@ -2479,7 +2546,7 @@ PL: Ulica jest zablokowana.
 
 [MAP0_S00.36]
 EN: Can't get out of town ~N through here. ~E
-PL: Nie da się wyjechać ~N tędy z miasta. ~E
+PL: Nie da się wyjechać tędy z miasta. ~E
 
 [MAP0_S00.37]
 EN: My car... ~N too banged up to drive.
@@ -2513,7 +2580,7 @@ PL: ~J0(1.5) Cieszę się.
 
 [MAP0_S01.19]
 EN: ~J0(5.0) You from around here? ~N Why don't you ~N tell me what happened?
-PL: ~J0(5.0) Jesteś stąd? ~N Może powiesz mi, ~N co się stało?
+PL: ~J0(5.0) Jesteś stąd? ~N Może powiesz mi, co się stało?
 
 [MAP0_S01.20]
 EN: ~J0(3.0) Wait a second. ~N I'm just a tourist.
@@ -2541,7 +2608,7 @@ PL: ~J0(3.0) Widziałaś może małą dziewczynkę?
 
 [MAP0_S01.26]
 EN: ~J0(4.0) Just turned seven last month... ~N Short, black hair...
-PL: ~J0(4.0) Skończyła siedem lat ~N miesiąc temu... ~N Krótkie, ciemne włosy...
+PL: ~J0(4.0) Skończyła siedem lat miesiąc temu... ~N Krótkie, ciemne włosy...
 
 [MAP0_S01.27]
 EN: ~J0(1.5) My daughter.
@@ -2593,7 +2660,7 @@ PL: ~J0(2.0) Cybil Bennett.
 
 [MAP0_S01.39]
 EN: ~J0(4.0) I'm a police officer ~N from Brahms, ~N the next town over.
-PL: ~J0(4.0) Jestem funkcjonariuszką ~N z Brahms, ~N sąsiedniego miasta.
+PL: ~J0(4.0) Jestem funkcjonariuszką z Brahms, ~N sąsiedniego miasta.
 
 [MAP0_S01.40]
 EN: ~J0(3.0) The phones are all dead, ~N and the radio, too.
@@ -2601,7 +2668,7 @@ PL: ~J0(3.0) Wszystkie telefony padły, ~N radio też.
 
 [MAP0_S01.41]
 EN: ~J0(4.0) I'm going back to call ~N in some reinforcements.
-PL: ~J0(4.0) Wracam, żeby wezwać ~N posiłki.
+PL: ~J0(4.0) Wracam, żeby wezwać posiłki.
 
 [MAP0_S01.42]
 EN: ~J0(1.5) Hmph. ~E
@@ -2609,7 +2676,7 @@ PL:
 
 [MAP0_S01.43]
 EN: ~D ~J0(4.0) Hold it! ~N Where do you think ~N you're going? ~E
-PL: ~D ~J0(4.0) Stój! ~N A ty gdzie ~N się wybierasz? ~E
+PL: ~D ~J0(4.0) Stój! ~N A ty gdzie się wybierasz? ~E
 
 [MAP0_S01.44]
 EN: ~J0(4.0) My daughter... ~N I've gotta find her! ~E
@@ -2641,7 +2708,7 @@ PL: ~J0(3.0) Ummm... nie. ~E
 
 [MAP0_S01.51]
 EN: ~J0(5.0) Take this. ~N And hope you don't ~N have to use it.
-PL: ~J0(5.0) Weź to. ~N I módl się, żebyś nie ~N musiał go użyć.
+PL: ~J0(5.0) Weź to. ~N I módl się, żebyś nie musiał go użyć.
 
 [MAP0_S01.52]
 EN: ~J0(1.5) Now listen to me,
@@ -2709,7 +2776,7 @@ PL: ~J0(4.3) To nie sen! ~N Co się tutaj dzieje!? ~E
 
 [MAP0_S01.69]
 EN: I'll worry about the radio later, ~N I have more important stuff ~N to do. ~E
-PL: Zajmę się tym radiem później, ~N mam ważniejsze rzeczy ~N do zrobienia. ~E
+PL: Zajmę się tym radiem później, ~N mam ważniejsze rzeczy na głowie. ~E
 
 [MAP0_S01.70]
 EN: I've got to beat that monster! ~E
@@ -2717,7 +2784,7 @@ PL: Muszę pokonać tego potwora! ~E
 
 [MAP0_S01.71]
 EN: The radio may be ~N useful for something.
-PL: To radio może się ~N na coś przydać.
+PL: To radio może się na coś przydać.
 
 [MAP0_S01.72]
 EN: I better take it with me. ~E
@@ -2747,7 +2814,7 @@ PL: Znalazłem ~C2 Piłę łańcuchową ~C7 . ~N Wziąć ją? ~S4
 
 [MAP0_S02.16]
 EN: Some oil cans are on the shelf. ~E
-PL: Na półce stoi kilka puszek ~N z olejem. ~E
+PL: Na półce stoi kilka puszek z olejem. ~E
 
 [MAP0_S02.17]
 EN: A car engine. ~N No problem there. ~E
@@ -2837,7 +2904,7 @@ PL: Jest tu przełącznik. ~N Chcesz go wcisnąć? ~S4
 
 [MAP1_S00.30]
 EN: Nothing appears to happen. ~E
-PL: Wygląda na to, ~N że nic się nie stało. ~E
+PL: Wygląda na to, że nic się nie stało. ~E
 
 [MAP1_S00.31]
 EN: The boiler is working. ~E
@@ -2903,7 +2970,7 @@ PL: Nic niezwykłego. ~E
 
 [MAP1_S01.20]
 EN: Just the melted remains of ~N a statue of a hand.
-PL: Tylko stopione resztki ~N rzeźby dłoni.
+PL: Tylko stopione resztki rzeźby dłoni.
 
 [MAP1_S01.21]
 EN: Nothing to worry about. ~E
@@ -2975,7 +3042,7 @@ PL: Glukoza. ~N Nie mam powodu, żeby ją wziąć. ~E
 
 [MAP1_S01.39]
 EN: ~C3 Warning. Don't forget to ~N take all of your possessions ~N after using the lockers.
-PL: ~C3 Uwaga. Nie zapomnij ~N zabrać wszystkich swoich rzeczy ~N po skorzystaniu z szafki.
+PL: ~C3 Uwaga. Nie zapomnij zabrać ~N wszystkich swoich rzeczy po ~N skorzystaniu z szafki.
 
 [MAP1_S01.40]
 EN: Normal elementary school ~N bulletin board. ~N Nothing in particular here. ~E
@@ -2983,7 +3050,7 @@ PL: Zwykła tablica ogłoszeń w ~N szkole podstawowej. ~N Nic szczególnego. ~E
 
 [MAP1_S01.41]
 EN: ~C3 ~M NO ~N RUNNING OR PLAYING ~N IN THE LOCKER ROOM ~E
-PL: ~C3 ~M ZAKAZ ~N BIEGANIA I ZABAWY ~N W SZATNI ~E
+PL: ~C3 ~M ZAKAZ ~N BIEGANIA I ZABAWY W SZATNI ~E
 
 [MAP1_S01.42]
 EN: Nothing useful in the locker. ~E
@@ -3049,7 +3116,7 @@ PL: Jeśli tak, nie mają dziurki ~N na klucz, ani nawet klamki...
 
 [MAP1_S02.25]
 EN: If I push it, it moves a bit, ~N but it certainly won't open. ~E
-PL: Jeśli je popchnę, ~N to lekko się ruszą, ~N ale na pewno się nie otworzą. ~E
+PL: Jeśli je popchnę to lekko się ruszą, ~N ale na pewno się nie otworzą. ~E
 
 [MAP1_S02.26]
 EN: What's this? ~E
@@ -3057,7 +3124,7 @@ PL: Co to? ~E
 
 [MAP1_S02.27]
 EN: In the center of the door is ~N a horizontal slot.
-PL: Na samym środku drzwi jest ~N pozioma szczelina.
+PL: Na samym środku drzwi ~N jest pozioma szczelina.
 
 [MAP1_S02.28]
 EN: What is it for? ~E
@@ -3165,7 +3232,7 @@ PL: Lalka leży na ziemi. ~E
 
 [MAP1_S02.54]
 EN: A headless doll is stuck ~N to the wall. ~E
-PL: Bezgłowa lalka jest przyczepiona ~N do ściany. ~E
+PL: Bezgłowa lalka jest ~N przyczepiona do ściany. ~E
 
 
 
@@ -3203,11 +3270,11 @@ PL: ~C3 Jednakże, takie zjawiska nie ~N zdają się przydarzać byle komu.
 
 [MAP1_S03.22]
 EN: ~C3 Although it's not clear why, ~N adolescents, especially girls, ~N are prone to such occurrences. ~E
-PL: ~C3 Chociaż nie jest jasne dlaczego, ~N nastolatkowie, zwłaszcza ~N dziewczęta, są podatni na ~N tego typu zdarzenia. ~E
+PL: ~C3 Chociaż nie jest jasne dlaczego, ~N nastolatkowie, zwłaszcza dziewczęta, ~N są podatni na tego typu zdarzenia. ~E
 
 [MAP1_S03.23]
 EN: ~C3 Hearing this, the hunter ~N armed with bow and arrow said, ~N [I will kill the lizard.]
-PL: ~C3 Słysząc to, łowca ~N uzbrojony w łuk i strzały, rzekł: ~N [Zabiję tego jaszczura.]
+PL: ~C3 Słysząc to, łowca uzbrojony ~N w łuk i strzały, rzekł: ~N [Zabiję tego jaszczura.]
 
 [MAP1_S03.24]
 EN: ~C3 But upon meeting his opponent, ~N he held back, taunting, ~N [Who's afraid of a reptile?]
@@ -3215,11 +3282,11 @@ PL: ~C3 Jednak gdy stanął twarzą w twarz ~N ze swoim przeciwnikiem, ~N powstr
 
 [MAP1_S03.25]
 EN: ~C3 At this, the furious lizard ~N hissed, [I'll swallow you up ~N in a single bite!]
-PL: ~C3 Na to wściekła jaszczurka ~N syknęła: [Pożrę cię ~N jednym kęsem!]
+PL: ~C3 Na to wściekła jaszczurka syknęła: ~N [Pożrę cię jednym kęsem!]
 
 [MAP1_S03.26]
 EN: ~C3 Then the huge creature ~N attacked, jaws opened wide.
-PL: ~C3 I wtedy monstrum to ~N zaatakowało, paszcza ~N szeroko otwarta.
+PL: ~C3 I wtedy monstrum to zaatakowało, ~N paszcza szeroko otwarta.
 
 [MAP1_S03.27]
 EN: ~C3 This was what the man wanted. ~N Calmly drawing his bow, he shot ~N into the lizard's gaping mouth.
@@ -3279,7 +3346,7 @@ PL: Jest tu zawór od odpływu. ~N Chcesz go otworzyć? ~S4
 
 [MAP1_S03.41]
 EN: It drains into the wrong hole. ~N Maybe I could plug ~N that up somehow. ~E
-PL: Spływa do złej dziury. ~N Może mógłbym ją ~N jakoś zatkać. ~E
+PL: Spływa do złej dziury. ~N Może mógłbym ją jakoś zatkać. ~E
 
 [MAP1_S03.42]
 EN: Nothing useful in the locker. ~E
@@ -3367,7 +3434,7 @@ PL: Lista nauczycieli.
 
 [MAP1_S06.26]
 EN: K. Gordon... that's it. ~N I'll note the address down ~N on the map. ~E
-PL: K. Gordon... no tak. ~N Zanotuję ten adres ~N na mapie. ~E
+PL: K. Gordon... no tak. ~N Zanotuję ten adres na mapie. ~E
 
 [MAP1_S06.27]
 EN: ~H There is a ~C5 School map ~C7 . ~N Take it? ~S4
@@ -3421,7 +3488,7 @@ PL: Okładka szkicownika. ~N Ten rysunek... to ja.
 
 [MAP2_S00.22]
 EN: The first picture that Cheryl ~N drew in the sketchbook that I ~N gave on her 5th birthday. ~E
-PL: To pierwszy rysunek jaki Cheryl ~N narysowała w tym szkicowniku, który ~N jej dałem na 5 urodziny. ~E
+PL: To pierwszy rysunek jaki Cheryl ~N narysowała w tym szkicowniku, ~N który jej dałem na 5 urodziny. ~E
 
 [MAP2_S00.23]
 EN: ~M ~C3 Doghouse ~N Levin st. ~E
@@ -3529,7 +3596,7 @@ PL: ~C3 Dyspozytornia Mostu Orridge ~E
 
 [MAP2_S00.49]
 EN: ~C3 Reservoir. ~N Authorized Personnel only. ~E
-PL: ~C3 Zbiornik. ~N Wstęp tylko dla ~N upoważnionych. ~E
+PL: ~C3 Zbiornik. ~N Wstęp tylko dla upoważnionych. ~E
 
 [MAP2_S00.50]
 EN: Hmm... the lock is worn out.
@@ -3537,7 +3604,7 @@ PL: Hmm... kłódka jest zużyta.
 
 [MAP2_S00.51]
 EN: I may be able to break it ~N if I hit it hard. ~E
-PL: Może będę w stanie ją ~N zniszczyć jeśli mocno uderzę. ~E
+PL: Może będę w stanie ją zniszczyć ~N jeśli mocno uderzę. ~E
 
 [MAP2_S00.52]
 EN: Something is written on the map ~N hanging on the wall.
@@ -3585,7 +3652,7 @@ PL: Most zwodzony jest zatrzymany. ~E
 
 [MAP2_S00.64]
 EN: There's a TV set. ~N The power must be out. ~N It doesn't work. ~E
-PL: Jest tu telewizor. ~N Nie działa. ~N Pewnie nie ma prądu. ~E
+PL: Jest tu telewizor. ~N Nie działa. Pewnie nie ma prądu. ~E
 
 [MAP2_S00.65]
 EN: Nothing useful. ~E
@@ -3641,7 +3708,7 @@ PL: Użyłem paliwa. ~E
 
 [MAP2_S00.78]
 EN: This must be that water works ~N Lisa was talking about. ~E
-PL: To muszą być wodociągi, o których ~N mówiła Lisa. ~E
+PL: To muszą być wodociągi, ~N o których mówiła Lisa. ~E
 
 
 
@@ -3899,7 +3966,7 @@ PL: ~J1(4.5) Drzemałem sobie w pokoju socjalnym. ~N Kiedy się obudziłem, ~N t
 
 [MAP3_S00.26]
 EN: ~J1(2.3) Everyone seems to ~N have disappeared.
-PL: ~J1(2.3) Wygląda to jakby ~N wszyscy zniknęli.
+PL: ~J1(2.3) Wygląda to jakby wszyscy zniknęli.
 
 [MAP3_S00.27]
 EN: ~J1(3.0) And it's snowing out. ~N This time of year.
@@ -3907,7 +3974,7 @@ PL: ~J1(3.0) I pada śnieg na zewnątrz. ~N O tej porze roku.
 
 [MAP3_S00.28]
 EN: ~J1(2.6) Something's gone ~N seriously wrong.
-PL: ~J1(2.6) Coś poszło ~N naprawdę nie tak.
+PL: ~J1(2.6) Coś poszło naprawdę nie tak.
 
 [MAP3_S00.29]
 EN: ~J1(2.2) Did you see those monsters?
@@ -3923,7 +3990,7 @@ PL: ~J1(2.0) Słyszałeś w ogóle kiedykolwiek ~N o czymś takim?
 
 [MAP3_S00.32]
 EN: ~J1(3.5) You and I both know, ~N creatures like that don't exist!
-PL: ~J1(3.5) Oboje wiemy, że ~N takie stworzenia nie istnieją!
+PL: ~J1(3.5) Oboje wiemy, ~N że takie stworzenia nie istnieją!
 
 [MAP3_S00.33]
 EN: ~J1(1.5) Yeah... ~E
@@ -3931,7 +3998,7 @@ PL: ~J1(1.5) Ta... ~E
 
 [MAP3_S00.34]
 EN: ~J1(2.4) Have you seen ~N a little girl anywhere?
-PL: ~J1(2.4) Widziałeś gdzieś ~N małą dziewczynkę?
+PL: ~J1(2.4) Widziałeś gdzieś małą dziewczynkę?
 
 [MAP3_S00.35]
 EN: ~J1(1.6) I'm looking for my daughter.
@@ -4009,7 +4076,7 @@ PL: Nic pomocnego. ~E
 
 [MAP3_S01.15]
 EN: The elevator doesn't ~N appear to be working. ~E
-PL: Wygląda na to, że winda ~N nie działa. ~E
+PL: Wygląda na to, że winda nie działa. ~E
 
 [MAP3_S01.16]
 EN: A glass vial lies shattered.
@@ -4097,7 +4164,7 @@ PL: Gazeta tu leży.
 
 [MAP3_S01.37]
 EN: This article's been ~N clipped out... ~E
-PL: Artykuł został ~N wycięty... ~E
+PL: Ten artykuł został wycięty... ~E
 
 [MAP3_S01.38]
 EN: The refrigerator is empty. ~E
@@ -4261,7 +4328,7 @@ PL: Butelka po alkoholu. ~N Wygląda na pustą. ~E
 
 [MAP3_S03.47]
 EN: Where do you want to ~N set the plate? ~E
-PL: Gdzie chcesz ~N wstawić płytę? ~E
+PL: Gdzie chcesz wstawić płytę? ~E
 
 [MAP3_S03.48]
 EN: Can't set the plate there. ~E
@@ -4269,7 +4336,7 @@ PL: Nie można tutaj wstawić płyty. ~E
 
 [MAP3_S03.49]
 EN: Which plate do you ~N want to remove? ~E
-PL: Którą płytę ~N chcesz usunąć? ~E
+PL: Którą płytę chcesz usunąć? ~E
 
 [MAP3_S03.50]
 EN: Can't remove that plate. ~E
@@ -4343,7 +4410,7 @@ PL:
 
 [MAP3_S04.19]
 EN: ~J0(4.7) Harry, tell me ~N what's happening here? ~N Where is everybody?
-PL: ~J0(4.7) Harry, powiedz mi ~N co się tu dzieje? ~N Gdzie są wszyscy?
+PL: ~J0(4.7) Harry, powiedz mi co się tu dzieje? ~N Gdzie są wszyscy?
 
 [MAP3_S04.20]
 EN: ~J0(2.7) I must have gotten knocked out.
@@ -4359,7 +4426,7 @@ PL: ~J0(1.3) To okropne... ~E
 
 [MAP3_S04.23]
 EN: ~J1(3.8) So you don't know ~N anything either. Great.
-PL: ~J1(3.8) A więc ty też ~N nic nie wiesz. Świetnie.
+PL: ~J1(3.8) A więc ty też nic nie wiesz. ~N Świetnie.
 
 [MAP3_S04.24]
 EN: ~J1(2.5) I just don't get it. ~E
@@ -4367,7 +4434,7 @@ PL: ~J1(2.5) Nic nie rozumiem. ~E
 
 [MAP3_S04.25]
 EN: ~J1(4.0) It's like this is ~N all some kind of bad dream.
-PL: ~J1(4.0) To tak, jakby to ~N wszystko to był jakiś koszmar.
+PL: ~J1(4.0) To tak, jakby to wszystko ~N to był jakiś koszmar.
 
 [MAP3_S04.26]
 EN: ~J1(2.8) Yeah. ~N A living nightmare. ~E
@@ -4415,7 +4482,7 @@ PL: ~J1(3.8) Nie. Czemu? ~N Coś jest tam na dole?
 
 [MAP3_S04.37]
 EN: ~J1(2.7) You don't know? ~N Don't you work here?
-PL: ~J1(2.7) Ty nic nie wiesz? ~N Czy ty tu nie pracujesz?
+PL: ~J1(2.7) Ty nic nie wiesz? ~N Nie pracujesz tutaj?
 
 [MAP3_S04.38]
 EN: ~J1(4.0) We're under strict orders never to ~N enter the basement storeroom.
@@ -4447,7 +4514,7 @@ PL: ~J0(2.5) Coś nie tak? ~N Harry...? ~E
 
 [MAP3_S04.45]
 EN: ~J0(2.6) Harry, ~N let me help you. ~E
-PL: ~J0(2.6) Harry, ~N pozwól, że ci pomogę. ~E
+PL: ~J0(2.6) Harry, pozwól że ci pomogę. ~E
 
 [MAP3_S04.46]
 EN: ~J0(1.0) ~E
@@ -4463,7 +4530,7 @@ PL: Użyłem ~C2 Klucza do gabinetu ~C7 . ~E
 
 [MAP3_S04.49]
 EN: There is a broken ~N vending machine. ~E
-PL: To zepsuty ~N automat z napojami. ~E
+PL: To zepsuty automat z napojami. ~E
 
 [MAP3_S04.50]
 EN: Nothing unusual. ~E
@@ -4483,7 +4550,7 @@ PL: W szufladzie biurka ~N nie ma nic przydatnego. ~E
 
 [MAP3_S04.54]
 EN: A sound is heard ~N from beyond the door. ~E
-PL: Zza drzwi ~N dochodzą jakieś odgłosy. ~E
+PL: Zza drzwi dochodzą jakieś odgłosy. ~E
 
 
 
@@ -4521,15 +4588,15 @@ PL: Znalazłem ~C2 Klucz do gabinetu ~C7 . ~N Wziąć go? ~S4
 
 [MAP3_S05.22]
 EN: Looks like a hallway ~N under the grate.
-PL: Wygląda to na korytarz ~N pod kratą.
+PL: Wygląda to na korytarz pod kratą.
 
 [MAP3_S05.23]
 EN: Can't move it since the vines ~N have grown around it. ~E
-PL: Nie mogę jej ruszyć, bo pnącza ~N ją obrosły. ~E
+PL: Nie mogę jej ruszyć, ~N bo pnącza ją obrosły. ~E
 
 [MAP3_S05.24]
 EN: No. ~N The fire goes out right away ~N when I light the vines. ~E
-PL: Nie. ~N Gdy podpalam pnącza, ogień ~N natychmiast gaśnie. ~E
+PL: Nie. ~N Gdy podpalam pnącza, ~N ogień natychmiast gaśnie. ~E
 
 [MAP3_S05.25]
 EN: Poured ~C2 Disinfecting alcohol ~C7 ~N on the vines. ~E
@@ -4577,7 +4644,7 @@ PL: W pudełkach nie ma nic przydatnego. ~E
 
 [MAP3_S05.36]
 EN: There's a bottle filled ~N with some kind of drug. ~N Better leave it. ~E
-PL: Butelka wypełniona ~N jakimś lekarstwem. ~N Lepiej ją zostawić. ~E
+PL: Butelka wypełniona jakimś lekarstwem. ~N Lepiej ją zostawić. ~E
 
 [MAP3_S05.37]
 EN: There are some empty bottles. ~E
@@ -4627,7 +4694,7 @@ PL: ~J1(3.9) Miasto jest pochłaniane ~N przez ciemność.
 
 [MAP3_S06.22]
 EN: ~J1(5.8) Strength must overcome ~N petty desire. ~N Childish sleep talk.
-PL: ~J1(5.8) Siła musi zwyciężyć ~N marne pragnienia. ~N Dziecinne majaczenie.
+PL: ~J1(5.8) Siła musi zwyciężyć marne pragnienia. ~N Dziecinne majaczenie.
 
 [MAP3_S06.23]
 EN: ~J1(3.4) I knew this day would come.
@@ -4639,7 +4706,7 @@ PL: ~J1(4.0) O czym ty mówisz? ~N Nie rozumiem ani słowa. ~E
 
 [MAP3_S06.25]
 EN: ~J0(3.8) Believe the evidence ~N of your eyes.
-PL: ~J0(3.8) Wierz świadectwu ~N własnych oczu.
+PL: ~J0(3.8) Wierz świadectwu własnych oczu.
 
 [MAP3_S06.26]
 EN: ~J0(5.3) The other church in this town. ~N That is your destination.
@@ -4647,11 +4714,11 @@ PL: ~J0(5.3) Drugi kościół w tym mieście. ~N Tam zmierzasz.
 
 [MAP3_S06.27]
 EN: ~J0(6.5) This is beyond my abilities. ~N Only you can stop it now. ~E
-PL: ~J0(6.5) To jest ponad moje możliwości. ~N Tylko ty możesz to powstrzymać. ~E
+PL: ~J0(6.5) To ponad moje możliwości. ~N Tylko ty możesz to teraz powstrzymać. ~E
 
 [MAP3_S06.28]
 EN: ~J0(5.0) Have you not seen ~N the crest marked ~N on the ground all over town?
-PL: ~J0(5.0) Czyż nie widziałeś ~N znaku wyrytego ~N na ziemi w całym mieście?
+PL: ~J0(5.0) Czyż nie widziałeś znaku wyrytego ~N na ziemi w całym mieście?
 
 [MAP3_S06.29]
 EN: ~J0(3.2) So that's what I saw ~N in the schoolyard.
@@ -4675,7 +4742,7 @@ PL: ~J0(1.8) Hej! Zaczekaj! ~E
 
 [MAP3_S06.34]
 EN: The elevator doesn't ~N appear to be working. ~E
-PL: Wygląda na to, że winda ~N nie działa. ~E
+PL: Wygląda na to, że winda nie działa. ~E
 
 [MAP3_S06.35]
 EN: ~H There is a ~C5 Hospital map ~C7 . ~N Take it? ~S4
@@ -4707,7 +4774,7 @@ PL: Gazeta tu leży.
 
 [MAP3_S06.42]
 EN: This article's been ~N clipped out... ~E
-PL: Artykuł został ~N wycięty... ~E
+PL: Ten artykuł został wycięty... ~E
 
 [MAP3_S06.43]
 EN: Nothing unusual. ~E
@@ -4773,7 +4840,7 @@ PL: ~J1(2.0) Wszystkie drogi z miasta ~N są zablokowane.
 
 [MAP4_S01.25]
 EN: ~J1(2.2) Cars have completely ~N stopped running.
-PL: ~J1(2.2) Samochody się ~N zepsuły na amen.
+PL: ~J1(2.2) Samochody się zepsuły na amen.
 
 [MAP4_S01.26]
 EN: ~J1(2.4) The phones and radios ~N are still out, too. ~E
@@ -4801,7 +4868,7 @@ PL: ~J1(2.4) Pobiegłam za nią, ~N ale wyparowała.
 
 [MAP4_S01.32]
 EN: ~J1(2.7) I don't know about ~N your daughter, but... ~E
-PL: ~J1(2.7) Nie wiem, czy to ~N twoja córka, ale... ~E
+PL: ~J1(2.7) Nie wiem, czy to twoja córka, ale... ~E
 
 [MAP4_S01.33]
 EN: ~J1(3.5) And you just let her go!? ~N Where was it?
@@ -4817,7 +4884,7 @@ PL: ~J1(2.0) Nie podniecaj się jednak.
 
 [MAP4_S01.36]
 EN: ~J1(2.5) It wasn't like she ran off ~N exactly.
-PL: ~J1(2.5) To nie tak, że po prostu ~N uciekła.
+PL: ~J1(2.5) To nie tak, że po prostu uciekła.
 
 [MAP4_S01.37]
 EN: ~J1(4.8) There was no place for her to go. ~N The road has been obliterated. ~E
@@ -4829,7 +4896,7 @@ PL: ~J1(3.0) Co!? ~N Więc Cheryl...
 
 [MAP4_S01.39]
 EN: ~J1(3.6) It was like she was walking ~N on thin air.
-PL: ~J1(3.6) Wyglądało to tak, jakby ~N chodziła po powietrzu.
+PL: ~J1(3.6) Wyglądało to tak, ~N jakby chodziła po powietrzu.
 
 [MAP4_S01.40]
 EN: ~J1(2.0) ~E
@@ -4897,7 +4964,7 @@ PL: ~J1(2.5) i dochodzenie stanęło w miejscu.
 
 [MAP4_S01.56]
 EN: ~J1(3.5) What could drug trafficking ~N have to do with all this?
-PL: ~J1(3.5) Jaki związek ma przemyt ~N narkotyków z tym wszystkim?
+PL: ~J1(3.5) Jaki związek ma przemyt narkotyków ~N z tym wszystkim?
 
 [MAP4_S01.57]
 EN: ~J1(3.2) I really don't know.
@@ -4905,7 +4972,7 @@ PL: ~J1(3.2) Nie mam pojęcia.
 
 [MAP4_S01.58]
 EN: ~J1(3.6) But, maybe that's the darkness ~N she was talking about.
-PL: ~J1(3.6) Ale, być może to jest ta ~N ciemność, o której mówiła.
+PL: ~J1(3.6) Ale, być może to jest ta ciemność, ~N o której mówiła.
 
 [MAP4_S01.59]
 EN: ~J1(1.8) That's all I can think of.
@@ -4925,7 +4992,7 @@ PL: ~J1(1.5) Dopiero to odkryłem.
 
 [MAP4_S01.63]
 EN: ~J1(1.8) Maybe there's something ~N back there.
-PL: ~J1(1.8) Może coś jest ~N tam z tyłu.
+PL: ~J1(1.8) Może coś jest tam z tyłu.
 
 [MAP4_S01.64]
 EN: ~J1(1.4) Let's have a look.
@@ -5101,7 +5168,7 @@ PL: ~J0(4.0) Mogłem mieć wypadek, ~N i teraz leżę nieprzytomny ~N w szpitaln
 
 [MAP4_S01.107]
 EN: ~J0(2.0) I don't know ~N what's real anymore... ~E
-PL: ~J0(2.0) Już sam nie wiem ~N co jest prawdą... ~E
+PL: ~J0(2.0) Już sam nie wiem co jest prawdą... ~E
 
 [MAP4_S01.108]
 EN: ~J0(1.0)
@@ -5181,7 +5248,7 @@ PL: Nic niezwykłego. ~E
 
 [MAP4_S03.19]
 EN: A picture is projected ~N on the screen.
-PL: Na ekranie wyświetla się ~N obraz.
+PL: Na ekranie wyświetla się obraz.
 
 [MAP4_S03.20]
 EN: Cheryl... ~N where could she be? ~E
@@ -5227,7 +5294,7 @@ PL: ~J1(1.3) Nic mi nie jest.
 
 [MAP4_S04.23]
 EN: ~J1(2.2) Nothing you need to ~N worry about.
-PL: ~J1(2.2) Nic, czym musisz ~N się martwić.
+PL: ~J1(2.2) Nic, czym musisz się martwić.
 
 [MAP4_S04.24]
 EN: ~J1(2.2) Well, if you're sure... ~E
@@ -5235,7 +5302,7 @@ PL: ~J1(2.2) No cóż, skoro tak twierdzisz... ~E
 
 [MAP4_S04.25]
 EN: ~J1(4.3) Lisa... ~N Do you know a woman ~N named Dahlia Gillespie?
-PL: ~J1(4.3) Lisa... ~N Znasz kobietę o ~N imieniu Dahlia Gillespie?
+PL: ~J1(4.3) Lisa... ~N Znasz kobietę o imieniu ~N Dahlia Gillespie?
 
 [MAP4_S04.26]
 EN: ~J1(3.2) Oh yeah, ~N that crazy Gillespie lady.
@@ -5247,7 +5314,7 @@ PL: ~J1(2.3) Jest tu całkiem dobrze znana.
 
 [MAP4_S04.28]
 EN: ~J1(4.0) She never sees anybody, ~N so I don't know ~N that much about her.
-PL: ~J1(4.0) Nigdy nikogo nie odwiedza, ~N więc nie wiem ~N o niej zbyt wiele.
+PL: ~J1(4.0) Nigdy nikogo nie odwiedza, ~N więc nie wiem o niej zbyt wiele.
 
 [MAP4_S04.29]
 EN: ~J1(5.2) I heard her kid died in a fire, ~N and supposedly she's been crazy ~N ever since. ~E
@@ -5259,11 +5326,11 @@ PL: ~J1(5.1) Cóż, twierdzi, że miasto jest ~N pochłaniane przez ciemność.
 
 [MAP4_S04.31]
 EN: ~J1(2.7) Do you have any idea ~N what she's talking about?
-PL: ~J1(2.7) Wiesz może, ~N o czym ona mówi?
+PL: ~J1(2.7) Wiesz może, o czym ona mówi?
 
 [MAP4_S04.32]
 EN: ~J1(3.5) The town... devoured ~N by the darkness.
-PL: ~J1(3.5) Miasto... pochłaniane ~N przez ciemność.
+PL: ~J1(3.5) Miasto... ~N pochłaniane przez ciemność.
 
 [MAP4_S04.33]
 EN: ~J1(2.1) Yes, I think I do.
@@ -5291,11 +5358,11 @@ PL: ~J1(5.0) Gdy młodzi zaczęli się wyprowadzać, ~N ludzie doszli do wniosku
 
 [MAP4_S04.39]
 EN: ~J1(3.7) Evidently, things like that ~N used to happen around here ~N all the time.
-PL: ~J1(3.7) Najwyraźniej, takie rzeczy ~N miały tutaj miejsce ~N na porządku dziennym.
+PL: ~J1(3.7) Najwyraźniej, takie rzeczy miały ~N tutaj miejsce na porządku dziennym.
 
 [MAP4_S04.40]
 EN: ~J1(3.5) Before the resort, ~N there really wasn't ~N anything else out here.
-PL: ~J1(3.5) Zanim powstał ośrodek, ~N naprawdę nie było tu ~N nic innego.
+PL: ~J1(3.5) Zanim powstał ośrodek, ~N naprawdę nie było tu nic innego.
 
 [MAP4_S04.41]
 EN: ~J1(4.5) Everyone was so flipped out. ~N Gotta blame it on something.
@@ -5303,7 +5370,7 @@ PL: ~J1(4.5) Wszyscy odchodzili od zmysłów. ~N Trzeba było to na coś zrzuci�
 
 [MAP4_S04.42]
 EN: ~J1(3.8) Then a lot of new people ~N came in and everybody ~N clammed up about it.
-PL: ~J1(3.8) Potem napłynęło sporo ~N nowych ludzi i wszyscy ~N nabrali wody w usta.
+PL: ~J1(3.8) Potem napłynęło sporo nowych ludzi ~N i wszyscy nabrali wody w usta.
 
 [MAP4_S04.43]
 EN: ~J0(1.8) A cult... ~E
@@ -5387,7 +5454,7 @@ PL: ~J1(2.3) Od lat stoi opuszczona.
 
 [MAP4_S04.63]
 EN: ~J1(4.2) There's an underground tunnel ~N out there used for inspections, ~N or something!
-PL: ~J1(4.2) Jest tam podziemny tunel ~N używany przy inspekcjach, ~N czy coś w ten deseń!
+PL: ~J1(4.2) Jest tam podziemny tunel używany ~N przy inspekcjach, ~N czy coś w ten deseń!
 
 [MAP4_S04.64]
 EN: ~J1(3.2) I remember hearing it runs ~N all the way to the lake! ~E
@@ -5431,7 +5498,7 @@ PL: ~J1(2.6) To może nie być najbezpieczniejsze ~N miejsce na świecie.
 
 [MAP4_S04.74]
 EN: ~J1(3.6) I can't promise you anything, ~N but I'll do my best ~N to protect you.
-PL: ~J1(3.6) Nie mogę niczego obiecać, ale ~N zrobię co w mojej mocy, ~N żeby cię chronić.
+PL: ~J1(3.6) Nie mogę niczego obiecać, ~N ale zrobię co w mojej mocy, ~N żeby cię chronić.
 
 [MAP4_S04.75]
 EN: ~J1(4.2) No... ~N somehow I feel I'm not supposed ~N to leave this place.
@@ -5717,7 +5784,7 @@ PL: Stary motocykl.
 
 [MAP5_S03.20]
 EN: Looks like it's been sitting ~N here for years.
-PL: Wygląda, jakby stał tutaj ~N od lat.
+PL: Wygląda, jakby stał tutaj od lat.
 
 [MAP5_S03.21]
 EN: ~J1(1.5)
@@ -5781,7 +5848,7 @@ PL: ~J1(1.9) No dobra, spokojnie. ~E
 
 [MAP5_S03.36]
 EN: ~J1(3.2) Unless you want to die, ~N keep your mind on business.
-PL: ~J1(3.2) Jeśli nie po drodze ci ze ~N śmiercią, pilnuj własnego nosa.
+PL: ~J1(3.2) Jeśli nie po drodze ci ze śmiercią, ~N pilnuj własnego nosa.
 
 [MAP5_S03.37]
 EN: ~J1(0.8) Got it? ~E
@@ -5797,7 +5864,7 @@ PL: ~J1(3.1) Rany, ale się wkurzył. ~N I jeszcze mu się spieszy.
 
 [MAP5_S03.40]
 EN: ~J1(1.8) That was probably dope ~N in the bottle.
-PL: ~J1(1.8) W tej butelce pewnie ~N były narkotyki.
+PL: ~J1(1.8) W tej butelce pewnie były narkotyki.
 
 [MAP5_S03.41]
 EN: ~J1(3.9) Anyway, better let him do as he ~N pleases. There's more than ~N my life at stake. ~E
@@ -5829,7 +5896,7 @@ PL: Jest z tego samego dnia ~N co ta ze szpitala... ~E
 
 [MAP5_S03.48]
 EN: ~L4 ~C3 Investigation stalled. ~N [PTV] dealers still at large. ~N ~N Suspicious deaths continue. ~N Like the anti-drug mayor, ~N a narcotics officer dies of ~N a sudden heart failure of ~N unknown origin. ~E
-PL: ~L4 ~C3 Śledztwo utknęło. ~N Handlarze [PTV] wciąż na ~N wolności. ~N ~N Podejrzane zgony nie ustają. ~N Po burmistrzu walczącym z ~N narkotykami umiera nagle ~N funkcjonariusz wydziału ~N narkotykowego - niewydolność ~N serca o nieznanej przyczynie. ~E
+PL: ~L4 ~C3 Śledztwo utknęło. ~N Handlarze [PTV] wciąż na wolności. ~N ~N Podejrzane zgony nie ustają. ~N Po burmistrzu walczącym z narkotykami ~N umiera nagle funkcjonariusz wydziału ~N narkotykowego na niewydolność ~N serca o nieznanej przyczynie. ~E
 
 [MAP5_S03.49]
 EN: ~C3 September 10
@@ -5947,7 +6014,7 @@ PL: ~J1(6.0) Nie podoba mi się to przeczucie. ~N Jakby zaraz miało się wydarz
 
 [MAP6_S00.23]
 EN: ~J1(4.0) No doubt, something terrible ~N is going on... ~E
-PL: ~J1(4.0) Bez dwóch zdań, dzieje się ~N coś strasznego... ~E
+PL: ~J1(4.0) Bez dwóch zdań, ~N dzieje się coś strasznego... ~E
 
 [MAP6_S00.24]
 EN: The cover has been removed...
@@ -5973,7 +6040,7 @@ PL:
 
 [MAP6_S01.16]
 EN: ~J1(1.1) Harry!
-PL: ~J1(1.1) Harry!
+PL: 
 
 [MAP6_S01.17]
 EN: ~J1(1.6) How did you get back here?
@@ -5985,7 +6052,7 @@ PL: ~J1(1.6) Szłam wzdłuż kanałów.
 
 [MAP6_S01.19]
 EN: ~J1(1.9) Were you the one ~N who cut the fence?
-PL: ~J1(1.9) Czy to ty rozciąłeś ~N ogrodzenie?
+PL: ~J1(1.9) Czy to ty rozwaliłeś kłódkę?
 
 [MAP6_S01.20]
 EN: ~J1(1.0) Yeah.
@@ -6041,7 +6108,7 @@ PL: ~J1(2.5) jest pochłaniane ~N przez Zaświaty.
 
 [MAP6_S01.33]
 EN: ~J1(4.0) By a world of someone's ~N nightmarish delusions ~N come to life...
-PL: ~J1(4.0) Przez świat czyichś ~N koszmarnych urojeń, które ~N stały się rzeczywistością...
+PL: ~J1(4.0) Przez świat czyichś ~N koszmarnych urojeń, ~N które stały się rzeczywistością...
 
 [MAP6_S01.34]
 EN: ~J1(2.9) Little by little ~N the invasion is spreading...
@@ -6053,7 +6120,7 @@ PL: ~J1(2.8) Próbuje zatopić ~N wszystko w ciemności.
 
 [MAP6_S01.36]
 EN: ~J1(4.2) I think I'm finally beginning ~N to understand what that lady ~N was talking about. ~E
-PL: ~J1(4.2) Chyba nareszcie zaczynam ~N rozumieć, o czym ta kobieta ~N mówiła. ~E
+PL: ~J1(4.2) Chyba nareszcie zaczynam rozumieć, ~N o czym ta kobieta mówiła. ~E
 
 [MAP6_S01.37]
 EN: ~J1(4.6) Harry. ~N Hold on a minute. ~N I don't get it?
@@ -6069,7 +6136,7 @@ PL: ~J1(1.8) Chyba po prostu nie ~N potrafię tego wytłumaczyć.
 
 [MAP6_S01.40]
 EN: ~J1(2.2) Well, what's making ~N this happen?
-PL: ~J1(2.2) No dobrze, ale co za ~N tym stoi?
+PL: ~J1(2.2) No dobrze, ~N ale co za tym stoi?
 
 [MAP6_S01.41]
 EN: ~J1(1.6) I don't know that either.
@@ -6125,7 +6192,7 @@ PL: ~J1(4.4) Wszystko staje się jasne. ~N Tak, wszystko.
 
 [MAP6_S01.54]
 EN: ~J1(4.9) Hungry for sacrifice, ~N the demon will swallow up ~N the land.
-PL: ~J1(4.9) Spragniony ofiary, ~N demon pochłonie ~N te ziemie.
+PL: ~J1(4.9) Spragniony ofiary, ~N demon pochłonie te ziemie.
 
 [MAP6_S01.55]
 EN: ~J1(3.1) I knew this day would come.
@@ -6141,11 +6208,11 @@ PL: ~J1(2.5) Zostały tylko dwa.
 
 [MAP6_S01.58]
 EN: ~J1(5.3) To seal this town to the abyss, ~N the mark of Samael.
-PL: ~J1(5.3) By zapieczętować to miasto ~N w otchłani, znak Samaela.
+PL: ~J1(5.3) By zapieczętować ~N to miasto w otchłani, ~N znak Samaela.
 
 [MAP6_S01.59]
 EN: ~J1(3.6) When it is completed, all is lost.
-PL: ~J1(3.6) Gdy się dopełni, wszystko ~N będzie stracone.
+PL: ~J1(3.6) Gdy się dopełni, ~N wszystko będzie stracone.
 
 [MAP6_S01.60]
 EN: ~J1(4.6) Even in daytime, ~N darkness will cover the sun.
@@ -6169,7 +6236,7 @@ PL: ~J1(3.6) To proste. ~N Powstrzymaj demona.
 
 [MAP6_S01.65]
 EN: ~J1(4.6) The demon, ~N the demon taking that ~N child's form.
-PL: ~J1(4.6) Demona, ~N który przybrał postać ~N tego dziecka.
+PL: ~J1(4.6) Demona, który przybrał ~N postać tego dziecka.
 
 [MAP6_S01.66]
 EN: ~J1(3.7) Stop it before your daughter ~N becomes a sacrifice.
@@ -6189,11 +6256,11 @@ PL: ~J1(1.6) Co mam zrobić?
 
 [MAP6_S01.70]
 EN: ~J1(3.0) Go to the lighthouse ~N on the lake,
-PL: ~J1(3.0) Udaj się do latarni ~N nad jeziorem,
+PL: ~J1(3.0) Udaj się do latarni nad jeziorem,
 
 [MAP6_S01.71]
 EN: ~J1(3.5) and to the center of ~N the amusement park.
-PL: ~J1(3.5) a potem do serca ~N parku rozrywki.
+PL: ~J1(3.5) a potem do serca parku rozrywki.
 
 [MAP6_S01.72]
 EN: ~J1(3.5) Make haste. ~N You are the only hope. ~E
@@ -6205,7 +6272,7 @@ PL: ~J0(1.1) Słuchaj, Harry.
 
 [MAP6_S01.74]
 EN: ~J0(2.1) I really don't get ~N what's going on.
-PL: ~J0(2.1) Nie mam pojęcia ~N co się dzieje.
+PL: ~J0(2.1) Nie mam pojęcia co się dzieje.
 
 [MAP6_S01.75]
 EN: ~J0(4.4) But if there's a chance ~N we can save your daughter, ~N I'm in.
@@ -6213,7 +6280,7 @@ PL: ~J0(4.4) Ale jeśli istnieje szansa, ~N że uratujemy twoją córkę, ~N mo�
 
 [MAP6_S01.76]
 EN: ~J0(1.9) I'll check out ~N the amusement park.
-PL: ~J0(1.9) Sprawdzę ~N park rozrywki.
+PL: ~J0(1.9) Sprawdzę park rozrywki.
 
 [MAP6_S01.77]
 EN: ~J0(1.7) You go to the lighthouse. ~E
@@ -6237,7 +6304,7 @@ PL: ~J0(1.7) Flaurosa.
 
 [MAP6_S01.82]
 EN: ~J0(3.2) Only with that can you ~N stop it. ~E
-PL: ~J0(3.2) Tylko z nim, będziesz ~N w stanie go powstrzymać. ~E
+PL: ~J0(3.2) Tylko z nim, ~N będziesz w stanie go powstrzymać. ~E
 
 [MAP6_S01.83]
 EN: ~J0(2.0) What about Cybil!? ~E
@@ -6249,7 +6316,7 @@ PL: ~J0(2.0) Cybil nie wróciła. ~E
 
 [MAP6_S01.85]
 EN: ~J0(3.5) That creep's sure to show up ~N at the Amusement Park ~N pretty soon.
-PL: ~J0(3.5) Ta wiedźma na pewno pojawi ~N się niedługo w ~N Parku Rozrywki.
+PL: ~J0(3.5) Ta wiedźma na pewno pojawi się ~N niedługo w Parku Rozrywki.
 
 [MAP6_S01.86]
 EN: ~J0(2.0) Let me be on time. ~E
@@ -6257,7 +6324,7 @@ PL: ~J0(2.0) Muszę tam być na czas. ~E
 
 [MAP6_S01.87]
 EN: There's a ship's wheel. ~N Don't worry about that now, ~N though. ~E
-PL: Koło sterowe statku. ~N Ale nie warto ~N się nim teraz zajmować. ~E
+PL: Koło sterowe statku. ~N Ale nie warto się nim teraz zajmować. ~E
 
 [MAP6_S01.88]
 EN: There's a body stuck ~N to the bulkhead. ~E
@@ -6383,23 +6450,23 @@ PL: ~J1(4.3) Ale, Cheryl nie jest ~N moją biologiczną córką.
 
 [MAP6_S04.26]
 EN: ~J1(3.0) I actually haven't told her yet.
-PL: ~J1(3.0) Prawdę mówiąc, jeszcze jej ~N nie powiedziałem.
+PL: ~J1(3.0) Prawdę mówiąc, ~N jeszcze jej nie powiedziałem.
 
 [MAP6_S04.27]
 EN: ~J1(3.3) She probably already knows ~N anyway, though. ~E
-PL: ~J1(3.3) Pewnie sama już się ~N domyśliła. ~E
+PL: ~J1(3.3) Pewnie sama już się domyśliła. ~E
 
 [MAP6_S04.28]
 EN: ~J1(3.9) We found her abandoned ~N on the side of the highway.
-PL: ~J1(3.9) Znaleźliśmy ją porzuconą ~N przy autostradzie.
+PL: ~J1(3.9) Znaleźliśmy ją ~N porzuconą przy autostradzie.
 
 [MAP6_S04.29]
 EN: ~J1(3.3) Nobody knew ~N where she came from.
-PL: ~J1(3.3) Nikt nie wie, ~N skąd się tam wzięła.
+PL: ~J1(3.3) Nikt nie wie, skąd się tam wzięła.
 
 [MAP6_S04.30]
 EN: ~J1(3.3) We didn't have any kids ~N of our own.
-PL: ~J1(3.3) Nie mieliśmy własnych ~N dzieci.
+PL: ~J1(3.3) Nie mieliśmy własnych dzieci.
 
 [MAP6_S04.31]
 EN: ~J1(2.4) My wife was sick,
@@ -6515,7 +6582,7 @@ PL: ~J1(1.2) Alesso.
 
 [MAP6_S04.59]
 EN: ~J1(4.0) This is the end of ~N your little game.
-PL: ~J1(4.0) To już koniec ~N twoich gierek.
+PL: ~J1(4.0) To już koniec twoich gierek.
 
 [MAP6_S04.60]
 EN: ~J1(1.2) Mama...
@@ -6543,7 +6610,7 @@ PL: ~J1(4.5) Ale Mamusia nie wiedziała, ~N jak bardzo urosłaś.
 
 [MAP6_S04.66]
 EN: ~J1(4.3) That's why I couldn't catch you ~N all by myself.
-PL: ~J1(4.3) Dlatego nie byłam w stanie cię ~N schwytać samodzielnie.
+PL: ~J1(4.3) Dlatego nie byłam w stanie ~N cię schwytać samodzielnie.
 
 [MAP6_S04.67]
 EN: ~J1(2.8) But what a pity, yes?
@@ -6551,7 +6618,7 @@ PL: ~J1(2.8) Wielka szkoda, nieprawdaż?
 
 [MAP6_S04.68]
 EN: ~J1(5.0) Now you're half indebted ~N to this man for his help.
-PL: ~J1(5.0) Teraz jesteś po części ~N dłużna temu mężczyźnie ~N za jego pomoc.
+PL: ~J1(5.0) Teraz jesteś po części dłużna ~N temu mężczyźnie za jego pomoc.
 
 [MAP6_S04.69]
 EN: ~J1(2.7) Hey! ~N What are you talking about?
@@ -6605,7 +6672,7 @@ PL: ~J1(1.6) Harry, posłuchaj.
 
 [MAP7_S00.19]
 EN: ~J1(2.8) Something you said before ~N has been bothering me.
-PL: ~J1(2.8) Coś co powiedziałeś ~N wcześniej nie daje mi spokoju.
+PL: ~J1(2.8) Coś co powiedziałeś wcześniej ~N nie daje mi spokoju.
 
 [MAP7_S00.20]
 EN: ~J1(2.6) I just can't get it out of my head.
@@ -6617,7 +6684,7 @@ PL: ~J1(1.6) O co chodzi Lisa?
 
 [MAP7_S00.22]
 EN: ~J1(2.5) So I went to look ~N in the basement.
-PL: ~J1(2.5) Poszłam zajrzeć ~N do piwnicy.
+PL: ~J1(2.5) Poszłam zajrzeć do piwnicy.
 
 [MAP7_S00.23]
 EN: ~J1(3.0) Even though I was scared ~N as hell.
@@ -6629,7 +6696,7 @@ PL: ~J1(3.1) Tak jak mówiłeś, ~N jest tam pełno strasznych pokoi.
 
 [MAP7_S00.25]
 EN: ~J1(3.2) But nothing really unusual ~N down there.
-PL: ~J1(3.2) Ale tak naprawdę ~N nic nadzwyczajnego.
+PL: ~J1(3.2) Ale tak naprawdę nic nadzwyczajnego.
 
 [MAP7_S00.26]
 EN: ~J1(3.6) But while I was down there, ~N I got this weird feeling.
@@ -6705,7 +6772,7 @@ PL: ~J0(2.1) Co się wydarzyło w tym mieście?
 
 [MAP7_S00.44]
 EN: ~J0(2.7) What could be making things ~N like this?
-PL: ~J0(2.7) Co mogłoby wywołać ~N coś takiego?
+PL: ~J0(2.7) Co mogłoby wywołać coś takiego?
 
 [MAP7_S00.45]
 EN: ~J0(4.3) I have a feeling if I take ~N the elevator down I'll find it. ~E
@@ -6795,7 +6862,7 @@ PL: Znowu to samo... ~E
 
 [MAP7_S01.31]
 EN: ~L4 ~C3 Investigation stalled. ~N [PTV] dealers still at large. ~N ~N Suspicious deaths continue. ~N Like the anti-drug mayor, ~N a narcotics officer dies of ~N a sudden heart failure of ~N unknown origin. ~E
-PL: ~L4 ~C3 Śledztwo utknęło. ~N Handlarze [PTV] wciąż na ~N wolności. ~N ~N Podejrzane zgony nie ustają. ~N Po burmistrzu walczącym z ~N narkotykami umiera nagle ~N funkcjonariusz wydziału ~N narkotykowego - niewydolność ~N serca o nieznanej przyczynie. ~E
+PL: ~L4 ~C3 Śledztwo utknęło. ~N Handlarze [PTV] wciąż na wolności. ~N ~N Podejrzane zgony nie ustają. ~N Po burmistrzu walczącym z narkotykami ~N umiera nagle funkcjonariusz wydziału ~N narkotykowego na niewydolność ~N serca o nieznanej przyczynie. ~E
 
 [MAP7_S01.32]
 EN: Are there others? ~N It's pretty old...
@@ -6855,7 +6922,7 @@ PL: ~L4 ~C3 Muszę wziąć. ~E
 
 [MAP7_S01.46]
 EN: ~L4 ~C3 Told the doctor I quit. ~N Won't work at that ~N hospital anymore. ~E
-PL: ~L4 ~C3 Powiedziałam doktorowi, ~N że odchodzę. ~N Nie będę już pracować ~N w tym szpitalu. ~E
+PL: ~L4 ~C3 Powiedziałam doktorowi, że odchodzę. ~N Nie będę już pracować ~N w tym szpitalu. ~E
 
 [MAP7_S01.47]
 EN: ~L4 ~C3 Help me... ~E
@@ -6955,7 +7022,7 @@ PL: Jakaś tablica. ~E
 
 [MAP7_S01.71]
 EN: ~C3 Names engraved ~N On a lithograph. ~N The Grim Reaper's list.
-PL: ~C3 Imiona wyryte ~N Na litografii. ~N Lista Ponurego Żniwiarza.
+PL: ~C3 Imiona wyryte Na litografii. ~N Lista Ponurego Żniwiarza.
 
 [MAP7_S01.72]
 EN: ~C3 Yes, the headcount is set ~N Young and old lined up ~N In order of age.
@@ -7023,11 +7090,11 @@ PL: Stalowa płyta ~N jest przykręcona do ściany. ~E
 
 [MAP7_S01.88]
 EN: The elevator doesn't ~N appear to be working. ~E
-PL: Wygląda na to, że winda ~N nie działa. ~E
+PL: Wygląda na to, że winda nie działa. ~E
 
 [MAP7_S01.89]
 EN: There's a clock ~N with a broken face. ~E
-PL: Zegar z rozbitą ~N tarczą. ~E
+PL: Zegar z rozbitą tarczą. ~E
 
 [MAP7_S01.90]
 EN: None of this stuff is of any use. ~E
@@ -7069,7 +7136,7 @@ PL: Znowu to samo... ~E
 
 [MAP7_S02.16]
 EN: ~L4 ~C3 Investigation stalled. ~N [PTV] dealers still at large. ~N ~N Suspicious deaths continue. ~N Like anti-drug Mayor, ~N narcotics officer dies of ~N sudden heart failure of ~N unknown origin. ~E
-PL: ~L4 ~C3 Śledztwo utknęło. ~N Handlarze [PTV] wciąż na ~N wolności. ~N ~N Podejrzane zgony nie ustają. ~N Po burmistrzu walczącym z ~N narkotykami umiera nagle ~N funkcjonariusz wydziału ~N narkotykowego - niewydolność ~N serca o nieznanej przyczynie. ~E
+PL: ~L4 ~C3 Śledztwo utknęło. ~N Handlarze [PTV] wciąż na wolności. ~N ~N Podejrzane zgony nie ustają. ~N Po burmistrzu walczącym z narkotykami ~N umiera nagle funkcjonariusz wydziału ~N narkotykowego na niewydolność ~N serca o nieznanej przyczynie. ~E
 
 [MAP7_S02.17]
 EN: Are there others? ~N It's pretty old...
@@ -7157,7 +7224,7 @@ PL: ~J2(2.3) Jej skóra jest cała zwęglona!
 
 [MAP7_S02.38]
 EN: ~J2(1.2) Even when I change ~N the bandages,
-PL: ~J2(1.2) Nawet kiedy zmieniam ~N bandaże,
+PL: ~J2(1.2) Nawet kiedy zmieniam bandaże,
 
 [MAP7_S02.39]
 EN: ~J2(3.8) the blood and pus just start ~N oozing through!
@@ -7169,7 +7236,7 @@ PL: ~J2(5.9) Dlaczego... ~N Co utrzymuje to dziecko przy życiu?
 
 [MAP7_S02.41]
 EN: ~J2(2.8) I... can't stand it ~N any longer...
-PL: ~J2(2.8) Ja... nie zniosę ~N tego dłużej...
+PL: ~J2(2.8) Ja... nie zniosę tego dłużej...
 
 [MAP7_S02.42]
 EN: ~J2(3.3) I won't tell a soul ~N ...promise.
@@ -7193,7 +7260,7 @@ PL:   (no text - timing only, leave blank)
 
 [MAP7_S02.47]
 EN: ~J1(6.4) Everything is going ~N according to plan. ~N Sheltered in the womb.
-PL: ~J1(6.4) Wszystko idzie ~N zgodnie z planem. ~N Jest schroniony w łonie.
+PL: ~J1(6.4) Wszystko idzie zgodnie z planem. ~N Jest schroniony w łonie.
 
 [MAP7_S02.48]
 EN: ~J1(1.8) But it's not done yet.
@@ -7201,11 +7268,11 @@ PL: ~J1(1.8) Ale to jeszcze nie koniec.
 
 [MAP7_S02.49]
 EN: ~J1(4.5) Half the soul is lost. ~N That is why the seed ~N lies dormant.
-PL: ~J1(4.5) Połowa duszy przepadła. ~N Dlatego nasienie ~N pozostaje uśpione.
+PL: ~J1(4.5) Połowa duszy przepadła. ~N Dlatego nasienie pozostaje uśpione.
 
 [MAP7_S02.50]
 EN: ~J1(3.6) And what soul remains ~N captured in that husk,
-PL: ~J1(3.6) A resztka duszy, która ~N jest uwięziona w tej powłoce,
+PL: ~J1(3.6) A resztka duszy, ~N która jest uwięziona w tej powłoce,
 
 [MAP7_S02.51]
 EN: ~J1(3.7) is buried deep down ~N in the subconscious.
@@ -7301,7 +7368,7 @@ PL: ~J1(5.3) Czemu wcześniej tego ~N nie dostrzegałam? ~N Nie ma sensu czekać
 
 [MAP7_S02.74]
 EN: ~J1(7.2) Herein lies the mother's womb, ~N containing the power ~N to create life.
-PL: ~J1(7.2) Oto tu kryje się matczyne łono, ~N a w nim moc ~N stwarzania życia.
+PL: ~J1(7.2) Oto tu kryje się matczyne łono, ~N a w nim moc stwarzania życia.
 
 [MAP7_S02.75]
 EN: ~J1(4.2) I could have done it all myself.
@@ -7373,7 +7440,7 @@ PL: Łańcuch jest przerwany. ~E
 
 [MAP7_S02.92]
 EN: The chain is fixed ~N with the ring. ~E
-PL: Pierścień spiął ~N końcówki łańcucha. ~E
+PL: Pierścień spiął końcówki łańcucha. ~E
 
 [MAP7_S02.93]
 EN: There is a ~C2 Ring of contract ~C7 . ~N Take it? ~S4
@@ -7413,7 +7480,7 @@ PL:   (no text - timing only, leave blank)
 
 [MAP7_S02.102]
 EN: ~C3 Names engraved ~N On a lithograph. ~N The Grim Reaper's list.
-PL: ~C3 Imiona wyryte ~N Na litografii. ~N Lista Ponurego Żniwiarza.
+PL: ~C3 Imiona wyryte Na litografii. ~N Lista Ponurego Żniwiarza.
 
 [MAP7_S02.103]
 EN: ~C3 Yes, the headcount is set ~N Young and old lined up ~N In order of age.
@@ -7533,11 +7600,11 @@ PL: Zerwana linia energetyczna. ~N Tutaj też nic szczególnego. ~E
 
 [MAP7_S02.132]
 EN: The elevator doesn't ~N appear to be working. ~E
-PL: Wygląda na to, że winda ~N nie działa. ~E
+PL: Wygląda na to, że winda nie działa. ~E
 
 [MAP7_S02.133]
 EN: There's a clock ~N with a broken face. ~E
-PL: Zegar z rozbitą ~N tarczą. ~E
+PL: Zegar z rozbitą tarczą. ~E
 
 [MAP7_S02.134]
 EN: Used the ~C2 Ring of contract ~C7 . ~E
@@ -7557,7 +7624,7 @@ PL: Na ścianie wiszą okazy ~N motyli i ciem. ~E
 
 [MAP7_S02.138]
 EN: A girl's clothing hangs ~N on the wall.
-PL: Dziewczęce ubrania ~N wiszą na ścianie.
+PL: Dziewczęce ubrania wiszą na ścianie.
 
 [MAP7_S02.139]
 EN: Six, maybe seven... ~N Must be a kid about that age. ~E
@@ -7565,7 +7632,7 @@ PL: Sześć, może siedem lat... ~N Dziecko w tym wieku. ~E
 
 [MAP7_S02.140]
 EN: Cards are scattered ~N on the floor. ~E
-PL: Karty są porozrzucane ~N po podłodze. ~E
+PL: Karty są porozrzucane po podłodze. ~E
 
 [MAP7_S02.141]
 EN: There are dolls on the floor. ~E
@@ -7647,7 +7714,7 @@ PL: Atlas roślin. ~N Nie mam teraz potrzeby go czytać. ~E
 
 [MAP7_S03.15]
 EN: ~J1(4.9) I was shocked to realize ~N the talisman of Metraton ~N was being used.
-PL: ~J1(4.9) Zdumiałam się, gdy pojęłam, ~N że użyto talizmanu ~N Metratona.
+PL: ~J1(4.9) Zdumiałam się, gdy pojęłam, ~N że użyto talizmanu Metratona.
 
 [MAP7_S03.16]
 EN: ~J1(4.0) In spite of the lost soul ~N returning at last,
@@ -7655,7 +7722,7 @@ PL: ~J1(4.0) Mimo że zagubiona dusza ~N wreszcie powróciła,
 
 [MAP7_S03.17]
 EN: ~J1(4.3) Just a little longer and all ~N would have been for naught.
-PL: ~J1(4.3) jeszcze chwila, a wszystko ~N poszłoby na marne.
+PL: ~J1(4.3) jeszcze chwila, ~N a wszystko poszłoby na marne.
 
 [MAP7_S03.18]
 EN: ~J1(7.0) It's all because of that man. ~N We must be thankful to him.
@@ -7663,7 +7730,7 @@ PL: ~J1(7.0) Wszystko dzięki temu mężczyźnie. ~N Winniśmy mu wdzięczność
 
 [MAP7_S03.19]
 EN: ~J1(3.2) Even though Alessa ~N has been stopped,
-PL: ~J1(3.2) Choć Alessa ~N została powstrzymana,
+PL: ~J1(3.2) Choć Alessa została powstrzymana,
 
 [MAP7_S03.20]
 EN: ~J1(8.5) his little girl still has to go. ~N What a pity... ~E
@@ -7747,11 +7814,11 @@ PL: ~J1(6.5) Alessa zostałą uwięziona ~N w niekończącym się koszmarze ~N z
 
 [MAP7_S03.40]
 EN: ~J1(4.0) He has been nurtured ~N by that nightmare.
-PL: ~J1(4.0) Koszmar ten ~N wychowywał go.
+PL: ~J1(4.0) Koszmar ten wychowywał go.
 
 [MAP7_S03.41]
 EN: ~J1(3.6) Waiting for ~N the day to be born.
-PL: ~J1(3.6) Czekał on na dzień ~N swoich narodzin.
+PL: ~J1(3.6) Czekał on na dzień swoich narodzin.
 
 [MAP7_S03.42]
 EN: ~J1(3.6) That day has finally come.
@@ -7779,11 +7846,11 @@ PL: ~J1(4.7) Gdy wszystkie nasze smutki ~N zostaną zmyte.
 
 [MAP7_S03.48]
 EN: ~J1(4.8) When we return to ~N the true paradise! ~E
-PL: ~J1(4.8) Gdy powrócimy ~N do prawdziwego raju! ~E
+PL: ~J1(4.8) Gdy powrócimy do prawdziwego raju! ~E
 
 [MAP7_S03.49]
 EN: ~J0(6.2) My daughter will be ~N the mother of God! ~E
-PL: ~J0(6.2) Moja córka zostanie ~N matką Boga! ~E
+PL: ~J0(6.2) Moja córka zostanie matką Boga! ~E
 
 [MAP7_S03.50]
 EN: ~J0(4.0) ~E
@@ -7811,7 +7878,7 @@ PL: ~J1(1.9) Nikt mnie nie wykorzystuje!
 
 [MAP7_S03.56]
 EN: ~J1(3.0) You won't get away ~N with this! ~E
-PL: ~J1(3.0) Nie ujdzie ci to ~N na sucho! ~E
+PL: ~J1(3.0) Nie ujdzie ci to na sucho! ~E
 
 [MAP7_S03.57]
 EN: ~J1(4.7) Your role is over. ~N We don't need you anymore.
@@ -7835,11 +7902,11 @@ PL: ~J0(3.5) Aglaophotis! ~N Myślałam, że się go pozbyłam!
 
 [MAP7_S03.62]
 EN: ~J0(3.2) All I had to do was plant it ~N somewhere for you to find,
-PL: ~J0(3.2) Wystarczyło tylko podrzucić go ~N tam, gdzie mogłabyś go znaleźć,
+PL: ~J0(3.2) Wystarczyło tylko podrzucić go tam, ~N gdzie mogłabyś go znaleźć,
 
 [MAP7_S03.63]
 EN: ~J0(3.9) You all, well, ~N it kept you busy.
-PL: ~J0(3.9) i cóż, ~N zajęło was to na chwilę.
+PL: ~J0(3.9) i cóż, zajęło was to na chwilę.
 
 [MAP7_S03.64]
 EN: ~J0(1.7) You're easy!
@@ -7847,7 +7914,7 @@ PL: ~J0(1.7) Ależ z ciebie naiwniaczka!
 
 [MAP7_S03.65]
 EN: ~J0(2.4) And there's more ~N where this came from! ~E
-PL: ~J0(2.4) I mam tego ~N o wiele więcej! ~E
+PL: ~J0(2.4) I mam tego o wiele więcej! ~E
 
 [MAP7_S03.66]
 EN: ~J0(1.7) Stop it!! ~E

@@ -489,8 +489,16 @@ def main():
         if key.startswith("QUICK."):
             enc, problems = encode_quick(source, text)
         else:
-            enc, problems = encode_entry(source, text, space_char_for(source),
-                                         budgets.get(key.split(".")[0]))
+            # MENU strings sit in boxes of their own size (the map prompts, the
+            # save dialogs), so the class-wide widest line -- a long single-line
+            # menu row -- would never wrap them. Wrap those to the entry's own
+            # widest line plus a little: those boxes are wider than their text.
+            cat = key.split(".")[0]
+            if cat == "MENU":
+                budget = max(len(ln.replace("\t", "")) for ln in source.split("\n")) + 4
+            else:
+                budget = budgets.get(cat)
+            enc, problems = encode_entry(source, text, space_char_for(source), budget)
         if problems:
             problem_keys.append((key, lineno, problems))
         if enc is None:

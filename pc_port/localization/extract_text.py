@@ -367,6 +367,48 @@ for arr, sect in [(r'INVENTORY_ITEM_NAMES\s*\[\s*\]\s*=', 'ITEM_NAME'),
         if kind == 'str' and val.strip():
             records.append((sect, f'{sect}.{idx}', val, readable(val), ''))
 
+# --- RESULTS SCREEN (Results_DisplayInfo, after the credits). Also drawn
+#     through Gfx_StringDraw, so MENU.<literal> keys. Budgets are the room
+#     between the label (x=24, or x=72 for the shot rows) and where the value
+#     is drawn, at the font's ~10px per glyph. Units (h/m/s/km), separators
+#     and the ending names (GOOD+, UFO ...) are left as they are. ---
+RESULTS_BUDGET = {
+    'GAME_RESULT': (20, 'title'),
+    'Mode': (18, 'label, the difficulty follows'),
+    'Saves': (20, 'label, a number follows'),
+    'Continues': (20, 'label, a number follows'),
+    'Total_time': (13, 'label, the play time follows'),
+    'Walking_distance': (16, 'label, a distance follows'),
+    'Running_distance': (16, 'label, a distance follows'),
+    'Items': (16, 'label, "found / total" follows'),
+    'Game_clear': (20, 'label, the number of clears follows'),
+    'Ending': (19, 'label, the ending name follows'),
+    '==Your_rank==': (13, 'label, the rank stars follow on the same line'),
+    'Defeated_enemy_by_shooting': (23, 'label, a number follows'),
+    'Defeated_enemy_by_fighting': (23, 'label, a number follows'),
+    'Shooting_style': (20, 'heading over the four rows below'),
+    'Short_range_shots': (19, 'label, a percentage follows'),
+    'Middle_range_shots': (19, 'label, a percentage follows'),
+    'Long_range_shots': (19, 'label, a percentage follows'),
+    'No_aiming_shots': (19, 'label, a percentage follows'),
+}
+res_body = extract_array_body(os.path.join(ROOT, 'src', 'bodyprog', 'ranking.c'),
+                              r'void Results_DisplayInfo\(u32\* arg0\)[^{]*')
+m = re.search(r'D_8002B4C0\[\]\s*=\s*\{(.*?)\};', res_body, re.S)
+assert m, 'results string table'
+have = {r[1] for r in records}
+res_seen = 0
+for kind, lit in parse_c_entries(m.group(1)):
+    plain = lit.replace(chr(1), '')
+    if kind != 'str' or plain not in RESULTS_BUDGET:
+        continue
+    res_seen += 1
+    if menu_key(lit) in have:
+        continue
+    budget, what = RESULTS_BUDGET[plain]
+    records.append(('RESULTS', menu_key(lit), lit, readable(lit), f'results screen {what}, max ~{budget} characters'))
+assert res_seen == len(RESULTS_BUDGET), ('results strings moved', res_seen)
+
 # --- INVENTORY SCREEN: prompts and labels Gfx_Inventory_ItemDescriptionDraw
 #     draws straight from local arrays. They reach Gfx_StringDraw like every
 #     menu string, so they are MENU.<literal> keys too. ---
@@ -453,6 +495,7 @@ LEGEND = """\
 SECTION_TITLES = {
     'COMMON':     'COMMON MESSAGES  (shown in every area: Yes/No, pickups, doors)',
     'MENU':       'MENUS & UI  (title, options, pause, save/load, memory card, inventory actions, save-location names)',
+    'RESULTS':    'RESULTS SCREEN  (after the credits: play statistics and rank)',
     'PCOPT':      'PC OPTIONS MENU  (Options > PC Options: graphics, system, controls, camera, HUD)',
     'QUICK':      'QUICK OPTIONS MENU  (F10 in game)',
     'CHEATS':     'QUICK OPTIONS - CHEATS AND DEBUG PAGES',
@@ -470,7 +513,7 @@ for rec in records:
         groups[sec] = []; order.append(sec)
     groups[sec].append(rec)
 
-fixed = ['COMMON', 'MENU', 'PCOPT', 'QUICK', 'CHEATS', 'CONTROLS', 'ITEM_NAME', 'ITEM_DESC']
+fixed = ['COMMON', 'MENU', 'RESULTS', 'PCOPT', 'QUICK', 'CHEATS', 'CONTROLS', 'ITEM_NAME', 'ITEM_DESC']
 map_secs = [s for s in order if s.startswith('MAP ')]
 
 keys = [k for (_, k, *_r) in records]
