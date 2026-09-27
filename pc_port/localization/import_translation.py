@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Re-import a finished translation into an engine-format language pack.
 
-Reads a translated SilentHill_<XX>_translation.txt (the [KEY]/EN:/PT: file
+Reads a translated SilentHill_<XX>_translation.txt (the [KEY]/EN:/TR: file
 handed to the translator) plus SilentHill_EN_raw.json, and writes
 gamedata/lang/<code>.lang for the runtime loader (pc_port/src/lang_pack.c).
 
@@ -44,7 +44,7 @@ DIGIT_CODES = set("CJLS")
 MSG_LINES_MAX = 9   # FONT_12X16_LINE_COUNT_MAX -- the renderer clips past it.
 LINE_CHARS_SOFT = 26  # box is x=40..~280 at ~10px/glyph; warn past this.
 
-PLACEHOLDER = "(no text"  # "(no text - timing only, leave PT blank)"
+PLACEHOLDER = "(no text"  # "(no text - timing only, leave blank)"
 
 
 # --------------------------------------------------------------------------
@@ -265,6 +265,18 @@ def category_budgets(raw_map):
     return budgets
 
 
+def encode_quick(raw, translated):
+    """QUICK. keys are drawn by the TrueType overlays, verbatim: real spaces,
+    any Unicode letter, no wrapping. The only engine rule is the {name}
+    placeholders, which the game fills in and must survive untouched."""
+    want = sorted(re.findall(r"\{[a-z]+\}", raw))
+    got = sorted(re.findall(r"\{[a-z]+\}", translated))
+    if want != got:
+        return None, ["control codes differ: placeholders %s vs %s"
+                      % (" ".join(want) or "(none)", " ".join(got) or "(none)")]
+    return translated.strip(), []
+
+
 def encode_entry(raw, translated, space_char, budget=None):
     """Rebuild engine format from a translated readable line, borrowing the
     source's layout whitespace so indent art and ~J pads survive.
@@ -373,8 +385,13 @@ def space_char_for(raw):
 # --------------------------------------------------------------------------
 # Translation-file parser
 # --------------------------------------------------------------------------
+# The translation line: TR: in the current template, PT: in the first one,
+# or a language code (RU:, PL: ...) in a pre-filled file.
+TR_LINE = re.compile(r"^(?!EN:)(TR|[A-Z]{2}):")
+
+
 def parse_translation(path):
-    """Blocks of [KEY] / EN: / PT:. A handful of MENU keys embed a newline
+    """Blocks of [KEY] / NOTE: / EN: / TR:. A handful of MENU keys embed a newline
     (the save/load prompts are two-line literals), so a key runs from the
     opening '[' to the first line ending in ']'."""
     entries = {}
@@ -398,8 +415,12 @@ def parse_translation(path):
                     pending = [line]
                 continue
 
-            if key is not None and line.startswith("PT:"):
-                entries[key] = (line[3:].strip(), lineno)
+            m = TR_LINE.match(line)
+            if key is not None and m:
+                # The separate PC-options file of Jul-Aug 2026 used PCOPT. /
+                # PCOPT_VAL. keys for what the game looks up as MENU.<literal>.
+                key = re.sub(r"^PCOPT(?:_VAL)?\.", "MENU.", key)
+                entries[key] = (line[m.end():].strip(), lineno)
                 key = None
     return entries
 
@@ -452,8 +473,11 @@ def main():
             skipped += 1
             continue
 
-        enc, problems = encode_entry(source, text, space_char_for(source),
-                                     budgets.get(key.split(".")[0]))
+        if key.startswith("QUICK."):
+            enc, problems = encode_quick(source, text)
+        else:
+            enc, problems = encode_entry(source, text, space_char_for(source),
+                                         budgets.get(key.split(".")[0]))
         if problems:
             problem_keys.append((key, lineno, problems))
         if enc is None:
