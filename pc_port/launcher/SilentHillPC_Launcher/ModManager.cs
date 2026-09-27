@@ -580,7 +580,7 @@ namespace SilentHillPC_Launcher
                 {
                     string dest = Path.Combine(home, Path.GetFileName(path.TrimEnd('\\', '/')));
                     if (!Directory.Exists(dest) &&
-                        !CopyTree(path, dest, report, "Importing " + Path.GetFileName(dest), cancelled))
+                        !CopyTree(path, dest, report, Loc.F("Importing {0}", Path.GetFileName(dest)), cancelled))
                     {
                         try { Directory.Delete(dest, true); } catch { }
                         return ImportResult.Skipped;
@@ -590,7 +590,7 @@ namespace SilentHillPC_Launcher
                 {
                     // An archive (.zip/.rar/.7z) — copy it in; Prepare() unpacks it after.
                     string dest = Path.Combine(home, Path.GetFileName(path));
-                    if (report != null) report(0, 0, "Copying " + Path.GetFileName(path));
+                    if (report != null) report(0, 0, Loc.F("Copying {0}", Path.GetFileName(path)));
                     if (!File.Exists(dest)) File.Copy(path, dest);
                 }
                 return ImportResult.Added;
@@ -751,18 +751,18 @@ namespace SilentHillPC_Launcher
                 bool activeNow = IsTextureActive(m);
                 if (m.Enabled && !activeNow)
                 {
-                    if (report != null) report(0, 0, "Enabling " + m.Label);
+                    if (report != null) report(0, 0, Loc.F("Enabling {0}", m.Label));
                     if (!EnableTexture(m, report, cancelled))
                     {
                         m.Enabled = false;
-                        result.Warnings.Add(m.Label + (cancelled != null && cancelled()
-                                                       ? ": unpack cancelled, left off"
-                                                       : ": enable failed"));
+                        result.Warnings.Add(cancelled != null && cancelled()
+                                            ? Loc.F("{0}: unpack cancelled, left off", m.Label)
+                                            : Loc.F("{0}: enable failed", m.Label));
                     }
                 }
                 else if (!m.Enabled && activeNow)
                 {
-                    if (report != null) report(0, 0, "Disabling " + m.Label);
+                    if (report != null) report(0, 0, Loc.F("Disabling {0}", m.Label));
                     DisableTexture(m);
                 }
             }
@@ -782,7 +782,7 @@ namespace SilentHillPC_Launcher
             }
 
             // 3) Deploy library mods (Gameplay, Load, FMV, TotalConversion, Preset)
-            if (report != null) report(0, 0, "Deploying mods…");
+            if (report != null) report(0, 0, Loc.T("Deploying mods…"));
             var plan = BuildDeployPlan(result);
             var keep = new HashSet<string>(plan.Keys.Select(Rel), StringComparer.OrdinalIgnoreCase);
             var old  = ReadManifest();
@@ -912,7 +912,7 @@ namespace SilentHillPC_Launcher
                 {
                     if (cancelled != null && cancelled()) return false;
                     i++;
-                    if (report != null) report(i, total, string.Format("Extracting {0}  ({1}/{2})",
+                    if (report != null) report(i, total, Loc.F("Extracting {0}  ({1}/{2})",
                         Path.GetFileName(zip), i, total));
                     string outPath = Path.GetFullPath(Path.Combine(dest, entry.FullName));
                     if (!outPath.StartsWith(destPrefix, StringComparison.OrdinalIgnoreCase)) continue; // zip-slip guard
@@ -936,7 +936,7 @@ namespace SilentHillPC_Launcher
             for (int i = 0; i < files.Length; i++)
             {
                 if (cancelled != null && cancelled()) return false;
-                if (report != null) report(i + 1, files.Length, string.Format("{0}  ({1}/{2})", label ?? "Copying", i + 1, files.Length));
+                if (report != null) report(i + 1, files.Length, string.Format("{0}  ({1}/{2})", label ?? Loc.T("Copying"), i + 1, files.Length));
                 File.Copy(files[i], files[i].Replace(src, dst), true);
             }
             return true;
@@ -967,12 +967,12 @@ namespace SilentHillPC_Launcher
                 bool isDll     = relLower.EndsWith(".dll");
                 if (relLower.Contains("..") || !(inMaps || inPlugins) || !isDll)
                 {
-                    warnings.Add("skipped (only maps/ and plugins/ DLLs deploy): " + rel);
+                    warnings.Add(Loc.F("skipped (only maps/ and plugins/ DLLs deploy): {0}", rel));
                     continue;
                 }
                 if (relLower.Count(c => c == '/') != 1)
                 {
-                    warnings.Add("skipped (nested path): " + rel);
+                    warnings.Add(Loc.F("skipped (nested path): {0}", rel));
                     continue;
                 }
 
@@ -1253,7 +1253,7 @@ namespace SilentHillPC_Launcher
                 string dst = kv.Key;
                 string src = kv.Value;
                 string rel = Rel(dst);
-                if (report != null && (++i % 50) == 0) report(i, plan.Count, "Deploying " + rel);
+                if (report != null && (++i % 50) == 0) report(i, plan.Count, Loc.F("Deploying {0}", rel));
 
                 DeployedRecord r;
                 if (old.TryGetValue(rel, out r))
