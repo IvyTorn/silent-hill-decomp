@@ -261,9 +261,11 @@ table.inv select { max-width: 17em; }
   </details>
 </div>
 
-<script src="sh_savecard_core.js"></script>
-<script src="sh_savecard_data.js"></script>
-<script src="sh_savecard_editor.js"></script>
+<!-- Bump ?v= whenever any of these files change: web hosts cache .js for a day,
+     and a new page running against an old core breaks. -->
+<script src="sh_savecard_core.js?v=2026-09-27"></script>
+<script src="sh_savecard_data.js?v=2026-09-27"></script>
+<script src="sh_savecard_editor.js?v=2026-09-27"></script>
 <script>
 (function () {
   'use strict';
