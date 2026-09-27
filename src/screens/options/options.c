@@ -29,6 +29,9 @@
 #include "pc_mouse_cursor.h"
 #include "map_registry.h"
 #include "lang_text.h" /* PAL Language row (title-screen options) */
+#ifdef SH_PC_PORT
+#include "lang_quick.h" /* quick-menu row values */
+#endif
 #include "lang_pack.h" /* PC-side pack language label (Polish) */
 #define LAYER_24   PSX_OT_OFS(24)
 #define LAYER_40   PSX_OT_OFS(40)
@@ -575,15 +578,15 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         return buf;
     case QO_X_SPEAKERS: {
         int a = g_PcConfig.audioOutput;
-        return (a >= 0 && a < 5) ? QO_SPEAKER_LBL[a] : "HRTF";
+        return Pc_LangQuick((a >= 0 && a < 5) ? QO_SPEAKER_LBL[a] : "HRTF");
     }
     /* Quick menu only: the PC Options graphics page is already at its row limit. */
     case QO_X_DREAMBLUR:
-        return g_PcConfig.dreamBlur ? "On" : "Off";
+        return Pc_LangQuickMenu(g_PcConfig.dreamBlur ? "On" : "Off");
     case QO_X_DPADMOVE:
-        return g_PcConfig.disableDpadMovement ? "On" : "Off";
+        return Pc_LangQuickMenu(g_PcConfig.disableDpadMovement ? "On" : "Off");
     case QO_X_DREAMSTR:
-        if (!g_PcConfig.dreamBlur) { snprintf(buf, bufsz, "%d%%  (off)", (int)(g_PcConfig.dreamBlurStrength * 100.0f + 0.5f)); return buf; }
+        if (!g_PcConfig.dreamBlur) { snprintf(buf, bufsz, "%d%%  %s", (int)(g_PcConfig.dreamBlurStrength * 100.0f + 0.5f), Pc_LangQuick("(off)")); return buf; }
         snprintf(buf, bufsz, "%d%%", (int)(g_PcConfig.dreamBlurStrength * 100.0f + 0.5f));
         return buf;
     case QO_X_BGM:
@@ -593,12 +596,12 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%d / 16", g_GameWork.config.volumeSe / 8);
         return buf;
     case QO_X_ASPECT:
-        return g_PcConfig.aspectRaw ? "Advanced" : "Simple";
+        return Pc_LangQuick(g_PcConfig.aspectRaw ? "Advanced" : "Simple");
     /* Advanced gets its shape from hfov x vfov / par instead, so the trim is
       * inert there and says so rather than reading as a knob that failed. */
     case QO_X_CRTTRIM:
-        snprintf(buf, bufsz, g_PcConfig.aspectRaw ? "%.2f  (simple)" : "%.2f",
-                 g_PcConfig.crtAspectTrim);
+        snprintf(buf, bufsz, "%.2f%s%s", g_PcConfig.crtAspectTrim,
+                 g_PcConfig.aspectRaw ? "  " : "", g_PcConfig.aspectRaw ? Pc_LangQuick("(simple)") : "");
         return buf;
     /* Simple hides this row entirely: its pixel-aspect solve divides hfov
       * straight back out, so the knob genuinely does nothing there. */
@@ -612,18 +615,22 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%.3f", g_PcConfig.pixelAspect);
         return buf;
     case QO_X_VSHIFT:
-        snprintf(buf, bufsz, "%+d rows", (int)g_PcConfig.worldVShift);
-        return buf;
     case QO_X_CUTSHIFT:
-        snprintf(buf, bufsz, "%+d rows", (int)g_PcConfig.cutsceneVShift);
+    {
+        char n[16];
+        snprintf(n, sizeof(n), "%+d", (int)(which == QO_X_VSHIFT ? g_PcConfig.worldVShift : g_PcConfig.cutsceneVShift));
+        snprintf(buf, bufsz, "%s", Pc_LangQuickFill("{n} rows", "{n}", n));
         return buf;
+    }
     case QO_X_TPSFOV:
-        snprintf(buf, bufsz, "%.0f%s", g_PcConfig.tpsFov,
-                 (g_PcConfig.tpsFov > 71.0f && g_PcConfig.tpsFov < 71.2f) ? " (default)" : "");
+        snprintf(buf, bufsz, "%.0f%s%s", g_PcConfig.tpsFov,
+                 (g_PcConfig.tpsFov > 71.0f && g_PcConfig.tpsFov < 71.2f) ? " " : "",
+                 (g_PcConfig.tpsFov > 71.0f && g_PcConfig.tpsFov < 71.2f) ? Pc_LangQuick("(default)") : "");
         return buf;
     case QO_X_FPSFOV:
-        snprintf(buf, bufsz, "%.0f%s", g_PcConfig.fpsFov,
-                 (g_PcConfig.fpsFov > 71.0f && g_PcConfig.fpsFov < 71.2f) ? " (default)" : "");
+        snprintf(buf, bufsz, "%.0f%s%s", g_PcConfig.fpsFov,
+                 (g_PcConfig.fpsFov > 71.0f && g_PcConfig.fpsFov < 71.2f) ? " " : "",
+                 (g_PcConfig.fpsFov > 71.0f && g_PcConfig.fpsFov < 71.2f) ? Pc_LangQuick("(default)") : "");
         return buf;
     case QO_X_FPSHEADX:
         snprintf(buf, bufsz, "%+d", g_PcConfig.fpsHeadX);
@@ -636,12 +643,13 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%+d", g_PcConfig.fpsHeadZ);
         return buf;
     case QO_X_FPSSWING:
-        if (g_PcConfig.fpsMeleeSwing <= 0.0001f) return "Off";
+        if (g_PcConfig.fpsMeleeSwing <= 0.0001f) return Pc_LangQuickMenu("Off");
         snprintf(buf, bufsz, "%.2f", g_PcConfig.fpsMeleeSwing);
         return buf;
     case QO_X_OTSFOV:
-        snprintf(buf, bufsz, "%.0f%s", g_PcConfig.otsFov,
-                 (g_PcConfig.otsFov > 71.0f && g_PcConfig.otsFov < 71.2f) ? " (default)" : "");
+        snprintf(buf, bufsz, "%.0f%s%s", g_PcConfig.otsFov,
+                 (g_PcConfig.otsFov > 71.0f && g_PcConfig.otsFov < 71.2f) ? " " : "",
+                 (g_PcConfig.otsFov > 71.0f && g_PcConfig.otsFov < 71.2f) ? Pc_LangQuick("(default)") : "");
         return buf;
     case QO_X_TPSAIMZOOM:
         snprintf(buf, bufsz, "%+d%%", (int)(g_PcConfig.tpsAimZoom + (g_PcConfig.tpsAimZoom < 0.0f ? -0.5f : 0.5f)));
@@ -650,7 +658,7 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%+d%%", (int)(g_PcConfig.otsAimZoom + (g_PcConfig.otsAimZoom < 0.0f ? -0.5f : 0.5f)));
         return buf;
     case QO_X_TPSOTSAIM:
-        return g_PcConfig.tpsOtsAim ? "On" : "Off";
+        return Pc_LangQuickMenu(g_PcConfig.tpsOtsAim ? "On" : "Off");
     /* Position offsets, raw Q12; Y shown up-positive (stored PSX-down). */
     case QO_X_TPSRESTX: snprintf(buf, bufsz, "%+d", g_PcConfig.tpsRestX);  return buf;
     case QO_X_TPSRESTY: snprintf(buf, bufsz, "%+d", -g_PcConfig.tpsRestY); return buf;

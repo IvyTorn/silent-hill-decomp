@@ -19,6 +19,7 @@
 
 #include "pc_cheats.h"
 #include "pc_config.h"
+#include "lang_quick.h"
 #include "sh_log.h"
 
 #include <stdio.h>
@@ -307,15 +308,16 @@ const char* Pc_Cheats_Label(int page, int idx, char* buf, int bufsz)
     if (!r) return "";
     switch (r->kind)
     {
-        case CH_TOGGLE:    return *r->flag ? "On" : "Off";
+        case CH_TOGGLE:    return Pc_LangQuickMenu(*r->flag ? "On" : "Off");
         /* Fog row stores "disabled", so present it the right way round. */
         case CH_ACTION:    return "";
         case CH_PLAYAS:    return Pc_PlayAs_Label(Pc_PlayAs_Current());
-        case CH_FREECAM:   return g_DebugCamEnabled ? "On" : "Off";
-        case CH_DEBUGKEYS: return g_PcAllowDebugControls ? "On" : "Off";
+        case CH_FREECAM:   return Pc_LangQuickMenu(g_DebugCamEnabled ? "On" : "Off");
+        case CH_DEBUGKEYS: return Pc_LangQuickMenu(g_PcAllowDebugControls ? "On" : "Off");
         case CH_SPAWN:
-            snprintf(buf, bufsz, "< %s >%s", Pc_SpawnList_Name(s_spawnIdx),
-                     Pc_SpawnList_Ready(s_spawnIdx) ? "" : "  (not in this map)");
+            snprintf(buf, bufsz, "< %s >%s%s", Pc_SpawnList_Name(s_spawnIdx),
+                     Pc_SpawnList_Ready(s_spawnIdx) ? "" : "  ",
+                     Pc_SpawnList_Ready(s_spawnIdx) ? "" : Pc_LangQuick("(not in this map)"));
             return buf;
         case CH_MAP:
         {

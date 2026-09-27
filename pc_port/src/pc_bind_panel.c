@@ -31,6 +31,7 @@
 #include "pc_mouse_cursor.h"
 #include "pc_config.h"
 #include "control_style.h"
+#include "lang_quick.h"
 #include "sh_log.h"
 #include "game.h"
 #include "bodyprog/sound/sfx_id_enum.h"
@@ -144,7 +145,7 @@ static int            s_fontsTried;
 #define BP_TEXT_MAX 192
 typedef struct
 {
-    char   text[64];
+    char   text[256];
     int    px;
     GLuint tex;
     int    w, h;
@@ -278,7 +279,7 @@ static const char* bp_pretty_key(const char* v)
     for (i = 0; i < (int)(sizeof(map) / sizeof(map[0])); i++)
     {
         if (SDL_strcasecmp(v, map[i].id) == 0)
-            return map[i].name;
+            return Pc_LangQuick(map[i].name);
     }
     return v;
 }
@@ -308,7 +309,7 @@ static const char* bp_pretty_pad(const char* v, int padType)
     for (i = 0; i < (int)(sizeof(map) / sizeof(map[0])); i++)
     {
         if (SDL_strcasecmp(v, map[i].id) == 0)
-            return ps ? map[i].ps : map[i].xb;
+            return Pc_LangQuick(ps ? map[i].ps : map[i].xb);
     }
     return v;
 }
@@ -322,7 +323,7 @@ static const char* bp_cell_text(int row, int col, int padType)
     if (s_rows[row].key[col] == NULL)
     {
         if (col == BP_PAD1 && (s_rows[row].flags & BPF_STICK))
-            return "Left Stick";
+            return Pc_LangQuick("Left Stick");
         return "";
     }
     v = bp_value(row, col);
@@ -986,7 +987,7 @@ static GLuint bp_bake(const char* text, float px, int* outW, int* outH)
     p     = text;
     while (*p)
     {
-        int cp = (unsigned char)*p++;
+        int cp = (int)Pc_LangUtf8Next(&p);
         int gx0, gy0, gx1, gy1, gw, gh, adv, lsb, sx, sy;
         float shiftX;
         if (prev)
@@ -1077,7 +1078,7 @@ void Pc_BindPanel_Draw(void)
     float colX[BP_COLS + 2];
     int   pxTitle, pxRow, pxSmall, padType, i, c, shown;
     const char* padName;
-    char  line[160];
+    char  line[384];
 
     GLint  prevProg = 0, prevVao = 0, prevBuf = 0, prevTex = 0, prevUnit = GL_TEXTURE0, prevAlign = 4;
     GLint  prevSrcRgb = GL_ONE, prevDstRgb = GL_ZERO, prevSrcA = GL_ONE, prevDstA = GL_ZERO;
@@ -1216,21 +1217,22 @@ void Pc_BindPanel_Draw(void)
     bp_quad(s_texWhite, NX(panelL + 2.0f), NY(panelT - titleH), NX(panelR - 2.0f), NY(panelT - titleH - 2.0f),
             0.47f, 0.11f, 0.08f, dim);
     {
-        const BpText* t = bp_text("CONTROLS", pxTitle);
+        const BpText* t = bp_text(Pc_LangQuick("CONTROLS"), pxTitle);
         if (t)
             TEXT_AT(t, panelL + (panelW - (float)t->w) * 0.5f, panelT - titleH * 0.5f, 1.0f, 0.93f, 0.86f);
     }
 
     /* Which binds these are, and which controller is live. */
     if (s_scheme)
-        snprintf(line, sizeof(line), "Editing: alternate camera binds (current camera: %s)", Pc_ControlStyleLabel(s_style));
+        snprintf(line, sizeof(line), "%s", Pc_LangQuickFill("Editing: alternate camera binds (current camera: {camera})",
+                                                            "{camera}", Pc_LangQuick(Pc_ControlStyleLabel(s_style))));
     else
-        snprintf(line, sizeof(line), "Editing: classic camera binds");
+        snprintf(line, sizeof(line), "%s", Pc_LangQuick("Editing: classic camera binds"));
     TEXT_AT(bp_text(line, pxSmall), listL, panelT - titleH - subH * 0.5f, 0.92f, 0.86f, 0.78f);
     if (padName != NULL)
-        snprintf(line, sizeof(line), "Controller: %s", padName);
+        snprintf(line, sizeof(line), "%s", Pc_LangQuickFill("Controller: {name}", "{name}", padName));
     else
-        snprintf(line, sizeof(line), "Controller: none connected");
+        snprintf(line, sizeof(line), "%s", Pc_LangQuick("Controller: none connected"));
     TEXT_AT(bp_text(line, pxSmall), listL, panelT - titleH - subH * 1.5f,
             padName ? 0.72f : 0.60f, padName ? 0.84f : 0.60f, padName ? 0.72f : 0.62f);
 
@@ -1239,7 +1241,7 @@ void Pc_BindPanel_Draw(void)
         static const char* heads[BP_COLS + 1] = { "Action", "Keyboard", "Keyboard 2", "Controller", "Controller 2" };
         float hy = panelT - titleH - 2.0f * subH - headH * 0.5f;
         for (c = 0; c <= BP_COLS; c++)
-            TEXT_AT(bp_text(heads[c], pxRow), colX[c] + pad * 0.4f, hy, 0.62f, 0.62f, 0.68f);
+            TEXT_AT(bp_text(Pc_LangQuick(heads[c]), pxRow), colX[c] + pad * 0.4f, hy, 0.62f, 0.62f, 0.68f);
         bp_quad(s_texWhite, NX(listL), NY(listT + 1.0f), NX(listR), NY(listT), 1.0f, 1.0f, 1.0f, 0.14f * dim);
     }
 
@@ -1264,7 +1266,7 @@ void Pc_BindPanel_Draw(void)
 
         if (i >= BP_ROWS)
         {
-            const char* lbl = (i == BP_ROW_RESET) ? "Reset to Defaults" : "Close";
+            const char* lbl = Pc_LangQuick((i == BP_ROW_RESET) ? "Reset to Defaults" : "Close");
             const BpText* t = bp_text(lbl, pxRow);
             if (selRow)
                 bp_quad(s_texWhite, NX(listL), NY(rt - 1.0f), NX(listR), NY(rb + 1.0f), 0.42f, 0.16f, 0.12f, 0.85f * dim);
@@ -1281,7 +1283,7 @@ void Pc_BindPanel_Draw(void)
 
         {
             float lc = enabled ? 0.88f : 0.42f;
-            TEXT_AT(bp_text(s_rows[i].label, pxRow), colX[0] + pad * 0.4f, ym, lc, lc * 0.97f, lc * 0.94f);
+            TEXT_AT(bp_text(Pc_LangQuick(s_rows[i].label), pxRow), colX[0] + pad * 0.4f, ym, lc, lc * 0.97f, lc * 0.94f);
         }
 
         for (c = 0; c < BP_COLS; c++)
@@ -1297,7 +1299,7 @@ void Pc_BindPanel_Draw(void)
                         0.42f, 0.16f, 0.12f, 0.85f * dim);
             }
             if (selCell && s_listen)
-                txt = (c >= BP_PAD1) ? "Press a button..." : "Press a key...";
+                txt = Pc_LangQuick((c >= BP_PAD1) ? "Press a button..." : "Press a key...");
             else
                 txt = bp_cell_text(i, c, padType);
 
@@ -1323,9 +1325,9 @@ void Pc_BindPanel_Draw(void)
 
     /* Scroll hints. */
     if (s_scroll > 0)
-        TEXT_AT(bp_text("more above", pxSmall), listR - pad * 4.0f, listT + headH * 0.5f, 0.55f, 0.55f, 0.60f);
+        TEXT_AT(bp_text(Pc_LangQuick("more above"), pxSmall), listR - pad * 4.0f, listT + headH * 0.5f, 0.55f, 0.55f, 0.60f);
     if (s_scroll + s_visRows < BP_ROW_COUNT)
-        TEXT_AT(bp_text("more below", pxSmall), listR - pad * 4.0f, listB - pxSmall * 0.6f, 0.55f, 0.55f, 0.60f);
+        TEXT_AT(bp_text(Pc_LangQuick("more below"), pxSmall), listR - pad * 4.0f, listB - pxSmall * 0.6f, 0.55f, 0.55f, 0.60f);
 
     /* Footer: what the keys do right now. */
     {
@@ -1335,21 +1337,26 @@ void Pc_BindPanel_Draw(void)
         {
             if (s_col >= BP_PAD1)
             {
-                snprintf(line, sizeof(line), "Press a controller button for %s", s_rows[s_row].label);
-                hint2 = "Esc, or wait a few seconds, to cancel";
+                snprintf(line, sizeof(line), "%s", Pc_LangQuickFill("Press a controller button for {action}", "{action}",
+                                                                    Pc_LangQuick(s_rows[s_row].label)));
+                hint2 = Pc_LangQuick("Esc, or wait a few seconds, to cancel");
             }
             else
             {
-                snprintf(line, sizeof(line), "Press a key%s for %s",
-                         (s_rows[s_row].flags & BPF_MOUSE) ? " or mouse button" : "", s_rows[s_row].label);
-                hint2 = "Esc to cancel";
+                snprintf(line, sizeof(line), "%s",
+                         Pc_LangQuickFill((s_rows[s_row].flags & BPF_MOUSE) ? "Press a key or mouse button for {action}"
+                                                                            : "Press a key for {action}",
+                                          "{action}", Pc_LangQuick(s_rows[s_row].label)));
+                hint2 = Pc_LangQuick("Esc to cancel");
             }
             hint = line;
         }
         else
         {
-            hint  = "Enter / A: rebind     Delete / X: clear     Esc / B: back";
-            hint2 = "Mouse: click a bind to change it, right-click to clear. Orange = used twice.";
+            snprintf(line, sizeof(line), "%s     %s     %s", Pc_LangQuick("Enter / A: rebind"),
+                     Pc_LangQuick("Delete / X: clear"), Pc_LangQuick("Esc / B: back"));
+            hint  = line;
+            hint2 = Pc_LangQuick("Mouse: click a bind to change it, right-click to clear. Orange = used twice.");
         }
         TEXT_AT(bp_text(hint, pxRow), panelL + pad, panelB + footH * 0.62f, 0.90f, 0.88f, 0.84f);
         if (hint2)

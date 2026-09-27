@@ -36,6 +36,7 @@
 #include "pc_config.h"
 #include "pc_cheats.h"
 #include "control_style.h"
+#include "lang_quick.h"
 #include "sh_log.h"
 #include "game.h"
 #include "bodyprog/sound/sfx_id_enum.h"
@@ -967,7 +968,7 @@ static GLuint qo_bake_once(const char* text, float px, int* outW, int* outH, int
     p     = text;
     while (*p)
     {
-        int cp = (unsigned char)*p++;
+        int cp = (int)Pc_LangUtf8Next(&p);
         int gx0, gy0, gx1, gy1, gw, gh, adv, lsb, sx, sy;
         float shiftX;
         if (prev)
@@ -1137,12 +1138,12 @@ static GLuint qo_bake_icon(const unsigned char* mask, int srcSize, int size, int
  * Both icon pairs are square at one size, so the fit holds for either. */
 static void qo_bake_nav(int page, int px, float avail)
 {
-    char dest[96];
+    char dest[192];
     int  pass, i;
 
     snprintf(dest, sizeof(dest), "(%s  /  %s)",
-             s_pageNames[(page + QO_PAGES - 1) % QO_PAGES],
-             s_pageNames[(page + 1) % QO_PAGES]);
+             Pc_LangQuick(s_pageNames[(page + QO_PAGES - 1) % QO_PAGES]),
+             Pc_LangQuick(s_pageNames[(page + 1) % QO_PAGES]));
 
     for (pass = 0; pass < 2; pass++)
     {
@@ -1150,9 +1151,9 @@ static void qo_bake_nav(int page, int px, float avail)
         const int icon   = (int)((float)px * 1.15f + 0.5f);
         float     total;
 
-        s_texNav[QO_NAV_PREV]   = qo_bake("Previous", (float)px, &s_navW[QO_NAV_PREV], &s_navH[QO_NAV_PREV]);
+        s_texNav[QO_NAV_PREV]   = qo_bake(Pc_LangQuick("Previous"), (float)px, &s_navW[QO_NAV_PREV], &s_navH[QO_NAV_PREV]);
         s_texNav[QO_NAV_SLASH]  = qo_bake("/", (float)px, &s_navW[QO_NAV_SLASH], &s_navH[QO_NAV_SLASH]);
-        s_texNav[QO_NAV_NEXT]   = qo_bake("Next", (float)px, &s_navW[QO_NAV_NEXT], &s_navH[QO_NAV_NEXT]);
+        s_texNav[QO_NAV_NEXT]   = qo_bake(Pc_LangQuick("Next"), (float)px, &s_navW[QO_NAV_NEXT], &s_navH[QO_NAV_NEXT]);
         s_texNav[QO_NAV_DEST]   = qo_bake(dest, (float)destPx, &s_navW[QO_NAV_DEST], &s_navH[QO_NAV_DEST]);
         s_texNav[QO_NAV_ICON_R] = qo_bake_icon(g_PcMouseIconRight, PC_MOUSE_ICON_SIZE, icon, &s_navW[QO_NAV_ICON_R], &s_navH[QO_NAV_ICON_R]);
         s_texNav[QO_NAV_ICON_L] = qo_bake_icon(g_PcMouseIconLeft,  PC_MOUSE_ICON_SIZE, icon, &s_navW[QO_NAV_ICON_L], &s_navH[QO_NAV_ICON_L]);
@@ -1333,12 +1334,12 @@ static void qo_row_name(const QoRowDef* r, char* out, int n)
     if (r->kind == ROW_OPT)
     {
         const void* h = PcOpt_QuickFind(r->key);
-        src = h ? PcOpt_QuickName(h) : r->key;
+        src = h ? Pc_LangQuickMenu(PcOpt_QuickName(h)) : r->key;
     }
     else if (r->kind == ROW_CHEAT)
-        src = Pc_Cheats_Name(r->cpage, r->extra);
+        src = Pc_LangQuick(Pc_Cheats_Name(r->cpage, r->extra));
     else
-        src = r->label;
+        src = Pc_LangQuick(r->label);
 
     for (i = 0; i < n - 1 && src[i]; i++)
         out[i] = (src[i] == '_') ? ' ' : src[i];
@@ -1352,7 +1353,7 @@ static void qo_row_value(const QoRowDef* r, char* out, int n)
     if (r->kind == ROW_OPT)
     {
         const void* h = PcOpt_QuickFind(r->key);
-        const char* v = h ? PcOpt_QuickLabel(h, buf, (int)sizeof(buf)) : "?";
+        const char* v = h ? Pc_LangQuickMenu(PcOpt_QuickLabel(h, buf, (int)sizeof(buf))) : "?";
         int i;
         for (i = 0; i < n - 1 && v[i]; i++)
             out[i] = (v[i] == '_') ? ' ' : v[i];
@@ -2012,26 +2013,20 @@ void Pc_QuickOptions_Draw(void)
     }
     if (!s_texTitle)
     {
-        char titleBuf[96];
-        char name[48];
-        int  k;
+        char titleBuf[192];
+        char name[96];
 
-        for (k = 0; k < (int)sizeof(name) - 1 && s_pageNames[s_page][k]; k++)
-        {
-            const char c = s_pageNames[s_page][k];
-            name[k] = (c >= 'a' && c <= 'z') ? (char)(c - 'a' + 'A') : c;
-        }
-        name[k] = 0;
+        Pc_LangUtf8Upper(Pc_LangQuick(s_pageNames[s_page]), name, (int)sizeof(name));
         if (s_page == QO_PG_VIEW)
         {
             int m = qo_view_cam_mode();
-            snprintf(titleBuf, sizeof(titleBuf), "QUICK OPTIONS  -  %s  (%s)", name,
-                     (m == QO_CAM_FPS) ? "Firstperson" :
-                     (m == QO_CAM_OTS) ? "Over-the-Shoulder" :
-                     (m == QO_CAM_TPS) ? "Thirdperson" : "Classic");
+            snprintf(titleBuf, sizeof(titleBuf), "%s  -  %s  (%s)", Pc_LangQuick("QUICK OPTIONS"), name,
+                     Pc_LangQuick((m == QO_CAM_FPS) ? "Firstperson" :
+                                  (m == QO_CAM_OTS) ? "Over-the-Shoulder" :
+                                  (m == QO_CAM_TPS) ? "Thirdperson" : "Classic"));
         }
         else
-            snprintf(titleBuf, sizeof(titleBuf), "QUICK OPTIONS  -  %s", name);
+            snprintf(titleBuf, sizeof(titleBuf), "%s  -  %s", Pc_LangQuick("QUICK OPTIONS"), name);
         s_texTitle = qo_bake(titleBuf, (float)(int)(titleH * 0.46f), &s_titleW, &s_titleH);
     }
     /* Controls footer, on two lines: as one it had to shrink to fit the panel
@@ -2039,15 +2034,18 @@ void Pc_QuickOptions_Draw(void)
      * once only if the wider of them still overflows. */
     if (!s_texHint)
     {
-        char  hint[128], hint2[128];
+        char  hint[384], hint2[384];
         float avail = panelW - 2.0f * pad;
         int   hpx   = (int)(hintH * 0.30f);
         int   widest;
 
         if (hpx < 7) hpx = 7;
-        snprintf(hint, sizeof(hint), "Up/Down select    Left/Right adjust    Q/E or PgUp/PgDn page");
-        snprintf(hint2, sizeof(hint2), "Drag the title to move    %s or Esc close    * needs restart",
-                 g_PcConfig.keyQuickOptions[0] ? g_PcConfig.keyQuickOptions : "F10");
+        snprintf(hint, sizeof(hint), "%s    %s    %s", Pc_LangQuick("Up/Down select"),
+                 Pc_LangQuick("Left/Right adjust"), Pc_LangQuick("Q/E or PgUp/PgDn page"));
+        snprintf(hint2, sizeof(hint2), "%s    %s    %s", Pc_LangQuick("Drag the title to move"),
+                 Pc_LangQuickFill("{key} or Esc close", "{key}",
+                                  g_PcConfig.keyQuickOptions[0] ? g_PcConfig.keyQuickOptions : "F10"),
+                 Pc_LangQuick("* needs restart"));
         s_texHint  = qo_bake(hint,  (float)hpx, &s_hintW,  &s_hintH);
         s_texHint2 = qo_bake(hint2, (float)hpx, &s_hint2W, &s_hint2H);
         widest = (s_hintW > s_hint2W) ? s_hintW : s_hint2W;
