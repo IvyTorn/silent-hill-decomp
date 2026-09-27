@@ -135,6 +135,52 @@ RU: ~C6Загрузка...~C7~E
 ##  MENUS & UI  (title, options, pause, save/load, memory card, inventory actions, save-location names)
 ################################################################################
 
+[MENU.Can't_use_it_here.]
+NOTE: inventory prompt
+EN: Can't use it here.
+RU: Это здесь не применить.
+
+[MENU.Too_dark_to_look_at
+		the_item_here.]
+NOTE: inventory prompt
+EN: Too dark to look at the item here.
+RU: Слишком темно, чтобы осматривать вещи.
+
+[MENU.Stock:]
+NOTE: inventory label, max ~10 characters
+EN: Stock:
+RU: х
+
+[MENU.--On--]
+NOTE: inventory label, max ~10 characters
+EN: ==On==
+RU: -Вкл-
+
+[MENU.--Off--]
+NOTE: inventory label, max ~10 characters
+EN: ==Off==
+RU: -Выкл-
+
+[MENU.--Use_OK--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK==
+RU: 
+
+[MENU.--Use_OK?--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK?==
+RU: 
+
+[MENU.--Use_NG--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use NG==
+RU: 
+
+[MENU.Fuel:]
+NOTE: inventory label, max ~10 characters
+EN: Fuel:
+RU: Топливо:
+
 [MENU.LOAD]
 EN: LOAD
 RU: ЗАГРУЗИТЬ
@@ -545,31 +591,6 @@ NOTE: not on the disc, written by the port team
 EN: Both
 RU: Оба
 
-[MENU.Can't_use_it_here.]
-EN: Can't use it here.
-RU: Это здесь не применить.
-
-[MENU.Too_dark_to_look_at
-		the_item_here.]
-EN: Too dark to look at the item here.
-RU: Слишком темно, чтобы осматривать вещи.
-
-[MENU.Stock:]
-EN: Stock:
-RU: х
-
-[MENU.--On--]
-EN: ==On==
-RU: -Вкл-
-
-[MENU.--Off--]
-EN: ==Off==
-RU: -Выкл-
-
-[MENU.Fuel:]
-EN: Fuel:
-RU: Топливо:
-
 [MENU.Too_dark_to_look_at
 		the_map_here.]
 EN: Too dark to look at the map here.
@@ -579,21 +600,6 @@ RU: Слишком темно, чтобы разглядеть что-нибуд
 		for_this_place.]
 EN: I don't have the map for this place.
 RU: У меня нет карты этого места.
-
-[MENU.--Use_OK--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use OK==
-RU: 
-
-[MENU.--Use_OK?--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use OK?==
-RU: 
-
-[MENU.--Use_NG--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use NG==
-RU: 
 
 
 

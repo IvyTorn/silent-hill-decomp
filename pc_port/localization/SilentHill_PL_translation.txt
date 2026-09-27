@@ -129,6 +129,52 @@ PL: ~C6W trakcie produkcji! ~C7 ~E
 ##  MENUS & UI  (title, options, pause, save/load, memory card, inventory actions, save-location names)
 ################################################################################
 
+[MENU.Can't_use_it_here.]
+NOTE: inventory prompt
+EN: Can't use it here.
+PL: Nie mogę tego tutaj użyć.
+
+[MENU.Too_dark_to_look_at
+		the_item_here.]
+NOTE: inventory prompt
+EN: Too dark to look at the item here.
+PL: Za ciemno, żeby to obejrzeć.
+
+[MENU.Stock:]
+NOTE: inventory label, max ~10 characters
+EN: Stock:
+PL: Ilość:
+
+[MENU.--On--]
+NOTE: inventory label, max ~10 characters
+EN: ==On==
+PL: ==Wł==
+
+[MENU.--Off--]
+NOTE: inventory label, max ~10 characters
+EN: ==Off==
+PL: ==Wył==
+
+[MENU.--Use_OK--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK==
+PL: ==OK==
+
+[MENU.--Use_OK?--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK?==
+PL: ==OK?==
+
+[MENU.--Use_NG--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use NG==
+PL: ==NG==
+
+[MENU.Fuel:]
+NOTE: inventory label, max ~10 characters
+EN: Fuel:
+PL: Paliwo:
+
 [MENU.LOAD]
 EN: LOAD
 PL: WCZYTAJ
@@ -530,103 +576,6 @@ PL: W Grze
 EN: Both
 PL: Oba
 
-[MENU.Can't_use_it_here.]
-EN: Can't use it here.
-PL: Nie mogę tego tutaj użyć.
-
-[MENU.Too_dark_to_look_at
-		the_item_here.]
-EN: Too dark to look at the item here.
-PL: Za ciemno, żeby to obejrzeć.
-
-[MENU.Stock:]
-EN: Stock:
-PL: Ilość:
-
-[MENU.--On--]
-EN: ==On==
-PL: ==Wł==
-
-[MENU.--Off--]
-EN: ==Off==
-PL: ==Wył==
-
-[MENU.Fuel:]
-EN: Fuel:
-PL: Paliwo:
-
-[MENU.GAME_RESULT]
-EN: GAME RESULT
-PL: WYNIKI GRY
-
-[MENU.Mode]
-EN: Mode
-PL: Tryb
-
-[MENU.Saves]
-EN: Saves
-PL: Zapisy
-
-[MENU.Continues]
-EN: Continues
-PL: Kontynuacje
-
-[MENU.Total_time]
-EN: Total time
-PL: Łączny czas
-
-[MENU.Walking_distance]
-EN: Walking distance
-PL: Dystans pieszo
-
-[MENU.Running_distance]
-EN: Running distance
-PL: Dystans biegiem
-
-[MENU.Items]
-EN: Items
-PL: Przedmioty
-
-[MENU.Game_clear]
-EN: Game clear
-PL: Ukończenia gry
-
-[MENU.Ending]
-EN: Ending
-PL: Zakończenie
-
-[MENU.--Your_rank--]
-EN: ==Your rank==
-PL: ==Ranga==
-
-[MENU.Defeated_enemy_by_shooting]
-EN: Defeated enemy by shooting
-PL: Wrogowie zastrzeleni
-
-[MENU.Defeated_enemy_by_fighting]
-EN: Defeated enemy by fighting
-PL: Zabici w walce wręcz
-
-[MENU.Shooting_style]
-EN: Shooting style
-PL: Styl strzelania
-
-[MENU.Short_range_shots]
-EN: Short range shots
-PL: Z bliska
-
-[MENU.Middle_range_shots]
-EN: Middle range shots
-PL: Ze średniej odl.
-
-[MENU.Long_range_shots]
-EN: Long range shots
-PL: Z daleka
-
-[MENU.No_aiming_shots]
-EN: No aiming shots
-PL: Bez celowania
-
 [MENU.Too_dark_to_look_at
 		the_map_here.]
 EN: Too dark to look at the map here.
@@ -637,20 +586,101 @@ PL: Jest za ciemno, żeby wyciągnąć mapę.
 EN: I don't have the map for this place.
 PL: Nie mam mapy tego miejsca.
 
-[MENU.--Use_OK--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use OK==
-PL: ==OK==
 
-[MENU.--Use_OK?--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use OK?==
-PL: ==OK?==
 
-[MENU.--Use_NG--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use NG==
-PL: ==NG==
+################################################################################
+##  RESULTS SCREEN  (after the credits: play statistics and rank)
+################################################################################
+
+[MENU.GAME_RESULT]
+NOTE: results screen title, max ~20 characters
+EN: GAME RESULT
+PL: WYNIKI GRY
+
+[MENU.Mode]
+NOTE: results screen label, the difficulty follows, max ~18 characters
+EN: Mode
+PL: Tryb
+
+[MENU.Saves]
+NOTE: results screen label, a number follows, max ~20 characters
+EN: Saves
+PL: Zapisy
+
+[MENU.Continues]
+NOTE: results screen label, a number follows, max ~20 characters
+EN: Continues
+PL: Kontynuacje
+
+[MENU.Total_time]
+NOTE: results screen label, the play time follows, max ~13 characters
+EN: Total time
+PL: Łączny czas
+
+[MENU.Walking_distance]
+NOTE: results screen label, a distance follows, max ~16 characters
+EN: Walking distance
+PL: Dystans pieszo
+
+[MENU.Running_distance]
+NOTE: results screen label, a distance follows, max ~16 characters
+EN: Running distance
+PL: Dystans biegiem
+
+[MENU.Items]
+NOTE: results screen label, "found / total" follows, max ~16 characters
+EN: Items
+PL: Przedmioty
+
+[MENU.Game_clear]
+NOTE: results screen label, the number of clears follows, max ~20 characters
+EN: Game clear
+PL: Ukończenia gry
+
+[MENU.Ending]
+NOTE: results screen label, the ending name follows, max ~19 characters
+EN: Ending
+PL: Zakończenie
+
+[MENU.--Your_rank--]
+NOTE: results screen label, the rank stars follow on the same line, max ~13 characters
+EN: ==Your rank==
+PL: ==Ranga==
+
+[MENU.Defeated_enemy_by_shooting]
+NOTE: results screen label, a number follows, max ~23 characters
+EN: Defeated enemy by shooting
+PL: Wrogowie zastrzeleni
+
+[MENU.Defeated_enemy_by_fighting]
+NOTE: results screen label, a number follows, max ~23 characters
+EN: Defeated enemy by fighting
+PL: Zabici w walce wręcz
+
+[MENU.Shooting_style]
+NOTE: results screen heading over the four rows below, max ~20 characters
+EN: Shooting style
+PL: Styl strzelania
+
+[MENU.Short_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Short range shots
+PL: Z bliska
+
+[MENU.Middle_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Middle range shots
+PL: Ze średniej odl.
+
+[MENU.Long_range_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: Long range shots
+PL: Z daleka
+
+[MENU.No_aiming_shots]
+NOTE: results screen label, a percentage follows, max ~19 characters
+EN: No aiming shots
+PL: Bez celowania
 
 
 

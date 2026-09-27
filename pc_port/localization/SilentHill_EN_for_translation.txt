@@ -129,6 +129,52 @@ TR:
 ##  MENUS & UI  (title, options, pause, save/load, memory card, inventory actions, save-location names)
 ################################################################################
 
+[MENU.Can't_use_it_here.]
+NOTE: inventory prompt
+EN: Can't use it here.
+TR: 
+
+[MENU.Too_dark_to_look_at
+		the_item_here.]
+NOTE: inventory prompt
+EN: Too dark to look at the item here.
+TR: 
+
+[MENU.Stock:]
+NOTE: inventory label, max ~10 characters
+EN: Stock:
+TR: 
+
+[MENU.--On--]
+NOTE: inventory label, max ~10 characters
+EN: ==On==
+TR: 
+
+[MENU.--Off--]
+NOTE: inventory label, max ~10 characters
+EN: ==Off==
+TR: 
+
+[MENU.--Use_OK--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK==
+TR: 
+
+[MENU.--Use_OK?--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK?==
+TR: 
+
+[MENU.--Use_NG--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use NG==
+TR: 
+
+[MENU.Fuel:]
+NOTE: inventory label, max ~10 characters
+EN: Fuel:
+TR: 
+
 [MENU.LOAD]
 EN: LOAD
 TR: 
@@ -530,31 +576,6 @@ TR:
 EN: Both
 TR: 
 
-[MENU.Can't_use_it_here.]
-EN: Can't use it here.
-TR: 
-
-[MENU.Too_dark_to_look_at
-		the_item_here.]
-EN: Too dark to look at the item here.
-TR: 
-
-[MENU.Stock:]
-EN: Stock:
-TR: 
-
-[MENU.--On--]
-EN: ==On==
-TR: 
-
-[MENU.--Off--]
-EN: ==Off==
-TR: 
-
-[MENU.Fuel:]
-EN: Fuel:
-TR: 
-
 [MENU.Too_dark_to_look_at
 		the_map_here.]
 EN: Too dark to look at the map here.
@@ -563,21 +584,6 @@ TR:
 [MENU.I_don't_have_the_map
 		for_this_place.]
 EN: I don't have the map for this place.
-TR: 
-
-[MENU.--Use_OK--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use OK==
-TR: 
-
-[MENU.--Use_OK?--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use OK?==
-TR: 
-
-[MENU.--Use_NG--]
-NOTE: inventory label, max ~10 characters
-EN: ==Use NG==
 TR: 
 
 

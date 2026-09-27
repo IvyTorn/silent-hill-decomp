@@ -239,15 +239,19 @@ for name, vals in lbl_arrays.items():
 
 PCOPT_EXTRA = ['PC_Options', '[R]_Reset']   # heading + reset hint drawn by the same menu
 
-# MENU section = s_MenuTr minus whatever the PC Options section now owns.
-seen = set()
-for lit in menu_literals:
-    if lit in pcopt_seen or lit in PCOPT_EXTRA:
-        continue
-    r = readable(lit)
-    if r and r not in seen:
-        seen.add(r)
-        records.append(('MENU', menu_key(lit), lit, r, ''))
+# MENU section = s_MenuTr minus whatever a dedicated section owns: PC Options
+# here, and the results screen / inventory labels further down, which carry
+# their own notes. Emitted at the end, once those have claimed their keys.
+def emit_plain_menu():
+    claimed = {r[1] for r in records}
+    seen = set()
+    for lit in menu_literals:
+        if lit in pcopt_seen or lit in PCOPT_EXTRA or menu_key(lit) in claimed:
+            continue
+        r = readable(lit)
+        if r and r not in seen:
+            seen.add(r)
+            records.append(('MENU', menu_key(lit), lit, r, ''))
 
 for lit in PCOPT_EXTRA:
     note = 'menu heading' if lit == 'PC_Options' else 'hint beside the heading, keep [R]'
@@ -420,6 +424,8 @@ for arr in ('D_80027F14', 'D_80027F94'):
         if kind == 'str' and menu_key(lit) not in {r[1] for r in records}:
             note = 'inventory prompt' if arr == 'D_80027F14' else 'inventory label, max ~10 characters'
             records.append(('MENU', menu_key(lit), lit, readable(lit), note))
+
+emit_plain_menu()
 
 # ---- write outputs -----------------------------------------------------------
 OUT = os.path.join(ROOT, 'pc_port', 'localization')
