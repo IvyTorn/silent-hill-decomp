@@ -655,7 +655,7 @@ PL: Wrogowie zastrzeleni
 [MENU.Defeated_enemy_by_fighting]
 NOTE: results screen label, a number follows, max ~23 characters
 EN: Defeated enemy by fighting
-PL: Zabici w walce wręcz
+PL: Wrogowie zabici br. białą
 
 [MENU.Shooting_style]
 NOTE: results screen heading over the four rows below, max ~20 characters

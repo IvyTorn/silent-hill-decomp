@@ -1639,7 +1639,7 @@ MENU.Game_clear=Ukończenia_gry
 MENU.Ending=Zakończenie
 MENU.--Your_rank--===Ranga==
 MENU.Defeated_enemy_by_shooting=Wrogowie_zastrzeleni
-MENU.Defeated_enemy_by_fighting=Zabici_w_walce_wręcz
+MENU.Defeated_enemy_by_fighting=Wrogowie_zabici_br._białą
 MENU.Shooting_style=Styl_strzelania
 MENU.Short_range_shots=Z_bliska
 MENU.Middle_range_shots=Ze_średniej_odl.
