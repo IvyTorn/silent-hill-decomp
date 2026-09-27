@@ -128,6 +128,53 @@ details { background: var(--surface); border: 1px solid var(--line); border-radi
 details summary { cursor: pointer; font-weight: 500; }
 details[open] summary { margin-bottom: 10px; }
 details .body { display: grid; gap: 10px; font-size: 0.95rem; }
+.card.wide { grid-column: 1 / -1; }
+.chip.edited { border-color: var(--ok); color: var(--ok); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+tr.dim td { color: var(--muted); }
+tr.sel td { background: var(--accent-soft); }
+.slot-actions { display: flex; gap: 4px; }
+.slot-actions button { padding: 2px 8px; font-size: 0.82rem; }
+button.danger { border-color: var(--warn); color: var(--warn); }
+
+.editor { background: var(--surface); border: 1px solid var(--accent); border-radius: 6px; padding: 16px; display: grid; gap: 14px; }
+.ed-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: start; }
+.ed-head h3 { font-size: 1.15rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 10px; color: var(--muted); }
+.tabs button.on { color: var(--ink); border-bottom-color: var(--accent); }
+.ed-body { display: grid; gap: 12px; }
+.ed-body h4 { margin: 4px 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 10px 14px; }
+.fld { display: grid; gap: 3px; min-width: 0; }
+.fld label { font-size: 0.82rem; }
+.fld input, .fld select { width: 100%; min-width: 0; }
+input[type="number"], input[type="text"], input[type="search"], input.hex {
+  font: inherit; font-size: 0.95rem; padding: 5px 7px; border-radius: 4px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); font-variant-numeric: tabular-nums;
+}
+input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+input.narrow { width: 4.5em; }
+input.hex { width: 7.5em; font-family: var(--mono); font-size: 0.85rem; }
+.hint-dot { display: inline-grid; place-items: center; width: 14px; height: 14px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--line); font-size: 0.65rem; color: var(--muted); cursor: help; }
+.chks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.chk { color: var(--ink); cursor: pointer; }
+.scroll { overflow: auto; max-height: 420px; border: 1px solid var(--line); border-radius: 4px; }
+.scroll table th { position: sticky; top: 0; background: var(--surface); }
+.scroll td, .scroll th { padding-left: 8px; }
+.mapsum { max-height: 240px; }
+.mapsum tbody tr { cursor: pointer; }
+.mapsum tbody tr:hover td { background: var(--accent-soft); }
+table.inv select { max-width: 17em; }
+.filters input[type="search"] { flex: 1 1 220px; }
+.filters select { max-width: 100%; }
+.flaglist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 2px 10px; max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
+.flag { display: flex; gap: 6px; align-items: baseline; font-size: 0.84rem; color: var(--ink); padding: 2px 4px; border-radius: 3px; cursor: pointer; min-width: 0; }
+.flag .fi { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); min-width: 2.6em; text-align: right; }
+.flag .fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flag.unnamed .fn { color: var(--muted); font-style: italic; }
+.flag.on { background: var(--accent-soft); }
+.flag.diff { box-shadow: inset 3px 0 0 var(--warn); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -135,7 +182,8 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
 <div class="wrap">
   <header>
     <h1>Silent Hill Save Converter</h1>
-    <p class="lede">Move saves between the PC port (<code>gamedata/save/N.MCD</code>), DuckStation and a real PlayStation memory card. Everything runs in this page; nothing is uploaded.</p>
+    <p class="lede">Move saves between the PC port (<code>gamedata/save/N.MCD</code>), DuckStation and a real PlayStation memory card, and inspect or edit what is inside them. Everything runs in this page; nothing is uploaded.</p>
+    <p class="lede">To edit: load a card, click a Silent Hill block, then <strong>Edit</strong> on a save. Use the arrows to reorder saves, then <strong>Download edited card</strong>.</p>
   </header>
 
   <section aria-labelledby="load-h">
@@ -151,6 +199,7 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
       <input type="file" id="folder-in" webkitdirectory hidden>
     </div>
     <div class="cards" id="cards"></div>
+    <section class="editor" id="editor" aria-label="Save editor" hidden></section>
   </section>
 
   <section aria-labelledby="conv-h">
@@ -196,7 +245,7 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
     <summary>How the three formats relate</summary>
     <div class="body">
       <p>All three are the same thing: a raw 128 KB PlayStation memory card image, 16 blocks of 8 KB. Block 0 is the directory, blocks 1 to 15 hold saves. DuckStation <code>.mcd</code> and a real-card <code>.mcr</code> are byte-for-byte the same format.</p>
-      <p>The PC port stores one image per memory card slot. Silent Hill supports the multitap, so there are up to eight:</p>
+      <p>The PC port stores one image per memory card slot. Silent Hill supports the multitap, but the PC port connects only Memory Card 1 and 2 (<code>0.MCD</code> and <code>8.MCD</code>). Older builds also created the multitap files below; empty ones can be deleted.</p>
       <div class="map"><table>
         <thead><tr><th>PC file</th><th>In game</th><th>PSX device</th></tr></thead>
         <tbody>
@@ -213,6 +262,8 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
 </div>
 
 <script src="sh_savecard_core.js"></script>
+<script src="sh_savecard_data.js"></script>
+<script src="sh_savecard_editor.js"></script>
 <script>
 (function () {
   'use strict';
@@ -272,12 +323,29 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
       const sh = entry.card.files.filter(f => S.parseShName(f.name)).length;
       chips.push(`<span class="chip">${sh} Silent Hill file${sh === 1 ? '' : 's'}</span>`);
       chips.push(`<span class="chip">${S.freeBlocks(entry.card)} free</span>`);
+      if (entry.modified) chips.push('<span class="chip edited">edited</span>');
     }
     el.innerHTML = `<div class="card-head"><div><div class="card-name">${esc(entry.fileName)}</div><div class="chips">${chips.join('')}</div></div>` +
       (opts.removable ? `<button type="button" class="link" data-remove="${entry.id}">Remove</button>` : '') + '</div>';
     if (entry.error) {
       const p = document.createElement('p'); p.className = 'error'; p.textContent = entry.error; el.appendChild(p);
       return el;
+    }
+    if (entry.modified) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'primary';
+      btn.textContent = 'Download edited card';
+      btn.addEventListener('click', () => {
+        const name = entry.fileName.split(/[\\/]/).pop();
+        saveFile(name.replace(/\.[^.]*$/, '') + ' (edited).zip', S.zip([{ name, data: S.toImage(entry.card) }]), btn);
+      });
+      const note = document.createElement('span');
+      note.className = 'hint';
+      note.textContent = 'The zip holds the card under its original name. Back up the original first.';
+      row.append(btn, note);
+      el.appendChild(row);
     }
 
     const grid = document.createElement('div');
@@ -325,7 +393,10 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
 
     const sel = state.selected[opts.key];
     const f = sel !== undefined ? entry.card.files[sel] : null;
-    if (f && S.parseShName(f.name)) {
+    if (f && S.parseShName(f.name) && opts.editable) {
+      el.classList.add('wide');
+      el.appendChild(slotTable(entry, sel));
+    } else if (f && S.parseShName(f.name)) {
       const slots = S.readSlots(f.data);
       const wrap = document.createElement('div');
       wrap.className = 'slots';
@@ -342,10 +413,74 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
     return el;
   }
 
+  // All 11 positions of a file, so saves can be moved into gaps. The save screen
+  // lists FILE01..FILE15 in order and each file's slots 1..11, skipping empty ones.
+  function slotTable(entry, fi) {
+    const blk = entry.card.files[fi].data;
+    const byIdx = {};
+    for (const sl of S.readSlots(blk)) byIdx[sl.index] = sl;
+    const cur = window.SHEditor.current();
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Slot</th><th>Save</th><th>Location</th><th>Time</th><th></th><th></th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    for (let s = 0; s < S.SLOTS; s++) {
+      const sl = byIdx[s];
+      const tr = document.createElement('tr');
+      if (!sl) tr.className = 'dim';
+      if (cur && cur.entry === entry && cur.fi === fi && cur.s === s) tr.className = 'sel';
+      tr.innerHTML = sl
+        ? `<td>${s + 1}</td><td>#${sl.saveCount}</td><td>${esc(sl.location)}</td><td>${S.formatTime(sl.seconds)}</td>` +
+          `<td class="${sl.valid ? '' : 'bad'}">${sl.nextFear ? '<span class="fear">Next Fear</span> ' : ''}${sl.valid ? '' : 'damaged'}</td>`
+        : `<td>${s + 1}</td><td colspan="4">empty</td>`;
+      const td = document.createElement('td');
+      td.className = 'slot-actions';
+      const btn = (text, label, fn, disabled) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = text; b.title = label; b.setAttribute('aria-label', label);
+        b.disabled = !!disabled;
+        b.addEventListener('click', fn);
+        td.appendChild(b);
+        return b;
+      };
+      const move = to => {
+        S.swapSlots(blk, s, blk, to);
+        markEdited(entry);
+        window.SHEditor.follow(entry, fi, s, fi, to);
+      };
+      if (sl) btn('Edit', `Edit slot ${s + 1}`, () => window.SHEditor.open(entry, fi, s));
+      btn('\u2191', `Move slot ${s + 1} up`, () => move(s - 1), s === 0);
+      btn('\u2193', `Move slot ${s + 1} down`, () => move(s + 1), s === S.SLOTS - 1);
+      if (sl) {
+        const key = `${entry.id}:${fi}:${s}`;
+        const del = btn(state.pendingDelete === key ? 'Confirm' : 'Delete', `Delete slot ${s + 1}`, () => {
+          if (state.pendingDelete !== key) { state.pendingDelete = key; render(); return; }
+          state.pendingDelete = null;
+          const c = window.SHEditor.current();
+          if (c && c.entry === entry && c.fi === fi && c.s === s) window.SHEditor.close();
+          S.clearSlot(blk, s);
+          markEdited(entry);
+        });
+        if (state.pendingDelete === key) del.className = 'danger';
+      }
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    const wrap = document.createElement('div');
+    wrap.className = 'slots';
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  function markEdited(entry) {
+    entry.modified = true;
+    render();
+  }
+
   function render() {
     const cards = $('cards');
     cards.innerHTML = '';
-    state.cards.forEach(c => cards.appendChild(cardPanel(c, { removable: true, key: 'in' + c.id })));
+    state.cards.forEach(c => cards.appendChild(cardPanel(c, { removable: true, editable: !c.example, key: 'in' + c.id })));
 
     const ok = state.cards.filter(c => c.card && !c.example);
     $('do-topc').disabled = !ok.some(c => c.kind === 'psx');
@@ -478,11 +613,22 @@ details .body { display: grid; gap: 10px; font-size: 0.95rem; }
   $('folder-in').addEventListener('change', e => { addFiles(keepFromFolder([...e.target.files])); e.target.value = ''; });
   $('cards').addEventListener('click', e => {
     const id = e.target.getAttribute && e.target.getAttribute('data-remove');
-    if (id) { state.cards = state.cards.filter(c => String(c.id) !== id); render(); }
+    if (id) {
+      const cur = window.SHEditor.current();
+      if (cur && String(cur.entry.id) === id) window.SHEditor.close();
+      state.cards = state.cards.filter(c => String(c.id) !== id);
+      render();
+    }
   });
   $('do-topc').addEventListener('click', toPc);
   $('do-topsx').addEventListener('click', toPsx);
   $('do-merge').addEventListener('click', doMerge);
+
+  window.SHEditor.mount($('editor'), {
+    onChange: entry => markEdited(entry),
+    onClose: () => render(),
+    entries: () => state.cards.filter(c => c.card && !c.example),
+  });
 
   // Opens with a formatted, empty card so the block layout is visible before anything is loaded.
   state.cards.push({ id: nextId++, example: true, fileName: 'Example: blank card', kind: 'psx', card: S.loadCard(S.toImage({ files: [], warnings: [] })) });

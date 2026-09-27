@@ -110,3 +110,20 @@ The language picked on a PAL or Japanese disc in the port is a PC setting, not p
 - PS1 to PC: only Silent Hill files are copied. Data is copied unchanged. Other games' files are left out.
 - PC to PS1: data is copied unchanged. The title block is rewritten in Shift-JIS for the chosen region and a blank icon is replaced by the disc's icon.
 - Merging: every file already on the target card is kept, from any game. An incoming Silent Hill file whose FILE number is taken moves to the next free number, and its title is renumbered to match.
+
+## Save editor
+
+The web page (`sh_savecard.html`) also edits saves. It needs `sh_savecard_core.js`, `sh_savecard_data.js` and `sh_savecard_editor.js` beside it.
+
+- **Overview:** save-list label, map, room, position, facing, health, difficulty, play time, counters, Next Fear, endings.
+- **Inventory:** all 40 item slots, slot count, equipped weapon, radio and flashlight toggles, key item states.
+- **Event flags:** all 1663 flags, with the decomp's names, notes and the maps whose code uses each flag in the hover text. A per-map table counts set flags and item pickups, and any save can be compared against another to list differing flags.
+- **Maps & enemies:** paper maps owned and the per-map enemy-alive masks.
+- **Stats** and **File options** (the options record shared by a file's 11 slots).
+- **Slot order:** the arrows swap a save with the neighbouring slot, and Copy to / Move to places it in an empty slot or a new FILE. The save screen lists FILE01 to FILE15, then slots 1 to 11, skipping empty ones, and opens on the save with the highest newest-save counter.
+
+The save-list label is a choice from the game's fixed list of 25 location names; the game cannot show custom text there.
+
+Every edit re-seals the slot the way the game does when saving: the slot's header entry (location, save count, play time, the Next Fear / 290-hour / special-item bits) is copied from the save data and both checksums are recomputed. Running this on unedited saves reproduces the game's bytes exactly.
+
+`sh_savecard_data.js` is generated from the decomp by `gen_savecard_data.py` (flag names from `include/event_flags.h`, usage from `src/`, map descriptions from `pc_port/src/map_registry.c`). Re-run it when those change.

@@ -186,6 +186,120 @@
   }
   const headerValid = blk => recordValid(blk, HDR_OFS, 256);
 
+  // ---- Save editing ------------------------------------------------------
+  // s_Savegame (636 bytes at SLOT_OFS + slot * 640). Offsets from
+  // include/bodyprog/savegame.h. Values are little-endian; q12 = fixed point / 4096.
+  const SAVEGAME = {
+    items: 0x000, itemCount: 40,
+    field_A0: 0x0A0, mapIdx: 0x0A4, mapRoomIdx: 0x0A5, savegameCount: 0x0A6, locationId: 0x0A8,
+    paperMapIdx: 0x0A9, equippedWeapon: 0x0AA, inventorySlotCount: 0x0AB, itemToggleFlags: 0x0AC,
+    ovlEnemyStates: 0x0B0, paperMapFlags: 0x164, eventFlags: 0x168, eventFlagWords: 52,
+    healthSaturation: 0x238, pickedUpItemCount: 0x23C, inventoryItemFlags: 0x23F, playerHealth: 0x240,
+    playerPositionX: 0x244, playerRotationY: 0x248, clearGameCount: 0x24A, clearGameEndings: 0x24B,
+    playerPositionZ: 0x24C, gameplayTimer: 0x250, runDistance: 0x254, walkDistance: 0x258, bits25C: 0x25C,
+    meleeKillCount: 0x25D, meleeKillCountB: 0x25E, rangedKillCount: 0x25F, word260: 0x260,
+    firedShotCount: 0x264, closeRangeShotCount: 0x266, midRangeShotCount: 0x268, longRangeShotCount: 0x26A,
+    field_26C: 0x26C, field_26E: 0x26E, field_270: 0x270, field_272: 0x272, field_274: 0x274,
+    field_276: 0x276, field_278: 0x278, field_27A: 0x27A, continueCount: 0x27B,
+  };
+  // s_OptionsConfig (at CFG_OFS). Offsets from include/bodyprog/savegame.h.
+  const OPTIONS = {
+    controllerConfig: 0x00, screenPositionX: 0x1C, screenPositionY: 0x1D, soundType: 0x1E, volumeBgm: 0x1F,
+    volumeSe: 0x20, vibrationEnabled: 0x21, brightness: 0x22, extraWeaponCtrl: 0x23, extraBloodColor: 0x24,
+    autoLoad: 0x25, extraOptionsEnabled: 0x27, extraViewCtrl: 0x28, extraViewMode: 0x29,
+    extraRetreatTurn: 0x2A, extraWalkRunCtrl: 0x2B, extraAutoAiming: 0x2C, extraBulletAdjust: 0x2D,
+    seenGameOverTips: 0x2E, palLanguageId: 0x34,
+  };
+
+  const slotOffset = s => SLOT_OFS + s * SLOT_SIZE;
+  const metaOffset = s => HDR_OFS + 4 + s * 12;
+  const slotUsed = (blk, s) => (u32(blk, metaOffset(s)) | 0) !== 0;
+
+  function sealRecord(blk, o, size) {
+    const f = o + size - 4;
+    blk[f] = blk[f + 1] = 0;
+    blk[f + 2] = blk[f + 3] = 0xDC;
+    let x = 0;
+    for (let i = o; i < o + size; i++) x ^= blk[i];
+    blk[f] = blk[f + 1] = x;
+  }
+  const sealHeader = blk => sealRecord(blk, HDR_OFS, 256);
+  const sealOptions = blk => sealRecord(blk, CFG_OFS, 128);
+
+  /** After editing a slot: copy the fields the save screen shows into the slot's
+   *  header entry (as the game does when saving) and redo both checksums. */
+  function sealSlot(blk, s) {
+    const o = slotOffset(s), m = metaOffset(s);
+    w32(blk, m + 4, u32(blk, o + SAVEGAME.gameplayTimer));
+    w16(blk, m + 8, u16(blk, o + SAVEGAME.savegameCount));
+    blk[m + 10] = blk[o + SAVEGAME.locationId];
+    blk[m + 11] = blk[o + SAVEGAME.bits25C];
+    sealRecord(blk, o, SLOT_SIZE);
+    sealHeader(blk);
+  }
+
+  function clearSlot(blk, s) {
+    blk.fill(0, metaOffset(s), metaOffset(s) + 12);
+    blk.fill(0, slotOffset(s), slotOffset(s) + SLOT_SIZE);
+    sealHeader(blk);
+  }
+
+  /** Copies a slot (data + header entry) over another. Same block allowed. */
+  function copySlot(srcBlk, srcS, dstBlk, dstS) {
+    const data = srcBlk.slice(slotOffset(srcS), slotOffset(srcS) + SLOT_SIZE);
+    const meta = srcBlk.slice(metaOffset(srcS), metaOffset(srcS) + 12);
+    dstBlk.set(data, slotOffset(dstS));
+    dstBlk.set(meta, metaOffset(dstS));
+    sealHeader(dstBlk);
+  }
+
+  function swapSlots(aBlk, aS, bBlk, bS) {
+    const aData = aBlk.slice(slotOffset(aS), slotOffset(aS) + SLOT_SIZE);
+    const aMeta = aBlk.slice(metaOffset(aS), metaOffset(aS) + 12);
+    copySlot(bBlk, bS, aBlk, aS);
+    bBlk.set(aData, slotOffset(bS));
+    bBlk.set(aMeta, metaOffset(bS));
+    sealHeader(aBlk);
+    sealHeader(bBlk);
+  }
+
+  /** Highest total-save counter on the card: the game puts its cursor on the
+   *  save holding it, so a duplicated save takes max + 1 to become "newest". */
+  function maxTotalSaveCount(card) {
+    let max = 0;
+    for (const f of card.files) {
+      if (!parseShName(f.name)) continue;
+      for (let s = 0; s < SLOTS; s++) max = Math.max(max, u32(f.data, metaOffset(s)) | 0);
+    }
+    return max;
+  }
+
+  function setTotalSaveCount(blk, s, v) {
+    w32(blk, metaOffset(s), v);
+    sealHeader(blk);
+  }
+
+  /** A new, empty Silent Hill file. Options are copied from another file's block:
+   *  an all-zero options record would load as muted, unbound controls. */
+  function newShFile(region, index, optionsFrom) {
+    const blk = new Uint8Array(BLOCK);
+    normaliseTitleBlock(blk, region, index);
+    sealHeader(blk);
+    blk.set(optionsFrom.subarray(CFG_OFS, CFG_OFS + 128), CFG_OFS);
+    return blk;
+  }
+
+  function getFlag(blk, s, idx) {
+    const o = slotOffset(s) + SAVEGAME.eventFlags + (idx >> 5) * 4;
+    return (u32(blk, o) >>> (idx & 31)) & 1;
+  }
+  function setFlag(blk, s, idx, on) {
+    const o = slotOffset(s) + SAVEGAME.eventFlags + (idx >> 5) * 4;
+    let v = u32(blk, o);
+    v = on ? (v | (1 << (idx & 31))) : (v & ~(1 << (idx & 31)));
+    w32(blk, o, v >>> 0);
+  }
+
   function titleBytes(region, index) {
     const b = [];
     if (region === 'jpn') {
@@ -364,6 +478,9 @@
     loadCard, toImage, put, freeBlocks, blocksOf, parseShName, makeName, readSlots, headerValid,
     normaliseTitleBlock, decodeTitle, iconRgba, iconBlank, gather, merge, cardRegion,
     isPcCardFileName, pcNumber, pcCardLabel, psxFileNameFor, formatTime, zip, crc32,
+    SLOTS, FILES_MAX, SAVEGAME, OPTIONS, HDR_OFS, CFG_OFS, SLOT_OFS, SLOT_SIZE, LOCATIONS,
+    slotOffset, metaOffset, slotUsed, sealSlot, sealHeader, sealOptions, clearSlot, copySlot, swapSlots,
+    maxTotalSaveCount, setTotalSaveCount, newShFile, getFlag, setFlag, u16, u32, w16, w32,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SHCard = api;
