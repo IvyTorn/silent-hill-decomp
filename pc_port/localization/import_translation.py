@@ -387,6 +387,12 @@ def space_char_for(raw):
 # --------------------------------------------------------------------------
 # The translation line: TR: in the current template, PT: in the first one,
 # or a language code (RU:, PL: ...) in a pre-filled file.
+# MISC.0/1 were hand-typed stand-ins for the two inventory prompts; the game
+# looks those up by their real literal, as MENU keys.
+RETIRED_KEYS = {
+    "MISC.0": "MENU.Can't_use_it_here.",
+    "MISC.1": "MENU.Too_dark_to_look_at\n\t\tthe_item_here.",
+}
 TR_LINE = re.compile(r"^(?!EN:)(TR|[A-Z]{2}):")
 
 
@@ -420,9 +426,16 @@ def parse_translation(path):
                 # The separate PC-options file of Jul-Aug 2026 used PCOPT. /
                 # PCOPT_VAL. keys for what the game looks up as MENU.<literal>.
                 key = re.sub(r"^PCOPT(?:_VAL)?\.", "MENU.", key)
+                key = RETIRED_KEYS.get(key, key)
                 entries[key] = (line[m.end():].strip(), lineno)
                 key = None
     return entries
+
+
+def esc(s):
+    """One entry per line: keys (the two-line map prompts) need it as much as
+    values. lang_pack.c resolves these escapes on both sides of the '='."""
+    return s.replace("\n", "\\n").replace("\t", "\\t")
 
 
 def main():
@@ -546,7 +559,7 @@ def main():
         f.write("!menu=%s\n" % (args.menu or args.name))
         for key in raw:  # source order keeps diffs readable
             if key in encoded:
-                f.write("%s=%s\n" % (key, encoded[key].replace("\n", "\\n").replace("\t", "\\t")))
+                f.write("%s=%s\n" % (esc(key), esc(encoded[key])))
 
     print("\nwrote %s (%d entries)" % (out_path, len(encoded)))
     return 1 if fatal else 0

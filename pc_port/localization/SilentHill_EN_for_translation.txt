@@ -4,7 +4,7 @@
  Every visible in-game English string that is NOT baked into an image:
  story/cutscene dialogue, examine/pickup prompts, the original menus, the PC
  port's own menus (PC Options, the F10 Quick Options menu, the Controls
- panel), item names and item descriptions.  Total entries: 1844.
+ panel), item names and item descriptions.  Total entries: 1851.
 
  HOW TO USE
  ----------
@@ -538,6 +538,52 @@ TR:
 [MENU.I_don't_have_the_map
 		for_this_place.]
 EN: I don't have the map for this place.
+TR: 
+
+[MENU.Can't_use_it_here.]
+NOTE: inventory prompt
+EN: Can't use it here.
+TR: 
+
+[MENU.Too_dark_to_look_at
+		the_item_here.]
+NOTE: inventory prompt
+EN: Too dark to look at the item here.
+TR: 
+
+[MENU.Stock:]
+NOTE: inventory label, max ~10 characters
+EN: Stock:
+TR: 
+
+[MENU.--On--]
+NOTE: inventory label, max ~10 characters
+EN: ==On==
+TR: 
+
+[MENU.--Off--]
+NOTE: inventory label, max ~10 characters
+EN: ==Off==
+TR: 
+
+[MENU.--Use_OK--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK==
+TR: 
+
+[MENU.--Use_OK?--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use OK?==
+TR: 
+
+[MENU.--Use_NG--]
+NOTE: inventory label, max ~10 characters
+EN: ==Use NG==
+TR: 
+
+[MENU.Fuel:]
+NOTE: inventory label, max ~10 characters
+EN: Fuel:
 TR: 
 
 
@@ -2340,22 +2386,6 @@ TR:
 
 [ITEM_DESC.194]
 EN: Fuel for chainsaws and rock drills.
-TR: 
-
-
-
-################################################################################
-##  OTHER IN-GAME PROMPTS
-################################################################################
-
-[MISC.0]
-NOTE: in-game prompt
-EN: Can't use here
-TR: 
-
-[MISC.1]
-NOTE: in-game prompt
-EN: Too dark too look at the item
 TR: 
 
 

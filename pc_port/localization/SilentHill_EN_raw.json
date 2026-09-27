@@ -1841,6 +1841,13 @@
  "ITEM_DESC.192": "One_touch_on/off_switch.\n\t\t\t\t\tIn_the_chest_pocket.",
  "ITEM_DESC.193": "Portable_radio_that\n\t\t\t\t\temits_static\n\t\t\t\t\twhen_monsters_are_near.",
  "ITEM_DESC.194": "Fuel_for_chainsaws_and\n\t\t\t\t\trock_drills.",
- "MISC.0": "Can't use here",
- "MISC.1": "Too dark too look at the item"
+ "MENU.Can't_use_it_here.": "Can't_use_it_here.",
+ "MENU.Too_dark_to_look_at\n\t\tthe_item_here.": "Too_dark_to_look_at\n\t\tthe_item_here.",
+ "MENU.Stock:": "Stock:",
+ "MENU.--On--": "==On==",
+ "MENU.--Off--": "==Off==",
+ "MENU.--Use_OK--": "==Use_OK==",
+ "MENU.--Use_OK?--": "==Use_OK?==",
+ "MENU.--Use_NG--": "==Use_NG==",
+ "MENU.Fuel:": "Fuel:"
 }

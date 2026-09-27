@@ -11,8 +11,10 @@ tooling to regenerate it and (later) import a finished translation back.
 | `SilentHill_EN_raw.json` | Machine map of `KEY -> exact source string` (with the original `_`=space and `~`/`	` codes). Used to re-import a finished translation into the game's exact format. Don't send this to the translator. |
 | `extract_text.py` | Regenerates both files from the source tree. Run with any Python 3: `python extract_text.py`. Re-run it whenever a menu row is added. |
 | `import_translation.py` | Turns a filled-in file back into a runtime pack (`../assets/gamedata/lang/<code>.lang`). |
+| `make_ru_template.py` | Writes `SilentHill_RU_for_review.txt`: the same file with an `RU:` line pre-filled from the Team Raccoon (ViT Co / Metallist) Russian disc, voiced-line subtitles from the same team's text-only release, and the port's own Russian menus where no disc has them. PC-port menus stay blank for the translator. |
+| `SilentHill_RU_for_review.txt` | That output, for the Russian reviewer. |
 
-## What's covered (1844 entries)
+## What's covered (1851 entries)
 
 - **Story / cutscene dialogue**: every `MAP_MESSAGES[]` across all 40 map scenes (`MAP<n>_S<nn>.<index>`).
 - **Common messages**: Yes/No, item-pickup prompts, door messages (`COMMON.<index>`), from `include/maps/shared/map_msg_common.h`.
@@ -20,7 +22,7 @@ tooling to regenerate it and (later) import a finished translation back.
 - **PC Options menu**: every row name and value label of the five PC Options pages in `src/screens/options/options.c`. The game looks these up by their English text exactly like the menus above, so they share the `MENU.<text>` keys. `NOTE:` lines give each one's character budget (label and value share a line).
 - **Quick Options menu (F10)**, its **Cheats/Debug pages**, the **Controls panel** (key binding screen) and the **confirm boxes**: `pc_quick_options.c`, `pc_cheats.c`, `pc_bind_panel.c`, `control_style.c`, `pc_confirm_dialog.c`. Keys `QUICK.<text>` (spaces as `_`, `=` as `-`). These overlays draw with a TrueType font, so they take real spaces and any Unicode letter, and `{n}`/`{key}`/`{name}`/`{action}`/`{camera}` placeholders are filled in by the game.
 - **Item names** and **item descriptions**: `INVENTORY_ITEM_NAMES[]` / `g_ItemDescriptions[]` in `src/bodyprog/items/item_screens_3.c`. Keys `ITEM_NAME.<index>` / `ITEM_DESC.<index>` (index = item id).
-- **Other prompts**: a couple of item-use prompts not in `s_MenuTr` (`MISC.<n>`).
+- **Inventory prompts and labels** drawn by `Gfx_Inventory_ItemDescriptionDraw` ("Can't use it here.", Stock:, Fuel:, ==On==...). They go through the same menu lookup, so they are `MENU.<text>` keys (`=` written as `-`). The old `MISC.0`/`MISC.1` keys were hand-typed stand-ins the game never read; the importer maps them onto the real keys.
 
 Not included on purpose: bare numbers (`30`, `2x`, `5.1`), map ids and monster/character names on the debug pages, and keyboard key names.
 

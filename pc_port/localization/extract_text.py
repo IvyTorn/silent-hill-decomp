@@ -168,8 +168,9 @@ for mapid, path in MAP_FILES:
                 records.append((f'MAP {mapid}', f'{mapid.upper()}.{idx}', val, readable(val), ''))
 
 # --- MENU (s_MenuTr keys) ---
+# '=' would end the key in a .lang line; lang_pack.c maps it the same way.
 def menu_key(lit):
-    return 'MENU.' + lit.replace(chr(1), '').replace('_', ' ').strip().replace(' ', '_')
+    return 'MENU.' + lit.replace(chr(1), '').replace('_', ' ').strip().replace(' ', '_').replace('=', '-')
 
 menu_body = extract_array_body(MENU, r's_MenuTr\s*\[\s*\]\s*=')
 menu_literals = []
@@ -366,13 +367,17 @@ for arr, sect in [(r'INVENTORY_ITEM_NAMES\s*\[\s*\]\s*=', 'ITEM_NAME'),
         if kind == 'str' and val.strip():
             records.append((sect, f'{sect}.{idx}', val, readable(val), ''))
 
-# --- MISC PROMPTS: visible strings drawn directly and NOT already covered by
-#     the s_MenuTr (MENU) table. s_MenuTr already includes inventory actions,
-#     save/load + memory-card messages, AND the save-location names, so only a
-#     few item-use prompts remain. Curated readable forms; re-import by hand. ---
-MISC = ["Can't use here", 'Too dark too look at the item']
-for i,t in enumerate(MISC):
-    records.append(('MISC', f'MISC.{i}', t, t, 'in-game prompt'))
+# --- INVENTORY SCREEN: prompts and labels Gfx_Inventory_ItemDescriptionDraw
+#     draws straight from local arrays. They reach Gfx_StringDraw like every
+#     menu string, so they are MENU.<literal> keys too. ---
+inv_body = extract_array_body(ITEMS, r'void Gfx_Inventory_ItemDescriptionDraw\(s32\* selectedItemId\)[^{]*')
+for arr in ('D_80027F14', 'D_80027F94'):
+    m = re.search(arr + r'\[\]\s*=\s*\{(.*?)\};', inv_body, re.S)
+    assert m, arr
+    for kind, lit in parse_c_entries(m.group(1)):
+        if kind == 'str' and menu_key(lit) not in {r[1] for r in records}:
+            note = 'inventory prompt' if arr == 'D_80027F14' else 'inventory label, max ~10 characters'
+            records.append(('MENU', menu_key(lit), lit, readable(lit), note))
 
 # ---- write outputs -----------------------------------------------------------
 OUT = os.path.join(ROOT, 'pc_port', 'localization')
@@ -454,7 +459,6 @@ SECTION_TITLES = {
     'CONTROLS':   'CONTROLS PANEL AND CONFIRM BOXES  (key/controller binding screen)',
     'ITEM_NAME':  'ITEM NAMES  (inventory)',
     'ITEM_DESC':  'ITEM DESCRIPTIONS  (inventory)',
-    'MISC':       'OTHER IN-GAME PROMPTS',
 }
 
 # group records, keeping first-seen order of sections
@@ -466,7 +470,7 @@ for rec in records:
         groups[sec] = []; order.append(sec)
     groups[sec].append(rec)
 
-fixed = ['COMMON', 'MENU', 'PCOPT', 'QUICK', 'CHEATS', 'CONTROLS', 'ITEM_NAME', 'ITEM_DESC', 'MISC']
+fixed = ['COMMON', 'MENU', 'PCOPT', 'QUICK', 'CHEATS', 'CONTROLS', 'ITEM_NAME', 'ITEM_DESC']
 map_secs = [s for s in order if s.startswith('MAP ')]
 
 keys = [k for (_, k, *_r) in records]
