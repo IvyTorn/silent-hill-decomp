@@ -757,6 +757,41 @@ s32 func_8008A3E0(s_SubCharacter* chara) // 0x8008A3E0
                     }
 #endif
 
+#ifdef SH_N64_PORT
+                    /* [SHOT] Hardware 2026-09-27: bullets do not register on
+                     * Rompers or dogs, while the knife kills a Groaner. Both
+                     * of those are LOW to the ground, so the question is
+                     * whether the trace passes over them (vertical aim) or the
+                     * hit band is wrong (collision cylinder). This prints one
+                     * line per shot -- the ray's origin and direction, what it
+                     * hit, and the nearest enemy's hit band -- capped at 24
+                     * lines for the whole run. Remove once answered. */
+                    if (chara == &g_SysWork.playerWork.player)
+                    {
+                        static int s_shotN;
+                        if (s_shotN < 24)
+                        {
+                            s32 tIdx = g_SysWork.targetNpcIdx;
+                            s_SubCharacter* tn = (tIdx >= 0) ? &g_SysWork.npcs[tIdx] : NULL;
+                            s_shotN++;
+                            SH_DBG("[SHOT] #%d from y=%d dir=(%d,%d,%d) hit=%d chara=%s | target id=%d y=%d box(top=%d bot=%d h=%d offY=%d) cyl(r=%d f2=%d)",
+                                   s_shotN,
+                                   (int)chara->field_44.field_18.vy,
+                                   (int)chara->field_44.field_48[0].vx,
+                                   (int)chara->field_44.field_48[0].vy,
+                                   (int)chara->field_44.field_48[0].vz,
+                                   (int)(temp != 0), ptr ? "YES" : "no",
+                                   tn ? (int)tn->model.charaId : -1,
+                                   tn ? (int)tn->position.vy : 0,
+                                   tn ? (int)tn->collision.box.top : 0,
+                                   tn ? (int)tn->collision.box.bottom : 0,
+                                   tn ? (int)tn->collision.box.height : 0,
+                                   tn ? (int)tn->collision.box.offsetY : 0,
+                                   tn ? (int)tn->collision.cylinder.radius : 0,
+                                   tn ? (int)tn->collision.cylinder.field_2 : 0);
+                        }
+                    }
+#endif
                     if (temp && ptr != NULL)
                     {
                         chara->field_44.field_48[1].vx = temp_s1_4;

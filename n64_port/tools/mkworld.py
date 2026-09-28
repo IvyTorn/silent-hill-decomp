@@ -41,6 +41,7 @@ import argparse
 import hashlib
 import os
 import struct
+import re
 import sys
 from collections import defaultdict
 
@@ -919,8 +920,17 @@ def main():
                     missing.add(name)
             return tims[name]
 
+        # EXACT prefix: a cell is <PREFIX><4 hex>.IPD. A plain startswith is a
+        # trap, because one area's prefix can be another's beginning -- "S"
+        # swallows SPR, SPU and SU, and the SPR*.SHW it then rewrites point
+        # their tile refs into S.SHT while the runtime, which derives the
+        # prefix from the cell NAME, still opens SPR.SHT. The city's textures
+        # come out of the wrong tile store and nothing reports it.
+        cell_re = re.compile(r"^" + re.escape(prefix) + r"[0-9A-F]{4}\.IPD$")
         cells = sorted(f for f in os.listdir(a.ipd_dir)
-                       if f.upper().startswith(prefix) and f.upper().endswith(".IPD"))
+                       if cell_re.match(f.upper()))
+        if not cells:
+            sys.exit(f"{prefix}: no <{prefix}><4 hex>.IPD cells in {a.ipd_dir}")
         parsed = []
         pieces_by_key = defaultdict(list)
         untex = []
