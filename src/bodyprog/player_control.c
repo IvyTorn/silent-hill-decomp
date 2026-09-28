@@ -1642,8 +1642,15 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
                     {
                         int _lb = g_SysWork.playerWork.extra.lowerBodyState;
                         g_PcQuickTurnRequest = 0;
-                        if (_lb <= PlayerLowerBodyState_RunLeft ||
-                            (_lb >= PlayerLowerBodyState_Aim && _lb <= PlayerLowerBodyState_AimRunLeft))
+                        /* Same guard as the native Player_CharaTurn_0 call sites: during a
+                         * walk<->run transition Player_AnimUpdate forces the legs onto the
+                         * Still blend every frame, which overwrites the QuickTurn anim this
+                         * state sets once on stateStep 0. The blend then links to the walk/
+                         * run loop and the state waits forever for a QuickTurn keyframe:
+                         * legs walking in place, upper body frozen, no input. */
+                        if (!g_Player_IsInWalkToRunTransition &&
+                            (_lb <= PlayerLowerBodyState_RunLeft ||
+                             (_lb >= PlayerLowerBodyState_Aim && _lb <= PlayerLowerBodyState_AimRunLeft)))
                         {
                             int _aim = (_lb < PlayerLowerBodyState_Aim) ? 0 : 20;
                             g_SysWork.playerWork.extra.lowerBodyState =
