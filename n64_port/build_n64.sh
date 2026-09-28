@@ -176,9 +176,10 @@ if [ -f "$SCRIPT_DIR/build/diag_disc.shpak" ] && [ -d "$SCRIPT_DIR/filesystem/ma
     fi
     if [ -d "$SCRIPT_DIR/build/n64w" ]; then
         cp -r "$SCRIPT_DIR/build/n64w" "$SCRIPT_DIR/build/diagfs/N64W"
-        # THR (the town, ~20MB) would push this ROM past ares's 64MB ISViewer
-        # limit; the diag ROM keeps the smaller areas only.
-        rm -f "$SCRIPT_DIR/build/diagfs/N64W/"THR*
+        # THR (the town, ~20MB) and HU (the nightmare hospital, ~4.6MB) would
+        # push this ROM past ares's 64MB ISViewer limit; the diag ROM keeps the
+        # smaller areas only. The hardware ROM carries the lot.
+        rm -f "$SCRIPT_DIR/build/diagfs/N64W/"THR* "$SCRIPT_DIR/build/diagfs/N64W/"HU*
         echo "    [DIAG] N64W: $(du -sh "$SCRIPT_DIR/build/diagfs/N64W" | cut -f1)"
     fi
     "$I/bin/mkdfs" "$SCRIPT_DIR/build/sh_diag.dfs" "$SCRIPT_DIR/build/diagfs" >/dev/null

@@ -184,6 +184,15 @@ int Sh_LogAllow(const char* fmt)
 /* Splits the stream into lines for the ring and forwards the bytes to stderr,
  * which is where libdragon's IS-Viewer and USB writers already sit. Both
  * destinations get everything; neither knows about the other. */
+/* Below this, a run is a boot that never got anywhere and its log must not
+ * evict the previous one. A title-screen-only boot is around 8 KB; a run that
+ * reaches gameplay passes this within the first room. */
+#define SH_LOG_ROTATE_MIN_BYTES (24 * 1024)
+
+/* >0: KB rotated to .prev.log. <0: -(KB)-1, kept because it was too short.
+ * 0: nothing there. Reported once the mirror is open. */
+static int   s_rotated;
+
 static FILE* s_sdMirror;
 static int   s_sdWanted;   /* mirror requested: reopen attempts may continue */
 
@@ -285,26 +294,58 @@ void ShLogN64_EnableSdMirror(void)
      * iterative logging and a crash log is otherwise overwritten by the reboot
      * that follows it. After a crash+reboot, .prev.log holds the crash run.
      * rename() is a no-op on this SD/FAT layer (verified on hardware: no
-     * .prev.log ever appeared), so copy the bytes across by hand. */
+     * .prev.log ever appeared), so copy the bytes across by hand.
+     *
+     * ONLY rotate a log worth keeping. With one generation and an
+     * unconditional copy, two short boots destroy a long session: that is
+     * exactly how a ten-minute hardware run through the hospital was lost on
+     * 2026-09-27, with both .log and .prev.log holding nothing but a title
+     * screen. A run that never left the menus is a few KB; a run that played
+     * is tens to hundreds. Below the threshold the previous run is not worth
+     * evicting the one before it, so .prev.log is left alone and the real
+     * session survives any number of "does it still boot" restarts. */
     {
         FILE* src = fopen("sd:/silenthill/silenthill.log", "rb");
         if (src != NULL)
         {
-            FILE* dst = fopen("sd:/silenthill/silenthill.prev.log", "wb");
-            if (dst != NULL)
+            long size = 0;
+            if (fseek(src, 0, SEEK_END) == 0)
             {
-                static char cp[4096];
-                size_t n;
-                while ((n = fread(cp, 1, sizeof cp, src)) > 0)
-                    fwrite(cp, 1, n, dst);
-                fclose(dst);
+                size = ftell(src);
+                fseek(src, 0, SEEK_SET);
+            }
+            if (size >= SH_LOG_ROTATE_MIN_BYTES)
+            {
+                FILE* dst = fopen("sd:/silenthill/silenthill.prev.log", "wb");
+                if (dst != NULL)
+                {
+                    static char cp[4096];
+                    size_t n;
+                    while ((n = fread(cp, 1, sizeof cp, src)) > 0)
+                        fwrite(cp, 1, n, dst);
+                    fclose(dst);
+                }
+                s_rotated = (int)(size / 1024);
+            }
+            else
+            {
+                s_rotated = -(int)(size / 1024) - 1;   /* kept, not rotated */
             }
             fclose(src);
         }
     }
     s_sdMirror = ShLogN64_SdOpen("w");
     if (s_sdMirror != NULL)
-        SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log (prev run -> silenthill.prev.log)");
+    {
+        if (s_rotated > 0)
+            SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log (previous run, %d KB, moved to silenthill.prev.log)",
+                   s_rotated);
+        else if (s_rotated < 0)
+            SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log (previous run was only %d KB -- too short to be worth keeping, silenthill.prev.log left as it was)",
+                   -(s_rotated + 1));
+        else
+            SH_DBG("[LOG] mirroring to sd:/silenthill/silenthill.log (no previous run to rotate)");
+    }
 }
 
 /* Called from the SH_PATCHed libdragon __rsp_crash BEFORE it touches the

@@ -37,7 +37,11 @@ unsigned g_PsxVramPalGen;
  * eviction thrashed: 38k decodes in one session = <1 fps. 64MB RAM has room. */
 #define CACHE_N  96
 
-static uint16_t s_vram[VRAM_W * VRAM_H];
+/* 8-aligned, not merely halfword-aligned: the N64 page decode reads this a
+ * 32-bit word at a time, and MIPS traps an unaligned word load. The page's
+ * own offset into a row is a multiple of 128 bytes, so the base is the only
+ * thing that has to be right. */
+static uint16_t s_vram[VRAM_W * VRAM_H] __attribute__((aligned(8)));
 
 /* s_vram keeps the PSX's byte layout VERBATIM: LoadImage/MoveImage are raw
  * byte copies of little-endian disc data, and StoreImage hands those bytes
@@ -428,6 +432,29 @@ static uint32_t Psx16ToArgb(uint16_t c)
 }
 
 /* Expand an indexed page to 8-bit indices in NV2A swizzle (Morton) order. */
+#if defined(SH_N64_PORT)
+/* The source row's bytes for one page row, as up to two spans: the page can
+ * start at halfword 960 and run 128 wide, which wraps the 1024-halfword VRAM
+ * row. Byte offsets stay 4-aligned (tx is a multiple of 64 halfwords). */
+typedef struct { const uint8_t* p; int n; } SpanN64;
+
+static int PageRowSpans(int tx, int ty, int v, int words, SpanN64 sp[2])
+{
+    const uint8_t* row = (const uint8_t*)&s_vram[((ty + v) & (VRAM_H - 1)) * VRAM_W];
+    int            first = words;
+
+    if (tx + words > VRAM_W)
+        first = VRAM_W - tx;
+    sp[0].p = row + tx * 2;
+    sp[0].n = first * 2;
+    if (first == words)
+        return 1;
+    sp[1].p = row;
+    sp[1].n = (words - first) * 2;
+    return 2;
+}
+#endif
+
 static void PageDecodeIndices(int tpage, uint8_t* out)
 {
     const int tx = (tpage & 0x0F) * 64;
@@ -435,6 +462,46 @@ static void PageDecodeIndices(int tpage, uint8_t* out)
     const int tp = (tpage >> 7) & 3;          /* 0 = 4bit, 1 = 8bit */
     uint8_t*  dst = SWZ_DST(out);
     int u, v;
+
+#if defined(SH_N64_PORT)
+    /* On this target the swizzle is IDENTITY and s_vram holds RAW
+     * little-endian disc bytes, so VRAM_RD's byte swap and the texel split
+     * cancel exactly and the whole decode collapses to a byte transform along
+     * the row:
+     *
+     *   8bpp: dst[j] = src[j]                    (w = b1<<8|b0, texels are
+     *                                             w&0xFF then w>>8 = b0, b1)
+     *   4bpp: dst[2j] = src[j]&0xF, dst[2j+1] = src[j]>>4
+     *
+     * The generic loop below computes the same bytes at the cost of a halfword
+     * swap and two table lookups per texel pair. It is not a small cost: the
+     * title screen was spending 36.6 ms of a 135 ms frame on four page
+     * decodes (hardware [PROF], 2026-09-27). */
+    {
+        SpanN64 sp[2];
+        int     ns, s;
+
+        for (v = 0; v < TEX_DIM; v++) {
+            uint8_t* o = dst + v * TEX_DIM;
+            ns = PageRowSpans(tx, ty, v, (tp == 0) ? (TEX_DIM / 4) : (TEX_DIM / 2), sp);
+            for (s = 0; s < ns; s++) {
+                const uint8_t* b = sp[s].p;
+                int            n = sp[s].n, k;
+                if (tp != 0) {
+                    memcpy(o, b, (size_t)n);
+                    o += n;
+                } else {
+                    for (k = 0; k < n; k++) {
+                        *o++ = (uint8_t)(b[k] & 0x0F);
+                        *o++ = (uint8_t)(b[k] >> 4);
+                    }
+                }
+            }
+        }
+    }
+    SH_STORE_BARRIER();
+    return;
+#endif
 
     for (v = 0; v < TEX_DIM; v++) {
         const uint16_t* row = &s_vram[((ty + v) & (VRAM_H - 1)) * VRAM_W];
@@ -516,6 +583,35 @@ static void PageDecodeIndices4(int tpage, uint8_t* out)
     const int tx = (tpage & 0x0F) * 64;
     const int ty = ((tpage >> 4) & 1) * 256;
     int u, v;
+
+#if defined(SH_N64_PORT)
+    /* Same collapse as PageDecodeIndices, and here it is even tighter: the
+     * RDP's CI4 wants the EVEN texel in the HIGH nibble, and working the
+     * algebra through (w = b1<<8|b0) every output byte is just its source byte
+     * with the nibbles swapped. Four bytes at a time, no table, no swap.
+     * This is the path the 2D screens actually take (ci4 binds in [PROF]). */
+    {
+        SpanN64 sp[2];
+        int     ns, s;
+
+        for (v = 0; v < TEX_DIM; v++) {
+            uint8_t* o = out + v * (TEX_DIM / 2);
+            ns = PageRowSpans(tx, ty, v, TEX_DIM / 4, sp);
+            for (s = 0; s < ns; s++) {
+                const uint32_t* w32 = (const uint32_t*)(const void*)sp[s].p;
+                uint32_t*       o32 = (uint32_t*)(void*)o;
+                int             n = sp[s].n, k;
+                for (k = 0; k < n / 4; k++) {
+                    uint32_t w = w32[k];
+                    o32[k] = ((w & 0x0F0F0F0Fu) << 4) | ((w >> 4) & 0x0F0F0F0Fu);
+                }
+                o += n;
+            }
+        }
+    }
+    SH_STORE_BARRIER();
+    return;
+#endif
 
     for (v = 0; v < TEX_DIM; v++) {
         const uint16_t* row = &s_vram[((ty + v) & (VRAM_H - 1)) * VRAM_W];
