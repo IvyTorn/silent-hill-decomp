@@ -14,7 +14,7 @@ This port is based on the PC port and will likely share bug fixing status. Howev
 - Online updates from console
 
  ### Support
-  Project Website: https://sh1pc.com/
+  Project Website: https://sh1pc.com/ <br/>
   Discord: https://discord.gg/JWuNzVsQbr
   
   I work with more than just AI. If you like what I do:\
