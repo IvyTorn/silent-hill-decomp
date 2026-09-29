@@ -97,6 +97,8 @@ bind F GIVE SHOTGUN;SPAWN GROANER
 | `unbind <key>` | Clear one. **(saved)** |
 | `unbindall` | Clear them all. **(saved)** |
 
+The command list may be wrapped in quotes if you prefer (`bind k "kill;spawn groaner"`); they are stripped. The console types `; : ' " , < / ? [ { ] } \ |` as well as letters, digits, space, `-`, `=` and `.`, so the separator can actually be entered.
+
 Refused: the console key, Escape, Enter, Backspace, Tab and the modifiers, and a bind
 may not contain `bind`/`unbind` (or pressing a key could silently rewrite your other
 binds). Up to 48 binds. They need `allow_debug_controls` on, same as the console, so a
@@ -113,7 +115,13 @@ when it is off.
 | `spawn list` | List monsters loaded in the current map. |
 | `spawn <name> [state]` | Spawn a monster in front of Harry. |
 | `unlimited [0\|1]` | Raise the concurrent-enemy cap to the PC max (toggles if no arg). |
-| `noclip` | Walk through walls (floor collision stays on). Same as debug key `0`. |
+| `noclip` | Walk through walls (floor collision stays on). |
+| `notarget [0\|1]` | Enemies ignore Harry. |
+| `freecam [0\|1]` | Free camera: mouse look, W/A/S/D, Space/C up/down, Shift fast, Ctrl slow. |
+| `collvis [0\|1]` | Collision visualizer panel. |
+| `fastforward [0\|1]` / `ff` | Speed the game up (the sticky toggle, not the Ctrl+F5 hold). |
+| `wireframe [0\|1]` | Wireframe rendering. |
+| `notex [0\|1]` | Disable textures. |
 | `getflags` | Show ending flags. |
 | `setflag <n> <0\|1>` | Set any event flag by index. |
 | `setending <bad\|bad+\|good\|good+>` | Set the ending flags. |
