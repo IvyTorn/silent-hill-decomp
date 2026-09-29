@@ -167,6 +167,23 @@ static int SetBind(const char* keyName, const char* cmds, int quiet)
     if (key[0] == '\0' || body[0] == '\0')
         return 0;
 
+    /* Tolerate a quoted command string. The syntax does not need quotes --
+     * ';' separates commands -- but wrapping the list in them is the habit
+     * from other consoles, and silently binding a command that begins with a
+     * quote is worse than just accepting it. */
+    {
+        size_t bl = strlen(body);
+        if (bl >= 2 && ((body[0] == '"' && body[bl - 1] == '"') ||
+                        (body[0] == '\'' && body[bl - 1] == '\'')))
+        {
+            memmove(body, body + 1, bl - 2);
+            body[bl - 2] = 0;
+            Trim(body);
+            if (body[0] == 0)
+                return 0;
+        }
+    }
+
     sc  = SDL_GetScancodeFromName(key);
     why = KeyRefusal(key, sc);
     if (why != NULL)

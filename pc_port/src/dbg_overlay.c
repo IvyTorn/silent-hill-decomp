@@ -1627,18 +1627,34 @@ void DbgOverlay_Update(void)
             s_input_buf[s_input_len]   = '\0';
             s_console_dirty            = 1;
         }
-        /* `-`/`_`, `=`/`+`, `.` for numeric and path args (e.g. `weld 2.5`,
-         * `inveqy -50`, map names with `_`). Shift gives the upper glyph; there's
-         * no full shift handling, just these three keys. */
+        /* Punctuation. Shift gives the upper glyph; there is no full shift
+         * handling, just this table.
+         *
+         * `;` is load-bearing: it is how `bind` separates the commands in one
+         * bind ("bind k kill;spawn groaner"), and without a key for it that
+         * syntax could not be typed at all. The quote keys are here for the
+         * same reason -- they are the other thing people reach for when a
+         * separator does not work.
+         *
+         * `[`, `]` and `\` are also the graphics-effect binds, but
+         * Dbg_GfxBindActive returns 0 while the console is open, so typing
+         * them cannot also fire the effect. */
         {
             int shift = ks[SDL_SCANCODE_LSHIFT] || ks[SDL_SCANCODE_RSHIFT];
             const struct { int sc; char lo, hi; } syms[] = {
-                { SDL_SCANCODE_MINUS,  '-', '_' },
-                { SDL_SCANCODE_EQUALS, '=', '+' },
-                { SDL_SCANCODE_PERIOD, '.', '.' },
+                { SDL_SCANCODE_MINUS,        '-',  '_' },
+                { SDL_SCANCODE_EQUALS,       '=',  '+' },
+                { SDL_SCANCODE_PERIOD,       '.',  '.' },
+                { SDL_SCANCODE_SEMICOLON,    ';',  ':' },
+                { SDL_SCANCODE_APOSTROPHE,   '\'', '"' },
+                { SDL_SCANCODE_COMMA,        ',',  '<' },
+                { SDL_SCANCODE_SLASH,        '/',  '?' },
+                { SDL_SCANCODE_LEFTBRACKET,  '[',  '{' },
+                { SDL_SCANCODE_RIGHTBRACKET, ']',  '}' },
+                { SDL_SCANCODE_BACKSLASH,    '\\', '|' },
             };
             int i;
-            for (i = 0; i < 3; i++) {
+            for (i = 0; i < (int)(sizeof(syms) / sizeof(syms[0])); i++) {
                 if (ks[syms[i].sc] && !s_prev_keys[syms[i].sc] &&
                     s_input_len < INPUT_BUF_CAP - 1) {
                     s_input_buf[s_input_len++] = shift ? syms[i].hi : syms[i].lo;

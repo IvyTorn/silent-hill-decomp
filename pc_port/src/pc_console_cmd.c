@@ -489,6 +489,11 @@ static const char* const HELP_LINES[] = {
     " spawn list     list monsters loaded in this map",
     " spawn <name>   spawn a monster in front of Harry",
     " noclip         walk through walls (floor stays on)",
+    " notarget [0|1]  enemies ignore Harry",
+    " freecam [0|1]  free camera (mouse look, WASD, Space/C)",
+    " collvis [0|1]  collision visualizer panel",
+    " fastforward [0|1] / ff   speed the game up",
+    " wireframe [0|1] / notex [0|1]   render debug",
     " god [0|1]      toggle/set damage immunity for Harry",
     " invaspect 0|1  inventory item proportions: PSX | square",
     " invscale <pct> inventory item vertical scale (def 125)",
@@ -1254,6 +1259,34 @@ void Pc_ConsoleExec(const char* line)
         else if (arg[0] == '0') g_PcUnlimitedEnemies = 0;
         else g_PcUnlimitedEnemies = !g_PcUnlimitedEnemies;
         cprintf("unlimited enemies %s (cap now %d)", g_PcUnlimitedEnemies ? "ON" : "OFF", NPC_COUNT_MAX);
+    } else if (strcmp(cmd, "NOTARGET") == 0) {
+        extern int g_DebugNoTarget;
+        g_DebugNoTarget = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_DebugNoTarget;
+        cprintf("enemies ignore Harry %s", g_DebugNoTarget ? "ON" : "OFF");
+    } else if (strcmp(cmd, "FREECAM") == 0) {
+        extern void Pc_FreeCam_Set(int on);
+        extern int  g_DebugCamEnabled;
+        int on = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_DebugCamEnabled;
+        Pc_FreeCam_Set(on);
+        cprintf("free camera %s%s", g_DebugCamEnabled ? "ON" : "OFF",
+                g_DebugCamEnabled ? " - mouse look, WASD, Space/C, Shift fast" : "");
+    } else if (strcmp(cmd, "COLLVIS") == 0) {
+        extern int g_CollVisEnabled;
+        g_CollVisEnabled = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_CollVisEnabled;
+        cprintf("collision visualizer %s", g_CollVisEnabled ? "ON" : "OFF");
+    } else if (strcmp(cmd, "FASTFORWARD") == 0 || strcmp(cmd, "FF") == 0) {
+        /* The sticky flag the Quick Options row drives, not the Ctrl+F5 hold. */
+        extern int g_PcFastForward;
+        g_PcFastForward = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_PcFastForward;
+        cprintf("fast forward %s", g_PcFastForward ? "ON" : "OFF");
+    } else if (strcmp(cmd, "WIREFRAME") == 0) {
+        extern int g_dbg_wireframeMode;
+        g_dbg_wireframeMode = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_dbg_wireframeMode;
+        cprintf("wireframe %s", g_dbg_wireframeMode ? "ON" : "OFF");
+    } else if (strcmp(cmd, "NOTEX") == 0) {
+        extern int g_dbg_texturelessMode;
+        g_dbg_texturelessMode = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_dbg_texturelessMode;
+        cprintf("textures %s", g_dbg_texturelessMode ? "OFF" : "ON");
     } else if (strcmp(cmd, "NOCLIP") == 0) {
         g_DebugNoWallCollision = !g_DebugNoWallCollision;
         cprintf("noclip %s", g_DebugNoWallCollision ? "ON" : "OFF");
