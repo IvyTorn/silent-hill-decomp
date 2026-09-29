@@ -34,7 +34,8 @@ Build and debugging notes live in `n64_port/README.md`.
 - Native rendering for the remaining areas
 
  ### Support
-  Message me wherever and I should answer. I am in most of the discords related to these projects as KushAstronaut, and I have a thread dedicated to this project in the Silent Hill channel of the PSX decompilation discord..
+  Project Website: https://sh1pc.com/ <br/>
+  Discord: https://discord.gg/JWuNzVsQbr
   
   I work with more than just AI. If you like what I do:\
   [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/F1F3K8V3B)
