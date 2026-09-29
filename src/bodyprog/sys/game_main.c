@@ -3278,6 +3278,15 @@ void MainLoop(void) // 0x80032EE0
                 s_narrowOffAtMs    = 1;
                 g_PcHorPlusEnabled = 0;
             }
+            else if ((g_Screen_FadeStatus & 0x7) >= ScreenFadeState_ResetTimestep &&
+                     (g_Screen_FadeStatus & 0x7) <= ScreenFadeState_FadeInStart)
+            {
+                /* The fade tile is fully opaque, so it IS the image: nothing
+                 * behind it can be squished, but narrowing clips the tile to the
+                 * 4:3 viewport. Black-on-black hides that; the white fade into
+                 * the post-Floatstinger map load showed as a pillarboxed white
+                 * frame. Keep whatever framing the fade started under. */
+            }
             else if (!g_PcWorldDrawnThisFrame)
             {
                 /* The hold exists to ride out a fade WITH THE WORLD STILL ON
