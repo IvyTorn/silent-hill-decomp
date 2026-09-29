@@ -67,6 +67,12 @@ when two overlap; a character beats a prop at the same depth. Harry is pickable 
 | `select player` | Select Harry without clicking, for the cameras that hide him. |
 | `select nearest` | Select the nearest live enemy to Harry. |
 | `scale <f>` | Resize the selected character or prop, `0.05`..`20`. Bare `scale` reports the current value. For a character the hit volume scales with it, so a giant Groaner is hittable over the body you can see and is blocked by walls at its own size. The model grows about its root bone rather than its feet. Per NPC slot, forgotten when that slot is recycled into a different monster; props are remembered by placement, up to 32 at a time. |
+| `health [n]` | Show the selection's health, or set it to `n`. With nothing selected it acts on Harry (capped at 100). Use `kill` rather than `health 0`. |
+| `heal` | Refill the selection's health: Harry to 100, an enemy to the highest health it has had since it appeared (enemies set their own health on their first frame and have no max-health field). |
+| `info` | Name, character id, health, position, facing, scale, and for an enemy its AI state and whether it is frozen. Harry when nothing is selected; a prop reports its placement and scale. |
+| `goto` | Move Harry next to the selected enemy or prop, on his side of it and facing it, dropped onto the floor there. |
+| `bring` | Move the selected enemy two units in front of Harry, facing him. Props cannot be moved. Unfreeze a frozen enemy first: it keeps drawing its last pose until it runs again. |
+| `freeze [0\|1]` | Hold the selected enemy still: its AI does not run, so it neither moves nor attacks, and damage dealt to it lands when it is unfrozen (`kill` unfreezes it). Bare `freeze` toggles. `freeze all` / `freeze none` act on every enemy in the room; `unfreeze` is `freeze 0`. |
 
 ## Custom key binds
 

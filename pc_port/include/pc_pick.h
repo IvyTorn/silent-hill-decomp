@@ -75,6 +75,25 @@ void Pc_Pick_WorldObjectPreDraw(const void* worldObject, void* coord);
  * frame just resolved. */
 void Pc_Pick_FrameEnd(void);
 
+/** The selected NPC's s_SubCharacter, or NULL when the selection is not an
+ * NPC or its slot has since been reused by another character. */
+void* Pc_Pick_SelectedNpc(void);
+
+/** The selected prop's placement in world Q12. Returns 0 when the selection is not a prop. */
+int Pc_Pick_PropPosition(int* x, int* y, int* z);
+
+/** Once per frame per live NPC, before its AI update (npc_main.c). Records the
+ * health HEAL restores and returns 1 when FREEZE holds the slot, in which case
+ * the caller skips the AI update and keeps drawing the last pose. */
+int Pc_Pick_NpcTick(const void* npc, int slot);
+
+/** Highest health seen for the character in `slot`, 0 when unknown. */
+int Pc_Pick_NpcMaxHealth(int slot);
+
+/** FREEZE: hold an NPC slot still. Returns 0 for an empty slot. */
+int Pc_Pick_SetFrozen(int slot, int on);
+int Pc_Pick_IsFrozen(int slot);
+
 /** Forget every scale and the selection (map change / New Game). */
 void Pc_Pick_Reset(void);
 
