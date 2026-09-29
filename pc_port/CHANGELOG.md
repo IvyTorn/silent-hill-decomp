@@ -1,5 +1,28 @@
 # Silent Hill PC Port — Changelog
 
+## beta-2026.09.29.1 -- 2026-09-29
+- Issue related to quick turn that could cause player to get stuck running in place has been fixed (thanks to thetrexx for sharing)
+- Added infinite ammo cheat (unlimited clip), console command infammo
+- NTSC-J: The title menu and inventory now show in the chosen language (Chinese or Japanese)
+- Added new console commands for functions that didn't exist as console commands, meaning they can be bound using the "bind" function. New commands:
+notarget [0|1]  - Enemies do not attack player
+freecam [0|1] - Toggle freecam mode
+collvis [0|1] - Collision visualizer debug tool
+fastforward [0|1] / ff - Make gameplay double speed
+wireframe [0|1] - Turn on wireframe mode
+notex [0|1] - turn on no texture mode
+Example: bind p "freecam; wireframe; notex" - Entering  this command will enable you to press p to toggle free cam with wireframe + no textures.
+
+Commit summaries: 
+- Movement freeze fix attempt 1
+- localization: no-subtitles text override mod for voiced lines
+- Console: type the punctuation bind needs, and commands for six menu-only cheats
+- docs: console punctuation, quoted bind lists, and the six new toggles
+- Infinite ammo cheat (console INFAMMO + Quick Options > Cheats)
+- NTSC-J: title menu and inventory in Japanese and Chinese
+- tools: the Chinese glyph finder behind lang_jpn_ui.inc
+- Capitalized Eugene's name
+
 ## beta-2026.09.27.1 -- 2026-09-27
 - Launcher is now almost 100% translated in all places for all 9 additional languages
 - Added ability to select objects by clicking them while in the console. Hold tab with console open to hide the window and click a character in the scene to select it
