@@ -21,8 +21,8 @@ Full breakdown: [COPYRIGHT.md](COPYRIGHT.md).
 
 - **The full game.** Every map, boss, cutscene and ending. All 43 map overlays are linked into the app.
 - **Touch controls.** A floating movement stick, drag-to-look, tap to act, and on-screen Aim / Item / Map / Start buttons, with a separate Fire button while aiming (**One Button Combat** merges them). Menus work by tapping. The third-person, over-the-shoulder and first-person cameras also work on touch, and an on-screen eye button cycles between them. The buttons send whatever your controller config has bound, so rebinds carry over.
-- **Controllers.** Paired Bluetooth / MFi pads work, and the touch overlay steps aside when one is in use. Remap them under **Options > Controller Config**.
-- **Mobile defaults.** 60 fps, mods on, and the widescreen, PGXP and graphics options from the PC port.
+- **Controllers.** Paired Bluetooth pads work, and the touch overlay steps aside when one is in use. Remap them under **Options > Controller Config**.
+- **Graphics.** Renders at the device's native resolution in widescreen (Hor+) by default, at 60 fps. PGXP perspective correction and the rest of the PC port's graphics options are available too.
 - **Quick options overlay.** Graphics, HUD, audio and cheats, opened from an on-screen button.
 - **RetroAchievements.** Sign in from **Options > System > Achievements** with a native sign-in sheet (softcore only). Your password is exchanged once for a token and is never stored.
 - **Mods.** Loose-file replacements and DuckStation-style texture packs. See [Modding](#modding).
