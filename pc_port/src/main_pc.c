@@ -1237,6 +1237,18 @@ int main(int argc, char* argv[])
              * being downmixed to stereo, so surround layouts finally get the
              * accurate reverb. Ignored by the legacy backend. */
             extern void PsyX_SPUAL_ConfigureSpatial(int enable, int speakers);
+            /* audio_output 2/3/4 = quad, 5.1, 7.1. Asking for one of those on
+             * the software SPU used to do nothing at all: without spatial the
+             * renderer falls through to the plain stereo sink and the layout is
+             * read, passed in and ignored. audio_spatial was the only way to
+             * turn it on and was documented nowhere, so requesting a surround
+             * layout now implies it. An explicit audio_spatial still wins, so
+             * = 0 remains a way back to the stereo sink. */
+            int wantSurround = g_PcConfig.audioOutput >= 2 && g_PcConfig.audioOutput <= 4;
+            /* Store the resolved value back so the log below, and anything
+             * that reads it later, sees what actually happened. */
+            if (!g_PcAudioConfig.spatialUserSet)
+                g_PcAudioConfig.spatial = wantSurround;
             PsyX_SPUAL_ConfigureSpatial(
                 (PcAudioConfig_UsesSoftwareSpu() && g_PcAudioConfig.spatial) ? 1 : 0,
                 g_PcConfig.audioOutput);
