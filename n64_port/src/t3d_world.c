@@ -2913,10 +2913,37 @@ int ShT3d_CharaDrawBegin(int isHarry)
 /* Returns the drawn character's mean part-centroid view depth (raw Q8, the
  * PSX OT's unit) so the caller can place an OT0 marker where his prims would
  * have sorted, or -1 when he did not draw natively this frame. */
+/* The depth the OT0 marker is linked at -- i.e. the ONE slot that decides,
+ * for every PSX-path polygon in the frame, whether it lands in front of the
+ * natively drawn Harry or behind him.
+ *
+ * This returns his FARTHEST drawn part, not the mean of his parts.
+ *
+ * The mean was wrong in a way that only shows up close. A monster buckets its
+ * polygons INDIVIDUALLY (bodyprog_80055028.c: addPrim(&ot[(z >> shift) >> 2]))
+ * at 1/32 of a world unit per bucket, while Harry collapses to this single
+ * slot -- and his body spans 13-19 buckets. Every monster polygon at or beyond
+ * the slot is painted over by ALL of him, and PSX-path prims carry no depth to
+ * argue with (pos[2] = 0, Z off for that path). At range that is harmless: the
+ * monster's buckets sit well beyond his and its footprint misses his
+ * silhouette anyway. In melee the two depth ranges interpenetrate and his
+ * silhouette covers a small, low Romper completely -- which is the reported
+ * "Rompers disappear when too close".
+ *
+ * Taking the farthest part puts the marker at the BACK of his own depth span,
+ * so the ambiguous overlap resolves in the monster's favour: it may clip
+ * slightly into him, where before it vanished outright. A monster genuinely
+ * behind him still buckets beyond every one of his parts and still draws
+ * under him, so this only moves the cases that were ambiguous to begin with.
+ *
+ * The real fix is finer-grained ordering -- a marker per PART at that part's
+ * own slot, or giving PSX-path characters real per-vertex depth and letting
+ * the Z-buffer interleave them (the item path already does this via
+ * s_itemDepthOn / ItemDepthApply). Both are bigger changes than this one. */
 int ShT3d_CharaDrawEnd(void)
 {
     const WChunk* c = &s_charChunk;
-    float sum = 0.0f;
+    float far_ = 0.0f;
     int   i, n = 0;
     int   was = s_charActive;
     s_charActive = 0;
@@ -2925,12 +2952,14 @@ int ShT3d_CharaDrawEnd(void)
     for (i = 0; i < c->instCount && i < 32; i++)
         if (s_charMask & (1u << i))
         {
-            sum += c->viewRow[i * 4 + 3];
+            float d = c->viewRow[i * 4 + 3];
+            if (d > far_)
+                far_ = d;
             n++;
         }
-    if (n == 0 || sum <= 0.0f)
+    if (n == 0 || far_ <= 0.0f)
         return -1;
-    return (int)(sum / (float)n);
+    return (int)far_;
 }
 
 /* The bone loop hands over each part's GAME view matrix (Vw_CoordToWorldAnd
