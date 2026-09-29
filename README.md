@@ -22,7 +22,7 @@ Full breakdown: [COPYRIGHT.md](COPYRIGHT.md).
 - **The full game.** Every map, boss, cutscene and ending. All 43 map overlays are linked into the app.
 - **Touch controls.** A floating movement stick, drag-to-look, tap to act, and on-screen Aim / Item / Map / Start buttons. Menus work by tapping. The buttons send whatever your controller config has bound, so rebinds carry over.
 - **Controllers.** Bluetooth and USB pads work, and the touch overlay steps aside when one is in use. Remap them under **Options > Controller Config**.
-- **Graphics.** Renders at the device's native resolution in widescreen (Hor+) by default, at 60 fps and locked to landscape (`screen_orientation` in `config.cfg` changes that). PGXP perspective correction and the rest of the PC port's graphics options are available too.
+- **Graphics.** Renders at the device's native resolution in widescreen (Hor+) by default, at 60 fps. It starts locked to landscape; **Options > Screen Rotation** switches between Landscape, Auto (follows the sensor) and Portrait after a restart. PGXP perspective correction and the rest of the PC port's graphics options are available too.
 - **Quick options overlay.** Graphics, HUD, audio and cheats, opened from an on-screen button.
 - **RetroAchievements.** Sign in from **Options > System > Achievements** (softcore only).
 - **Mods.** Loose-file replacements and DuckStation-style texture packs. See [Modding](#modding).
