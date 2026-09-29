@@ -59,6 +59,7 @@ enum { CH_TOGGLE = 0, CH_ACTION, CH_PLAYAS, CH_FREECAM, CH_DEBUGKEYS, CH_SPAWN, 
 /* ---- big head mode ---------------------------------------------------- */
 
 int g_PcBigHead = 0;
+extern int g_PcInfiniteAmmo; /* game_main.c */
 
 #define BIGHEAD_BONE  2 /* the head on every 18-bone human rig (parent chain -1,0,1,...) */
 #define BIGHEAD_SCALE 2
@@ -244,6 +245,7 @@ static const CheatRow s_cheats[] = {
     { "Noclip",               CH_TOGGLE,  &g_DebugNoWallCollision, NULL },
     { "Enemies ignore Harry", CH_TOGGLE,  &g_DebugNoTarget,       NULL },
     { "Unlimited enemies",    CH_TOGGLE,  &g_PcUnlimitedEnemies,  NULL },
+    { "Infinite ammo",        CH_TOGGLE,  &g_PcInfiniteAmmo,      NULL },
     { "Big head mode",        CH_TOGGLE,  &g_PcBigHead,           NULL },
     { "Handgun bullets +15",  CH_ACTION,  NULL, act_handgun_ammo },
     { "Hunting rifle +30",    CH_ACTION,  NULL, act_rifle },

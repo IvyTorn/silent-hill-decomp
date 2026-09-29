@@ -489,6 +489,7 @@ static const char* const HELP_LINES[] = {
     " spawn list     list monsters loaded in this map",
     " spawn <name>   spawn a monster in front of Harry",
     " noclip         walk through walls (floor stays on)",
+    " infammo [0|1]  fire without spending ammo (no reloads)",
     " notarget [0|1]  enemies ignore Harry",
     " freecam [0|1]  free camera (mouse look, WASD, Space/C)",
     " collvis [0|1]  collision visualizer panel",
@@ -1259,6 +1260,11 @@ void Pc_ConsoleExec(const char* line)
         else if (arg[0] == '0') g_PcUnlimitedEnemies = 0;
         else g_PcUnlimitedEnemies = !g_PcUnlimitedEnemies;
         cprintf("unlimited enemies %s (cap now %d)", g_PcUnlimitedEnemies ? "ON" : "OFF", NPC_COUNT_MAX);
+    } else if (strcmp(cmd, "INFAMMO") == 0 || strcmp(cmd, "INFINITEAMMO") == 0) {
+        extern int g_PcInfiniteAmmo;
+        g_PcInfiniteAmmo = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_PcInfiniteAmmo;
+        cprintf("infinite ammo %s%s", g_PcInfiniteAmmo ? "ON" : "OFF",
+                g_PcInfiniteAmmo ? " (guns you own fire without spending rounds)" : "");
     } else if (strcmp(cmd, "NOTARGET") == 0) {
         extern int g_DebugNoTarget;
         g_DebugNoTarget = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !g_DebugNoTarget;

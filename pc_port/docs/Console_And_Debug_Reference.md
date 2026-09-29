@@ -116,6 +116,7 @@ when it is off.
 | `spawn <name> [state]` | Spawn a monster in front of Harry. |
 | `unlimited [0\|1]` | Raise the concurrent-enemy cap to the PC max (toggles if no arg). |
 | `noclip` | Walk through walls (floor collision stays on). |
+| `infammo [0\|1]` | Fire without spending ammo, so clips never empty and guns never need reloading. Affects only the guns you already carry: it suppresses the ammo decrement rather than granting rounds, so nothing is ever added to or removed from your inventory. The automatic reload-on-empty is held off while it is on, since that is the one path that would move rounds out of the inventory. Off restores normal ammo use exactly. Also a Quick Options > Cheats row. |
 | `notarget [0\|1]` | Enemies ignore Harry. |
 | `freecam [0\|1]` | Free camera: mouse look, W/A/S/D, Space/C up/down, Shift fast, Ctrl slow. |
 | `collvis [0\|1]` | Collision visualizer panel. |
