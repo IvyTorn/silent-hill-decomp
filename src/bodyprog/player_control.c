@@ -221,6 +221,26 @@ VECTOR3    g_Player_PrevPosition;
  * movement shim REPLACES Player_LowerBodyUpdate, so under the alternate cameras
  * and 2D control the results-screen walk/run totals never accrued. */
 int        g_PcNativeDistAccrued;
+
+/* The shim's strafe and jump-back write Harry's position directly rather than
+ * through D_800C4590.offset, so the func_8007C0D8 fallback never sees them.
+ * Walk vs run follows the native classification: sidesteps are walking, and
+ * run-strafe and the jump back land in its default (running) branch. */
+static void Pc_ShimDistCredit(s32 dx, s32 dz, int running)
+{
+    s32 step = SquareRoot0(SQUARE(dx) + SQUARE(dz));
+
+    if (running)
+    {
+        g_SavegamePtr->runDistance += step;
+        g_SavegamePtr->runDistance  = CLAMP(g_SavegamePtr->runDistance, 1, Q12(1000000.0f));
+    }
+    else
+    {
+        g_SavegamePtr->walkDistance += step;
+        g_SavegamePtr->walkDistance  = CLAMP(g_SavegamePtr->walkDistance, 1, Q12(1000000.0f));
+    }
+}
 #endif
 u16        g_Player_IsRunning;
 s16        __pad_bss_800C4606;
@@ -2240,8 +2260,13 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
                             s_prevJumpBackTime = curTime;
                             if (dTime > 0) {
                                 q19_12 step = Q12_MULT_PRECISE(Q12(0.22f), dTime);
-                                player->position.vx -= Q12_MULT(step, Math_Sin(player->rotation.vy));
-                                player->position.vz -= Q12_MULT(step, Math_Cos(player->rotation.vy));
+                                s32    jbX  = Q12_MULT(step, Math_Sin(player->rotation.vy));
+                                s32    jbZ  = Q12_MULT(step, Math_Cos(player->rotation.vy));
+                                player->position.vx -= jbX;
+                                player->position.vz -= jbZ;
+#ifdef SH_PC_PORT
+                                Pc_ShimDistCredit(jbX, jbZ, 1);
+#endif
                             }
                         } else {
                             /* Brace/blend phase: no positional advance; reset time tracking. */
@@ -2567,11 +2592,15 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
 
                                 player->position.vx += strafeColl.offset.vx;
                                 player->position.vz += strafeColl.offset.vz;
+                                Pc_ShimDistCredit(strafeColl.offset.vx, strafeColl.offset.vz, runStrafe);
                             } else
 #endif
                             {
                                 player->position.vx += strafeWish.vx;
                                 player->position.vz += strafeWish.vz;
+#ifdef SH_PC_PORT
+                                Pc_ShimDistCredit(strafeWish.vx, strafeWish.vz, runStrafe);
+#endif
                             }
                         }
                     }
