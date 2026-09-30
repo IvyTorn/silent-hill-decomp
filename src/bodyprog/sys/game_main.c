@@ -39,6 +39,10 @@ int g_PcHorPlusGate = 0;
 /* Set by a freeze-frame state (pause, map messages) when it hands control back,
  * instead of dropping g_PsxPresentLastFrame on the spot. See the release below. */
 int g_PcFreezeReleasePending = 0;
+/* Set by open_main when a blocking FMV returns. The movie's whole runtime lands
+ * in the next frame's dt; the game clock never ran during it on PSX either, so
+ * it must not become cutscene catch-up debt. */
+int g_PcFmvClockDiscard = 0;
 
 /* [SLOWFRAME] phase clocks. A stall report needs to say WHICH part of the frame
  * took the time -- "worst=9470ms" in [PERF] separates a stall from slow
@@ -3057,6 +3061,15 @@ void MainLoop(void) // 0x80032EE0
 
             dtRaw    = MIN(dtTrue, PC_DT_STEP_15FPS);
             dtCapped = MIN(dtRaw, PC_DT_STEP_30FPS);
+
+            /* The ~22s escape-run movie in the Good+ ending (ME_03300) otherwise
+             * banked the 2s debt maximum and fast-forwarded the scene after it. */
+            if (g_PcFmvClockDiscard)
+            {
+                g_PcFmvClockDiscard = 0;
+                s_cutsceneDebt      = 0;
+                dtTrue              = dtCapped;
+            }
 
             if (pcInCutscene && !pcConsoleFrozen)
             {
