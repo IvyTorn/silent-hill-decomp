@@ -301,6 +301,9 @@ static const s_PcOpt PCOPT_H[] = {
     /* From the System page; a crosshair is HUD, and that page needed the room. */
     { "Crosshair",         &g_PcConfig.crosshair,          "crosshair",             VAL_ONOFF, 2, LBL_ONOFF, NULL, 1, PCK_INT },
     { "Crosshair_Size",    NULL, "crosshair_size",         NULL, 0, NULL, NULL, 1, PCK_SLIDER, &g_PcConfig.crosshairSize, NULL, 25.0f, 125.0f, 5.0f },
+    /* Subtitles, memos and other map messages (text_draw.c Pc_MsgScaleSetup).
+     * Menus keep their fixed layouts. */
+    { "Text_Size",         NULL, "text_size",              NULL, 0, NULL, NULL, 1, PCK_SLIDER, &g_PcConfig.textSize,      NULL, 100.0f, 150.0f, 5.0f },
     { "Prev_Page",         NULL,                           NULL,                    NULL,      0, NULL,      NULL, 0, PCK_PREV },
     { "Back",              NULL,                           NULL,                    NULL,      0, NULL,      NULL, 0, PCK_BACK },
 };

@@ -177,6 +177,7 @@ when it is off.
 |---|---|
 | `invaspect [0\|1]` | Inventory item proportions: PSX-faithful vs square (true). |
 | `invscale <50..200>` | Inventory item vertical scale (% of square; default `125`). |
+| `textsize <100..150>` | Size of subtitles, memos and other in-game messages, in percent (saved as `text_size`; also Options > HUD). Menus keep their size; a message that would leave the screen is drawn as large as fits. |
 | `invcary <n>` | Carousel item Y offset (+ down). |
 | `inveqy <n>` | Equipped item Y offset (+ down). |
 | `invdim <0..100>` | Off-center carousel dim strength (%). |

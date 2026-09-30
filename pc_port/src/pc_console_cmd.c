@@ -1593,6 +1593,19 @@ void Pc_ConsoleExec(const char* line)
             }
         }
         cprintf("crosshair size: %d%% (25..125)", (int)(g_PcConfig.crosshairSize + 0.5f));
+    } else if (strcmp(cmd, "TEXTSIZE") == 0) {
+        if (arg[0]) {
+            float v = (float)atof(arg);
+            if (v < 100.0f) v = 100.0f;
+            if (v > 150.0f) v = 150.0f;
+            g_PcConfig.textSize = v;
+            {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d", (int)(v + 0.5f));
+                PcConfig_SaveKeyValue("text_size", buf);
+            }
+        }
+        cprintf("text size: %d%% (100..150, subtitles and messages)", (int)(g_PcConfig.textSize + 0.5f));
     } else if (strcmp(cmd, "OBST") == 0) {
         extern int g_PcObstacleCollision;
         if (arg[0]) g_PcObstacleCollision = atoi(arg) ? 1 : 0;

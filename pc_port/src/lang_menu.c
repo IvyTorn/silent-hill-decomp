@@ -249,6 +249,7 @@ static const s_MenuTranslation s_MenuTr[] = {
     { "Minimap_Reqs_Map",  { "Nur_mit_Karte",      "Carte_requise",       "Requiere_mapa",      "Serve_la_mappa"  } },
     { "Low_HP_Glow",       { "Warnung_wenig_LP",   "Alerte_PV_bas",       "Aviso_vida_baja",    "Avviso_vita_bassa" } },
     { "Crosshair_Size",    { "Fadenkreuzgr\xF6\xDF" "e", "Taille_r\xE9ticule", "Tama\xF1o_ret\xED" "cula", "Dim._mirino" } },
+    { "Text_Size",         { "Textgr\xF6\xDF" "e",  "Taille_du_texte",     "Tama\xF1o_del_texto", "Dim._testo"      } },
     { "Dither",            { NULL,                 "Tramage",             "Tramado",            "Retinatura"      } },
     { "Trilinear",         { NULL,                 "Trilin\xE9" "aire",   "Trilineal",          "Trilineare"      } },
     { "Classic",           { "Klassisch",          "Classique",           "Cl\xE1sico",         "Classico"        } },
