@@ -4,7 +4,7 @@
  This is the full English script of the PC port with a Russian line under
  every entry. The Russian is PRE-FILLED from the Team Raccoon / ViT Co /
  Metallist fan translation ("Silent Hill (ViT Co_Metallist) (Team
- Raccoon)"), read straight off that disc.  Total entries: 1869.
+ Raccoon)"), read straight off that disc.  Total entries: 1870.
 
  WHAT TO DO
  ----------
@@ -921,6 +921,11 @@ RU:
 [MENU.Crosshair_Size]
 NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Crosshair Size
+RU: 
+
+[MENU.Text_Size]
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
+EN: Text Size
 RU: 
 
 [MENU.Windowed]

@@ -4,7 +4,7 @@
  Every visible in-game English string that is NOT baked into an image:
  story/cutscene dialogue, examine/pickup prompts, the original menus, the PC
  port's own menus (PC Options, the F10 Quick Options menu, the Controls
- panel), item names and item descriptions.  Total entries: 1869.
+ panel), item names and item descriptions.  Total entries: 1871.
 
  HOW TO USE
  ----------
@@ -908,6 +908,11 @@ NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
 EN: Crosshair Size
 TR: 
 
+[MENU.Text_Size]
+NOTE: row name, HUD page, max ~17 characters (also used in the original menus)
+EN: Text Size
+TR: 
+
 [MENU.Windowed]
 NOTE: setting value, max ~11 characters (also used in the original menus)
 EN: Windowed
@@ -1418,6 +1423,11 @@ TR:
 [QUICK.Unlimited_enemies]
 NOTE: cheat / debug row. Keep key names in brackets
 EN: Unlimited enemies
+TR: 
+
+[QUICK.Infinite_ammo]
+NOTE: cheat / debug row. Keep key names in brackets
+EN: Infinite ammo
 TR: 
 
 [QUICK.Big_head_mode]

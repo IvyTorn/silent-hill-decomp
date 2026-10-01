@@ -88,6 +88,7 @@ s_PcConfig g_PcConfig = {
     .crosshair           = 0, /* draw a center crosshair while aiming in TPS/OTS */
     .crosshairStyle      = 0, /* 0 = cross (+), 1 = dot, 2 = circle, 3 = dashes/gap */
     .crosshairSize       = 100.0f,
+    .textSize            = 100.0f,
     .aimAssist           = 1, /* OTS/TPS free-aim aim assist (mouse body-coverage + controller auto-aim) */
     .mouseCursor         = 1, /* mouse controls cursor puzzles + clickable main menu */
     .altButtonSprint     = 0, /* alt cams sprint from the run control only (off = full stick push also sprints) */
@@ -1006,6 +1007,13 @@ void PcConfig_Load(const char* path)
             if (v < 25.0f) v = 25.0f;
             if (v > 125.0f) v = 125.0f;
             g_PcConfig.crosshairSize = v;
+        }
+        else if (strcmp(key, "text_size") == 0)
+        {
+            float v = (float)atof(value);
+            if (v < 100.0f) v = 100.0f;
+            if (v > 150.0f) v = 150.0f;
+            g_PcConfig.textSize = v;
         }
         else if (strcmp(key, "mouse_cursor") == 0)
         {

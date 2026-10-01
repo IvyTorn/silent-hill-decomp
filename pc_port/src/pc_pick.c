@@ -78,6 +78,32 @@ static int        s_propCount;
 static const void* s_selPropModel;
 static s32         s_selPropX, s_selPropY, s_selPropZ;
 
+/* FREEZE and HEAL state per NPC slot, each tagged with the character it was
+ * recorded for so a recycled slot starts clean (same reason as
+ * s_npcScaleChara). -1 = nothing recorded. */
+static s32 s_frozenChara[NPC_COUNT_MAX];
+static s32 s_bakedScale[NPC_COUNT_MAX]; /* scale the slot's bones were last drawn at */
+static s32 s_maxHealth[NPC_COUNT_MAX];
+static s32 s_maxHealthChara[NPC_COUNT_MAX];
+static int s_npcStateInit;
+
+static void NpcStateInit(void)
+{
+    int i;
+
+    if (s_npcStateInit)
+        return;
+
+    for (i = 0; i < NPC_COUNT_MAX; i++)
+    {
+        s_frozenChara[i]    = -1;
+        s_maxHealth[i]      = 0;
+        s_maxHealthChara[i] = -1;
+        s_bakedScale[i]     = Q12(1.0f);
+    }
+    s_npcStateInit = 1;
+}
+
 /* Pending click: 0 = none, 1 = armed (waiting for a frame), 2 = frame ran. */
 static int s_pendState;
 static int s_pendX, s_pendY;
@@ -399,6 +425,86 @@ void Pc_Pick_Reset(void)
     s_selSlot    = -1;
     s_selCharaId = -1;
     s_pendState  = 0;
+    s_npcStateInit = 0;
+    NpcStateInit();
+}
+
+void* Pc_Pick_SelectedNpc(void)
+{
+    s_SubCharacter* npc;
+
+    if (s_selKind != PcPick_Npc || s_selSlot < 0 || s_selSlot >= NPC_COUNT_MAX)
+        return NULL;
+
+    npc = &g_SysWork.npcs[s_selSlot];
+    if (npc->model.charaId == Chara_None || npc->model.charaId != s_selCharaId)
+        return NULL;
+
+    return npc;
+}
+
+int Pc_Pick_PropPosition(int* x, int* y, int* z)
+{
+    if (s_selKind != PcPick_Prop)
+        return 0;
+
+    /* Placements are stored Q8; callers work in world Q12. */
+    *x = (int)(s_selPropX << 4);
+    *y = (int)(s_selPropY << 4);
+    *z = (int)(s_selPropZ << 4);
+    return 1;
+}
+
+int Pc_Pick_NpcTick(const void* npcPtr, int slot)
+{
+    const s_SubCharacter* npc = (const s_SubCharacter*)npcPtr;
+
+    if (slot < 0 || slot >= NPC_COUNT_MAX || npc == NULL)
+        return 0;
+
+    NpcStateInit();
+
+    /* Enemies set their own health on their first AI tick and there is no
+     * max-health field, so the highest value seen is what HEAL restores. */
+    if (s_maxHealthChara[slot] != npc->model.charaId)
+    {
+        s_maxHealthChara[slot] = npc->model.charaId;
+        s_maxHealth[slot]      = 0;
+        s_frozenChara[slot]    = -1;
+    }
+    if (npc->health > s_maxHealth[slot])
+        s_maxHealth[slot] = npc->health;
+
+    return s_frozenChara[slot] == npc->model.charaId;
+}
+
+int Pc_Pick_NpcMaxHealth(int slot)
+{
+    if (slot < 0 || slot >= NPC_COUNT_MAX || !s_npcStateInit)
+        return 0;
+    if (s_maxHealthChara[slot] != g_SysWork.npcs[slot].model.charaId)
+        return 0;
+
+    return s_maxHealth[slot];
+}
+
+int Pc_Pick_SetFrozen(int slot, int on)
+{
+    if (slot < 0 || slot >= NPC_COUNT_MAX || g_SysWork.npcs[slot].model.charaId == Chara_None)
+        return 0;
+
+    NpcStateInit();
+    s_frozenChara[slot] = on ? g_SysWork.npcs[slot].model.charaId : -1;
+    return 1;
+}
+
+int Pc_Pick_IsFrozen(int slot)
+{
+    if (slot < 0 || slot >= NPC_COUNT_MAX || !s_npcStateInit)
+        return 0;
+
+    return g_SysWork.npcs[slot].model.charaId != Chara_None &&
+           s_frozenChara[slot] == g_SysWork.npcs[slot].model.charaId;
 }
 
 void Pc_Pick_CharaPreDraw(struct _SubCharacter* charaPtr, int slot, void* boneCoordsPtr)
@@ -429,8 +535,26 @@ void Pc_Pick_CharaPreDraw(struct _SubCharacter* charaPtr, int slot, void* boneCo
         *scale = Q12(1.0f);
     }
 
-    if (scale != NULL && *scale != Q12(1.0f) && boneCoords != NULL)
-        Chara_ModelBoneScaleSet(boneCoords, 0, *scale, *scale, *scale);
+    if (kind == PcPick_Npc && Pc_Pick_IsFrozen(slot))
+    {
+        /* A frozen NPC is not re-posed, so its bones still carry the scale
+         * applied on its last live frame. Re-applying it would compound it;
+         * only a change made while frozen is applied, as the ratio. */
+        s32 want = (scale != NULL) ? *scale : Q12(1.0f);
+        if (boneCoords != NULL && want != s_bakedScale[slot] && s_bakedScale[slot] > 0)
+        {
+            s32 ratio = (s32)(((s64)want << 12) / s_bakedScale[slot]);
+            Chara_ModelBoneScaleSet(boneCoords, 0, ratio, ratio, ratio);
+        }
+        s_bakedScale[slot] = want;
+    }
+    else
+    {
+        if (scale != NULL && *scale != Q12(1.0f) && boneCoords != NULL)
+            Chara_ModelBoneScaleSet(boneCoords, 0, *scale, *scale, *scale);
+        if (kind == PcPick_Npc && slot >= 0 && slot < NPC_COUNT_MAX)
+            s_bakedScale[slot] = (scale != NULL) ? *scale : Q12(1.0f);
+    }
 
     if (s_pendState != 1)
         return;

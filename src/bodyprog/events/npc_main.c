@@ -845,7 +845,12 @@ void Game_NpcUpdate(void) // 0x80038354
             }
 #endif
 #ifdef SH_PC_PORT
-            if (g_DebugAnimKfView && g_DebugViewNpcSlot == k)
+            if (Pc_Pick_NpcTick(npc, (int)(npc - g_SysWork.npcs)))
+            {
+                /* Console FREEZE: no AI tick, so the bones keep last frame's
+                 * pose and the enemy neither moves nor attacks. */
+            }
+            else if (g_DebugAnimKfView && g_DebugViewNpcSlot == k)
             {
                 /* Keyframe viewer is inspecting this NPC: pose it from the
                  * inspector (freeze/loop) instead of running its AI + per-frame

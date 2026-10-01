@@ -1315,6 +1315,7 @@ MENU.Minimap_Reqs_Map=Wymaga_Mapy_w_Ekw.
 MENU.Low_HP_Glow=Pośw._Niskiego_HP
 MENU.Crosshair=Celownik
 MENU.Crosshair_Size=Rozmiar_Celownika
+MENU.Text_Size=Rozmiar_Tekstu
 MENU.Windowed=W_Oknie
 MENU.Fullscreen=Pełny_Ekran
 MENU.Borderless=Bezramkowy

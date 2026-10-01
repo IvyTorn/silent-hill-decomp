@@ -225,6 +225,7 @@ typedef struct {
     int crosshair;          /* 1 = draw a center crosshair while aiming in TPS/OTS (config key: crosshair) */
     int crosshairStyle;     /* reticle shape: 0 = cross (+), 1 = dot, 2 = circle, 3 = dashes/gap (config key: crosshair_style) */
     float crosshairSize;    /* reticle scale in percent, 25..125 (config key: crosshair_size) */
+    float textSize;         /* subtitle/message text scale in percent, 100..150 (config key: text_size) */
     int aimAssist;          /* 1 = OTS/TPS free-aim aim assist (mouse body-coverage + controller auto-aim) (config key: aim_assist) */
     int mouseCursor;        /* 1 = mouse controls cursor puzzles + clickable main menu (config key: mouse_cursor) */
     int altButtonSprint;    /* "Always use button based sprinting": 1 = walk by default, sprint ONLY while the bound run control is held — applies to alt cameras (TPS/OTS/FPS) AND 2D control under any camera; 0 = a near-full stick push also sprints (config key: altcam_button_sprint) */

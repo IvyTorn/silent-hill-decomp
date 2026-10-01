@@ -20,6 +20,11 @@
  *                  right-click to deselect
  *   SELECT [clear|player|nearest] - show / clear / set the selection
  *   SCALE <f>            - resize the selected character (0.05..20)
+ *   HEALTH [n] / HEAL    - show/set or refill the selection's health
+ *                          (Harry when nothing is selected)
+ *   INFO                 - name, health, position and state of the selection
+ *   GOTO / BRING         - Harry to the selection / the selected enemy to Harry
+ *   FREEZE [0|1|ALL|NONE] - hold enemies still (UNFREEZE = FREEZE 0)
  *   BIND <key> <cmds>    - run one or more console commands from a key;
  *                          BIND LIST / UNBIND <key> / UNBINDALL
  *   ABOUT                - PC port credits (same block the staff roll appends)
@@ -56,6 +61,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 /* fmv_player.cpp */
 extern int         FMV_Play(int file_idx, int max_frames);
@@ -511,6 +517,11 @@ static const char* const HELP_LINES[] = {
     " select [clear|player|nearest]  show/clear/set the selection",
     " (hold TAB to hide the console and click through it)",
     " scale <f>      resize the selected character (click one first)",
+    " health [n] / heal   show/set or refill the selection's health",
+    " info           name, health, position, state of the selection",
+    " goto           move Harry next to the selected enemy or prop",
+    " bring          move the selected enemy in front of Harry",
+    " freeze [0|1]   hold the selected enemy still (freeze all/none)",
     " about          PC port credits",
     " pccredits [0|1]  PC port credits block in the staff roll",
     " loga / logb    log Harry+camera pos/angles to SilentHill.log",
@@ -1092,6 +1103,226 @@ static void cmd_scale(const char* arg)
             what, Pc_Pick_GetScale() / 4096.0f);
 }
 
+/* HEALTH / HEAL / INFO / GOTO / BRING / FREEZE act on the click selection.
+ * HEALTH, HEAL and INFO fall back to Harry with nothing selected, like KILL. */
+static s_SubCharacter* sel_chara(char* what, int whatSize)
+{
+    s_SubCharacter* npc;
+
+    switch (Pc_Pick_Kind()) {
+        case PcPick_Npc:
+            npc = (s_SubCharacter*)Pc_Pick_SelectedNpc();
+            if (npc == NULL) {
+                Pc_Pick_Clear(0);
+                break;
+            }
+            Pc_Pick_Describe(what, whatSize);
+            return npc;
+        case PcPick_Prop:
+            return NULL;
+        default:
+            break;
+    }
+    snprintf(what, whatSize, "Harry");
+    return &g_SysWork.playerWork.player;
+}
+
+static void cmd_health(const char* arg, int heal)
+{
+    char            what[64];
+    s_SubCharacter* ch;
+    int             isHarry;
+    int             slot = Pc_Pick_Slot();
+
+    if (Pc_Pick_Kind() == PcPick_Prop) {
+        cprintf("%s: props have no health", heal ? "heal" : "health");
+        return;
+    }
+    ch      = sel_chara(what, sizeof(what));
+    isHarry = (ch == &g_SysWork.playerWork.player);
+
+    if (ch->health <= Q12(0.0f) && (heal || arg[0])) {
+        cprintf("%s is dead", what);
+        return;
+    }
+
+    if (heal) {
+        s32 full = isHarry ? Q12(100.0f) : Pc_Pick_NpcMaxHealth(slot);
+        if (full <= Q12(0.0f)) {
+            cprintf("heal: %s's full health is not known yet", what);
+            return;
+        }
+        ch->health = full;
+    } else if (arg[0]) {
+        double v = atof(arg);
+        if (v <= 0.0) {
+            cprintf("health: use a value above 0 (or 'kill')");
+            return;
+        }
+        if (isHarry && v > 100.0)
+            v = 100.0;
+        ch->health = (s32)(v * 4096.0);
+    }
+
+    if (isHarry)
+        cprintf("%s health %.1f / 100", what, ch->health / 4096.0f);
+    else
+        cprintf("%s health %.1f (full %.1f)", what, ch->health / 4096.0f,
+                Pc_Pick_NpcMaxHealth(slot) / 4096.0f);
+}
+
+static void cmd_info(void)
+{
+    char            what[64];
+    s_SubCharacter* ch;
+    int             slot = Pc_Pick_Slot();
+
+    if (Pc_Pick_Kind() == PcPick_Prop) {
+        int x, y, z;
+        Pc_Pick_Describe(what, sizeof(what));
+        Pc_Pick_PropPosition(&x, &y, &z);
+        cprintf("%s", what);
+        cprintf(" pos %.2f %.2f %.2f  scale %.2f", x / 4096.0f, y / 4096.0f, z / 4096.0f,
+                Pc_Pick_GetScale() / 4096.0f);
+        return;
+    }
+
+    ch = sel_chara(what, sizeof(what));
+    cprintf("%s  charaId %d", what, (int)ch->model.charaId);
+    cprintf(" health %.1f  pos %.2f %.2f %.2f  facing %d deg",
+            ch->health / 4096.0f, ch->position.vx / 4096.0f, ch->position.vy / 4096.0f,
+            ch->position.vz / 4096.0f, (int)(((ch->rotation.vy & 0xFFF) * 360) >> 12));
+    if (ch == &g_SysWork.playerWork.player)
+        cprintf(" scale %.2f", Pc_Pick_GetScale() / 4096.0f);
+    else
+        cprintf(" scale %.2f  state %d/%d%s", Pc_Pick_GetScale() / 4096.0f,
+                (int)ch->model.controlState, (int)ch->model.stateStep,
+                Pc_Pick_IsFrozen(slot) ? "  FROZEN" : "");
+}
+
+static void cmd_goto(void)
+{
+    char            what[64];
+    s_SubCharacter* hr = &g_SysWork.playerWork.player;
+    s_CollisionSurface surf;
+    s32             tx, tz, dx, dz, dist, gap;
+
+    if (Pc_Pick_Kind() == PcPick_Npc) {
+        s_SubCharacter* npc = sel_chara(what, sizeof(what));
+        if (npc == hr) {
+            cprintf("goto: the selection is gone - select again");
+            return;
+        }
+        tx = npc->position.vx;
+        tz = npc->position.vz;
+    } else if (Pc_Pick_Kind() == PcPick_Prop) {
+        int x, y, z;
+        Pc_Pick_Describe(what, sizeof(what));
+        Pc_Pick_PropPosition(&x, &y, &z);
+        tx = x;
+        tz = z;
+    } else {
+        cprintf("goto: select an enemy or prop first");
+        return;
+    }
+
+    /* Land a little short of it on Harry's side, facing it, so he does not
+     * spawn inside its body or a prop's mesh. */
+    dx   = hr->position.vx - tx;
+    dz   = hr->position.vz - tz;
+    dist = (s32)sqrt((double)dx * dx + (double)dz * dz);
+    gap  = Q12(1.2f);
+    if (dist > 0) {
+        tx += (s32)(((s64)dx * gap) / dist);
+        tz += (s32)(((s64)dz * gap) / dist);
+    } else {
+        tz -= gap;
+    }
+
+    Collision_SurfaceGet(&surf, tx, tz);
+    hr->position.vx                          = tx;
+    hr->position.vz                          = tz;
+    hr->position.vy                          = surf.groundHeight;
+    hr->properties.player.groundHeight       = surf.groundHeight;
+    hr->fallSpeed                            = 0;
+    hr->rotation.vy = (s16)(ratan2(-dx, -dz) & 0xFFF);
+    cprintf("Harry moved to %s", what);
+}
+
+static void cmd_bring(void)
+{
+    char            what[64];
+    s_SubCharacter* hr = &g_SysWork.playerWork.player;
+    s_SubCharacter* npc;
+    s_CollisionSurface surf;
+    s32             yaw = hr->rotation.vy;
+    s32             dist = Q12(2.0f);
+    s32             x, z;
+
+    if (Pc_Pick_Kind() == PcPick_Prop) {
+        cprintf("bring: props cannot be moved");
+        return;
+    }
+    if (Pc_Pick_Kind() != PcPick_Npc) {
+        cprintf("bring: select an enemy first");
+        return;
+    }
+    npc = sel_chara(what, sizeof(what));
+    if (npc == hr) {
+        cprintf("bring: the selection is gone - select again");
+        return;
+    }
+    /* A frozen NPC is not re-posed, so it would keep drawing where it was. */
+    if (Pc_Pick_IsFrozen(Pc_Pick_Slot())) {
+        cprintf("bring: %s is frozen - 'freeze 0' first", what);
+        return;
+    }
+
+    x = hr->position.vx + (s32)(((s64)dist * Math_Sin(yaw)) >> 12);
+    z = hr->position.vz + (s32)(((s64)dist * Math_Cos(yaw)) >> 12);
+    Collision_SurfaceGet(&surf, x, z);
+    npc->position.vx = x;
+    npc->position.vz = z;
+    npc->position.vy = surf.groundHeight;
+    npc->rotation.vy = (s16)((yaw + 0x800) & 0xFFF);
+    cprintf("brought %s in front of Harry", what);
+}
+
+static void cmd_freeze(const char* arg)
+{
+    char what[64];
+    int  i, n = 0;
+
+    if (strcmp(arg, "ALL") == 0 || strcmp(arg, "NONE") == 0) {
+        int on = (arg[0] == 'A');
+        for (i = 0; i < NPC_COUNT_MAX; i++) {
+            s_SubCharacter* npc = &g_SysWork.npcs[i];
+            if (npc->model.charaId == Chara_None || npc->model.charaId == Chara_Harry)
+                continue;
+            if (Pc_Pick_SetFrozen(i, on))
+                n++;
+        }
+        cprintf("%s %d characters", on ? "froze" : "unfroze", n);
+        return;
+    }
+
+    if (Pc_Pick_Kind() != PcPick_Npc) {
+        cprintf("freeze: select an enemy first (or 'freeze all' / 'freeze none')");
+        return;
+    }
+    if (sel_chara(what, sizeof(what)) == &g_SysWork.playerWork.player) {
+        cprintf("freeze: the selection is gone - select again");
+        return;
+    }
+
+    {
+        int slot = Pc_Pick_Slot();
+        int on   = (arg[0] == '1') ? 1 : (arg[0] == '0') ? 0 : !Pc_Pick_IsFrozen(slot);
+        Pc_Pick_SetFrozen(slot, on);
+        cprintf("%s %s", what, on ? "frozen" : "unfrozen");
+    }
+}
+
 /* The staff-roll block, read straight off the same table pc_credits.c encodes
  * for the roll, so the two can never drift apart. */
 static void cmd_about(void)
@@ -1190,6 +1421,20 @@ void Pc_ConsoleExec(const char* line)
         cmd_select(arg);
     } else if (strcmp(cmd, "SCALE") == 0) {
         cmd_scale(arg);
+    } else if (strcmp(cmd, "HEALTH") == 0 || strcmp(cmd, "HP") == 0) {
+        cmd_health(arg, 0);
+    } else if (strcmp(cmd, "HEAL") == 0) {
+        cmd_health(arg, 1);
+    } else if (strcmp(cmd, "INFO") == 0) {
+        cmd_info();
+    } else if (strcmp(cmd, "GOTO") == 0) {
+        cmd_goto();
+    } else if (strcmp(cmd, "BRING") == 0) {
+        cmd_bring();
+    } else if (strcmp(cmd, "FREEZE") == 0) {
+        cmd_freeze(arg);
+    } else if (strcmp(cmd, "UNFREEZE") == 0) {
+        cmd_freeze((arg[0] == '\0') ? "0" : (strcmp(arg, "ALL") == 0) ? "NONE" : arg);
     } else if (strcmp(cmd, "ABOUT") == 0 || strcmp(cmd, "CREDITS") == 0) {
         cmd_about();
     } else if (strcmp(cmd, "PCCREDITS") == 0) {
@@ -1224,6 +1469,9 @@ void Pc_ConsoleExec(const char* line)
                  * damage.amount itself and then runs its own death path, so
                  * the kill routes through the real cleanup for every type. */
                 npc->damage.amount = Q12(99999.0f);
+                /* The damage is applied by the enemy's own AI tick, which a
+                 * frozen enemy skips. */
+                Pc_Pick_SetFrozen(Pc_Pick_Slot(), 0);
                 cprintf("killed %s", what);
             }
         } else if (Pc_Pick_Kind() == PcPick_Prop) {
@@ -1249,6 +1497,7 @@ void Pc_ConsoleExec(const char* line)
                 continue;
             }
             npc->damage.amount = Q12(99999.0f);
+            Pc_Pick_SetFrozen(i, 0);
             killed++;
         }
         cprintf("killed %d nearby enemies", killed);
@@ -1344,6 +1593,19 @@ void Pc_ConsoleExec(const char* line)
             }
         }
         cprintf("crosshair size: %d%% (25..125)", (int)(g_PcConfig.crosshairSize + 0.5f));
+    } else if (strcmp(cmd, "TEXTSIZE") == 0) {
+        if (arg[0]) {
+            float v = (float)atof(arg);
+            if (v < 100.0f) v = 100.0f;
+            if (v > 150.0f) v = 150.0f;
+            g_PcConfig.textSize = v;
+            {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d", (int)(v + 0.5f));
+                PcConfig_SaveKeyValue("text_size", buf);
+            }
+        }
+        cprintf("text size: %d%% (100..150, subtitles and messages)", (int)(g_PcConfig.textSize + 0.5f));
     } else if (strcmp(cmd, "OBST") == 0) {
         extern int g_PcObstacleCollision;
         if (arg[0]) g_PcObstacleCollision = atoi(arg) ? 1 : 0;
