@@ -261,11 +261,6 @@ typedef struct {
      * = Automatic (every controller). For a TV box whose remote enumerates as a
      * controller ahead of the pad. (config key: preferred_controller) */
     char preferredController[128];
-    /* Mobile screen orientation: 0 = lock landscape (the default and what the
-     * port has always done), 1 = follow the sensor, 2 = lock portrait. SDL
-     * otherwise derives this from the window's proportions, which on a device
-     * rotated to portrait letterboxes the game into a strip. Config key:
-     * screen_orientation. */
     /* Which on-screen control scheme: 0 = Context (the floating stick, drag to
      * look, tap to act, buttons that change with the screen), 1 = Gamepad (a
      * fixed PSX pad -- stick, four face buttons, shoulders, Start/Select --
@@ -275,7 +270,6 @@ typedef struct {
      * styles. Off by default: they open the save and load screens, which
      * nobody wants under a stray thumb. Config key: touch_quicksave_buttons. */
     int   touchQuickSaveLoad;
-    int   screenOrientation;
     float touchLookSensitivity; /* touch look speed multiplier, 0.1..4.0 (config key: touch_look_sensitivity); default 1.0 */
     int   oneButtonCombat;  /* 1 = Aim also fires, so combat is one thumb (config key: one_button_combat) */
     int altButtonSprint;    /* "Always use button based sprinting": 1 = walk by default, sprint ONLY while the bound run control is held — applies to alt cameras (TPS/OTS/FPS) AND 2D control under any camera; 0 = a near-full stick push also sprints (config key: altcam_button_sprint) */

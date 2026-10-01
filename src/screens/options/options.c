@@ -237,8 +237,6 @@ static const char* const LBL_FLMODE[] = { "Classic", "C_+_Shadows", "Modern", "M
 static const char* const LBL_MMCNR[]  = { "Top_L", "Top_R", "Bottom_L", "Bottom_R" };
 static const char* const LBL_MMMODE[] = { "Off", "Square", "Circle" };
 static const char* const LBL_TOUCH[]  = { "Automatic", "Always_On", "Always_Off" };
-static const int VAL_ORIENT[]  = { 0, 1, 2 };
-static const char* const LBL_ORIENT[] = { "Landscape", "Auto", "Portrait" };
 static const int VAL_TSTYLE[] = { 0, 1 };
 static const char* const LBL_TSTYLE[] = { "Context", "Gamepad" };
 static const char* const LBL_WHZ[]    = { "30_Hz", "60_Hz" };
@@ -437,8 +435,7 @@ static const s_PcOpt PCOPT_H[] = {
 #if defined(SH_IOS) || defined(__ANDROID__)
 /* Page 6, phones only: the overflow. Each of these was parked on a page with
  * a spare row until the rows ran out -- Bullet_Decals on Controls, the
- * RetroAchievements login on HUD, Android's Screen_Rotation on Camera, which
- * had made that page twelve tall there. The pages are unlabelled in game, so
+ * RetroAchievements login on HUD. The pages are unlabelled in game, so
  * grouping is secondary to every page fitting. */
 static const s_PcOpt PCOPT_M[] = {
     /* Which controller drives the game when more than one is connected. An
@@ -449,10 +446,6 @@ static const s_PcOpt PCOPT_M[] = {
     /* Mobile only, because a phone has no launcher: everywhere else the
      * launcher owns the account and the game just consumes its token. */
     { "Achievements",      NULL,                          NULL,                  NULL,       0, NULL,       NULL, 0, PCK_RALOGIN },
-#if defined(__ANDROID__)
-    /* Applied at startup, so it needs a relaunch. */
-    { "Screen_Rotation",   &g_PcConfig.screenOrientation, "screen_orientation", VAL_ORIENT, 3, LBL_ORIENT, NULL, 0, PCK_INT },
-#endif
     { "Prev_Page",         NULL,                          NULL,                  NULL,       0, NULL,       NULL, 0, PCK_PREV },
     { "Back",              NULL,                          NULL,                  NULL,       0, NULL,       NULL, 0, PCK_BACK },
 };
