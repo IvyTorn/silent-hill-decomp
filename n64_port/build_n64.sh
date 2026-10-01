@@ -139,6 +139,16 @@ if [ -d "$SCRIPT_DIR/filesystem/maps" ]; then
     rm -rf "$SCRIPT_DIR/build/hwfs"
     mkdir -p "$SCRIPT_DIR/build/hwfs"
     cp -r "$SCRIPT_DIR/filesystem/maps" "$SCRIPT_DIR/build/hwfs/maps"
+    # SH_N64_NO_ASSETS=1 builds a ROM with NO game data in it: no world, no
+    # character. Everything it needs then comes from the player's own card,
+    # which tools/sh_n64_setup.py builds from their own disc (the runtime
+    # probes sd:/silenthill/gamedata/load/N64W|N64C before rom:/). That is the
+    # only form of this ROM that is ours to hand to anyone else. The normal
+    # build bakes the assets in, which is convenient for OUR console and is
+    # Konami's content, so it is not shareable.
+    if [ "${SH_N64_NO_ASSETS:-0}" = "1" ]; then
+        echo "    [HW] NO-ASSETS build: no N64W/N64C baked in (card supplies them)"
+    else
     # Native world assets ride in the cart so a console needs nothing new on
     # its SD card; sd:/silenthill/gamedata/load/N64W still overrides for mods.
     if [ -d "$SCRIPT_DIR/build/n64w" ]; then
@@ -148,10 +158,15 @@ if [ -d "$SCRIPT_DIR/filesystem/maps" ]; then
     if [ -d "$SCRIPT_DIR/build/chara/N64C" ]; then
         cp -r "$SCRIPT_DIR/build/chara/N64C" "$SCRIPT_DIR/build/hwfs/N64C"
     fi
+    fi
+    # A no-assets build gets its own name so the shareable ROM and the one
+    # with Konami's data baked in can never be confused for each other.
+    HWNAME=sh_hardware
+    [ "${SH_N64_NO_ASSETS:-0}" = "1" ] && HWNAME=sh_hardware_noassets
     "$I/bin/mkdfs" "$HWDFS" "$SCRIPT_DIR/build/hwfs" >/dev/null
-    rm -f "$OUT/sh_hardware.z64"
-    "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/sh_hardware.z64"         --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"         ${MSYM:+"$MSYM"}         --align 4096 "$HWDFS"
-    ls -l "$OUT/sh_hardware.z64"
+    rm -f "$OUT/$HWNAME.z64"
+    "$I/bin/n64tool" --toc --title "SILENT HILL" --output "$OUT/$HWNAME.z64"         --align 256 "$OUT/sh.elf.stripped" "$OUT/sh.elf.sym"         ${MSYM:+"$MSYM"}         --align 4096 "$HWDFS"
+    ls -l "$OUT/$HWNAME.z64"
 fi
 
 # Diagnostic ROM: SND-less disc pack + maps, small enough (<64MB) that ares

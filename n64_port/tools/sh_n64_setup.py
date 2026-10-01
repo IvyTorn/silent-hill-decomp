@@ -35,10 +35,15 @@ RAW_SECTOR = 2352
 # The areas that have native world assets. Each is one mkworld run over the
 # area's IPD cells; an area missing here still plays, through the slower
 # per-primitive path. Keep in step with n64_port/build_n64.sh's staging.
+# Area tags are the MapType_* names the engine uses (include/bodyprog/map/map.h).
+# An area missing here still plays, but falls back to the per-primitive path and
+# is much slower, so this list should match what the ROM expects.
 AREAS = [
-    ("ER",  None),              # Old Silent Hill interiors: no global-PLM file
+    ("ER",  None),              # interiors; this area has no global-PLM file
     ("SPR", "SPR_GLB.PLM"),     # Central Silent Hill
-    ("THR", "THR_GLB.PLM"),     # Resort area
+    ("THR", "THR_GLB.PLM"),     # the town exterior (the largest area, 128 cells)
+    ("HP",  None),              # hospital
+    ("HU",  None),              # hospital, otherworld
 ]
 
 # Held weapons, baked into HERO's model in this exact order: it is the contract
