@@ -110,6 +110,15 @@ extern int g_PsyX_UseFlashlightShadows;
 extern void PsyX_ApplyWindowState(int width, int height, int fullscreen);
 extern void PsyX_ApplyVsync(int vsync);
 
+#if defined(SH_IOS) || defined(__ANDROID__)
+/* Preferred controller picker (PsyX_pad.cpp). */
+extern char        g_cfg_preferredController[128];
+extern int         PsyX_Pad_DeviceCount(void);
+extern const char* PsyX_Pad_DeviceName(int n);
+extern int         PsyX_Pad_PreferredControllerConnected(void);
+extern void        PsyX_Pad_ApplyPreferredController(void);
+#endif
+
 /* Per-pixel flashlight beam live floats (PsyCross); mirrored by the sliders. */
 extern float g_PsyX_FlashlightIntensity;
 extern float g_PsyX_FogStrength;
@@ -165,7 +174,7 @@ int Pc_ExitToMenuRowActive(void)
 }
 
 
-enum { PCK_INT, PCK_RES, PCK_FILTER, PCK_WINMODE, PCK_VSYNC, PCK_SLIDER, PCK_MAP, PCK_FLMODE, PCK_NEXT, PCK_PREV, PCK_BACK, PCK_RESET, PCK_STORAGE, PCK_RALOGIN };
+enum { PCK_INT, PCK_RES, PCK_FILTER, PCK_WINMODE, PCK_VSYNC, PCK_SLIDER, PCK_MAP, PCK_FLMODE, PCK_PAD, PCK_NEXT, PCK_PREV, PCK_BACK, PCK_RESET, PCK_STORAGE, PCK_RALOGIN };
 
 /* PC-options row origin. The heading sits at y=20 and the rows used to start at 56,
  * leaving a full empty row beneath it while the pages ran off the BOTTOM of the
@@ -433,6 +442,10 @@ static const s_PcOpt PCOPT_H[] = {
  * had made that page twelve tall there. The pages are unlabelled in game, so
  * grouping is secondary to every page fitting. */
 static const s_PcOpt PCOPT_M[] = {
+    /* Which controller drives the game when more than one is connected. An
+     * Android TV remote enumerates as a controller, and with first-come
+     * assignment it could take the slots ahead of a Bluetooth pad. */
+    { "Controller",        NULL,                          "preferred_controller", NULL,      0, NULL,       NULL, 1, PCK_PAD },
     { "Bullet_Decals",     &g_PcConfig.bulletDecals,      "bullet_decals",       VAL_ONOFF,  2, LBL_ONOFF,  NULL, 1, PCK_INT },
     /* Mobile only, because a phone has no launcher: everywhere else the
      * launcher owns the account and the game just consumes its token. */
@@ -534,6 +547,72 @@ static int PcOpt_ValueColumnX(const s_PcOpt* tbl, int count)
     return x;
 }
 
+#if defined(SH_IOS) || defined(__ANDROID__)
+/* The Controller row cycles Automatic, each connected controller, and the saved
+ * one while it is disconnected -- otherwise opening the menu with the pad
+ * switched off would show Automatic and the first press would lose the choice. */
+static const char* PcOpt_PadChoice(int idx, int* count)
+{
+    const char* saved = g_PcConfig.preferredController;
+    int         n     = PsyX_Pad_DeviceCount();
+    int         i, extra = (saved[0] != '\0');
+
+    for (i = 0; i < n && extra; i++)
+    {
+        const char* nm = PsyX_Pad_DeviceName(i);
+
+        if (nm != NULL && strcmp(nm, saved) == 0)
+            extra = 0;
+    }
+
+    *count = 1 + n + extra;
+    if (idx <= 0)
+        return "";
+    if (idx <= n)
+        return PsyX_Pad_DeviceName(idx - 1);
+    return saved;
+}
+
+static int PcOpt_PadChoiceIndex(void)
+{
+    int count, i;
+
+    (void)PcOpt_PadChoice(0, &count);
+    for (i = 1; i < count; i++)
+    {
+        const char* nm = PcOpt_PadChoice(i, &count);
+
+        if (nm != NULL && strcmp(nm, g_PcConfig.preferredController) == 0)
+            return i;
+    }
+    return 0;
+}
+
+/* The game font lacks most punctuation and draws '_' as its space. */
+static const char* PcOpt_PadLabel(char* buf, int bufsz, int maxChars)
+{
+    const char* nm = g_PcConfig.preferredController;
+    int         i, k = 0;
+
+    if (nm[0] == '\0')
+        return "Automatic";
+
+    for (i = 0; nm[i] && k < bufsz - 1 && k < maxChars; i++)
+    {
+        const char c = nm[i];
+
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+            buf[k++] = c;
+        else if (k > 0 && buf[k - 1] != '_')
+            buf[k++] = '_';
+    }
+    while (k > 0 && buf[k - 1] == '_')
+        k--;
+    buf[k] = '\0';
+    return buf;
+}
+#endif
+
 static const char* PcOpt_ValueLabel(const s_PcOpt* e, char* buf, int bufsz)
 {
     if (e->kind == PCK_RES) {
@@ -556,6 +635,9 @@ static const char* PcOpt_ValueLabel(const s_PcOpt* e, char* buf, int bufsz)
     }
 #endif
 #if defined(SH_IOS) || defined(__ANDROID__)
+    /* Same 12-glyph budget as the account name below. */
+    if (e->kind == PCK_PAD)
+        return PcOpt_PadLabel(buf, bufsz, 12);
     if (e->kind == PCK_RALOGIN) {
         if (Pc_Ra_LoginPending())
             return "Signing_in";
@@ -665,6 +747,26 @@ static void PcOpt_Adjust(const s_PcOpt* e, int dir)
         }
         return;
     }
+#if defined(SH_IOS) || defined(__ANDROID__)
+    if (e->kind == PCK_PAD) {
+        int         count, idx = PcOpt_PadChoiceIndex();
+        const char* nm;
+        char        pick[sizeof(g_PcConfig.preferredController)];
+
+        (void)PcOpt_PadChoice(0, &count);
+        idx = (idx + dir + count) % count;
+        nm  = PcOpt_PadChoice(idx, &count);
+        snprintf(pick, sizeof(pick), "%s", nm != NULL ? nm : "");
+        memcpy(g_PcConfig.preferredController, pick, sizeof(pick));
+        PcConfig_SaveKeyValue(e->key, g_PcConfig.preferredController);
+        snprintf(g_cfg_preferredController, sizeof(g_cfg_preferredController), "%s",
+                 g_PcConfig.preferredController);
+        PsyX_Pad_ApplyPreferredController();
+        SH_DBG_ECHO("Controller: %s", g_PcConfig.preferredController[0]
+                                          ? g_PcConfig.preferredController : "Automatic");
+        return;
+    }
+#endif
     if (e->field == NULL)
         return;
 
@@ -734,6 +836,17 @@ int         PcOpt_QuickRealtime(const void* h) { return ((const s_PcOpt*)h)->rea
 
 const char* PcOpt_QuickLabel(const void* h, char* buf, int bufsz)
 {
+#if defined(SH_IOS) || defined(__ANDROID__)
+    /* The panel has room for the whole name, and its own font has the glyphs. */
+    if (((const s_PcOpt*)h)->kind == PCK_PAD) {
+        if (g_PcConfig.preferredController[0] == '\0')
+            return "Automatic";
+        /* Cut so the suffix survives the panel's 48-byte value buffer. */
+        snprintf(buf, bufsz, PsyX_Pad_PreferredControllerConnected() ? "%s" : "%.28s (not connected)",
+                 g_PcConfig.preferredController);
+        return buf;
+    }
+#endif
     return PcOpt_ValueLabel((const s_PcOpt*)h, buf, bufsz);
 }
 

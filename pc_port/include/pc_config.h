@@ -256,6 +256,11 @@ typedef struct {
     int aimAssist;          /* 1 = OTS/TPS free-aim aim assist (mouse body-coverage + controller auto-aim) (config key: aim_assist) */
     int mouseCursor;        /* 1 = mouse controls cursor puzzles + clickable main menu (config key: mouse_cursor) */
     int touchControls;      /* on-screen touch controls during gameplay -- floating movement stick on the left, drag to look on the right, tap for Action, plus Aim/Fire/Item/Map/Start buttons. e_TouchControlsMode (config key: touch_controls); defaults to Automatic where a touchscreen is the only input */
+    /* SDL joystick name of the controller that drives the game while it is
+     * connected; every other controller is ignored until it disconnects. Empty
+     * = Automatic (every controller). For a TV box whose remote enumerates as a
+     * controller ahead of the pad. (config key: preferred_controller) */
+    char preferredController[128];
     /* Mobile screen orientation: 0 = lock landscape (the default and what the
      * port has always done), 1 = follow the sensor, 2 = lock portrait. SDL
      * otherwise derives this from the window's proportions, which on a device

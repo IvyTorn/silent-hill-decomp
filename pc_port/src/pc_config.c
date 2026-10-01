@@ -1072,6 +1072,11 @@ void PcConfig_Load(const char* path)
 
             g_PcConfig.screenOrientation = v;
         }
+        else if (strcmp(key, "preferred_controller") == 0)
+        {
+            strncpy(g_PcConfig.preferredController, value, sizeof(g_PcConfig.preferredController) - 1);
+            g_PcConfig.preferredController[sizeof(g_PcConfig.preferredController) - 1] = '\0';
+        }
         else if (strcmp(key, "touch_controls") == 0)
         {
             int v = atoi(value);
