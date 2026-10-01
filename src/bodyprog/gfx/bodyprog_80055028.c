@@ -1406,11 +1406,56 @@ bool Lm_IsTextureLoaded(s_LmHeader* lmHdr) // 0x80056888
 
         if (curMat->texture == NULL)
         {
+#ifdef SH_N64_PORT
+            /* [TEXGATE] This return is what keeps map0_s00 (the intro street,
+             * area THR) black: the chunk never reaches
+             * StaticModelLoadState_Loaded, so Ipd_ChunkDraw is never called at
+             * all and the frame reports blocks=0 with fallback=0.
+             *
+             * Two causes produce an identical log and only this line separates
+             * them. A NULL texture means the page pool is EXHAUSTED -- the
+             * exterior claim path has no steal loop, unlike the interior one,
+             * and THR's global PLM pins 4 of the 8 full pages before any chunk
+             * claims. A non-NULL texture with a pending queueIdx (logged just
+             * below) means the TIM READ never completed, which is a different
+             * bug entirely. Once per second, naming the material and the pool
+             * census, so it cannot become a per-frame probe. */
+            {
+                extern s_MapTerrain g_Map;
+                static int s_texGateN;
+                if (s_texGateN < 12)
+                {
+                    s_texGateN++;
+                    SH_DBG("[TEXGATE] POOL EXHAUSTED: material %d of %d has no page; "
+                           "pool full %d/8 half %d/2 claimed",
+                           (int)(curMat - &lmHdr->materials[0]),
+                           (int)lmHdr->materialCount,
+                           (int)g_Map.chunkTextures.fullPage.count,
+                           (int)g_Map.chunkTextures.halfPage.count);
+                }
+            }
+#endif
             return false;
         }
 
         if (!Fs_QueueIsEntryLoaded(curMat->texture->queueIdx))
         {
+#ifdef SH_N64_PORT
+            /* The OTHER half of [TEXGATE]: the material HAS a page, so the pool
+             * is fine and the TIM read simply has not finished. Same visible
+             * result, completely different bug, so the two are logged apart. */
+            {
+                static int s_texWaitN;
+                if (s_texWaitN < 12)
+                {
+                    s_texWaitN++;
+                    SH_DBG("[TEXGATE] TIM READ PENDING: material %d of %d has a page but queueIdx=%d is not loaded",
+                           (int)(curMat - &lmHdr->materials[0]),
+                           (int)lmHdr->materialCount,
+                           (int)curMat->texture->queueIdx);
+                }
+            }
+#endif
             return false;
         }
 
