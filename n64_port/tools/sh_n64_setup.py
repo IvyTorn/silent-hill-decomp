@@ -38,10 +38,24 @@ RAW_SECTOR = 2352
 # Area tags are the MapType_* names the engine uses (include/bodyprog/map/map.h).
 # An area missing here still plays, but falls back to the per-primitive path and
 # is much slower, so this list should match what the ROM expects.
+# EVERY area on the disc. Baking the lot is the point: an area left out does
+# not fail, it silently falls back to the per-primitive path, which is an order
+# of magnitude slower and reads as "the game runs badly here" rather than as a
+# missing asset. The card has no 64 MB cartridge window to respect, so there is
+# no reason to choose. Total is around 65 MB and takes a few minutes.
+# (APR has a global-PLM file but no cells of its own, so it is not listed.)
 AREAS = [
-    ("ER",  None),              # interiors; this area has no global-PLM file
+    ("THR", "THR_GLB.PLM"),     # the town exterior, and the intro street
+    ("SC",  None),              # 42 cells
+    ("SU",  None),              # 40 cells
     ("SPR", "SPR_GLB.PLM"),     # Central Silent Hill
-    ("THR", "THR_GLB.PLM"),     # the town exterior (the largest area, 128 cells)
+    ("SPU", "SPU_GLB.PLM"),     # Central Silent Hill, otherworld
+    ("RSR", "RSR_GLB.PLM"),     # resort
+    ("RSU", "RSU_GLB.PLM"),     # resort, otherworld
+    ("APU", "APU_GLB.PLM"),     # amusement park, otherworld
+    ("ER",  None),              # interiors; no global-PLM file
+    ("DR",  "DR_GLB.PLM"),
+    ("DRU", "DRU_GLB.PLM"),
     ("HP",  None),              # hospital
     ("HU",  None),              # hospital, otherworld
 ]

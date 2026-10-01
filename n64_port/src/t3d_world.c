@@ -2684,6 +2684,26 @@ void ShT3d_NotifyFrameEnd(void)
                s_cnBlocks, s_cnWorldTris,
                s_cnFallback, s_tileRam / 1024, s_cnTileUp, s_cnTileDedup,
                s_fogOn, (int)s_fogFullZ, (int)s_fogCullZ, s_cnFogCulled);
+
+    /* The PSX fallback is a safety net, not a mode anyone should end up in
+     * without noticing: it is an order of magnitude slower and it looks like
+     * the game merely running badly. The four ways in (no .SHT for the area,
+     * palette allocation refused, no pool gap, chunk over the arena) each log
+     * once, which is easy to miss in a long session and says nothing about how
+     * much of the frame is actually on it. So: while ANY cell is falling back,
+     * say so about once a second, with the count, for as long as it lasts. A
+     * silent slow path is the thing to prevent here; a noisy log is cheap. */
+    if (s_worldStarted && s_cnFallback > 0)
+    {
+        static int s_fbTick, s_fbPeak;
+        if (s_cnFallback > s_fbPeak)
+            s_fbPeak = s_cnFallback;
+        if ((s_fbTick++ % 30) == 0)
+            SH_DBG("[T3DW-SLOW] %d cell(s) on the PSX fallback this frame (peak %d). "
+                   "The native world is NOT drawing them; expect a fraction of the frame rate. "
+                   "Check the [T3DW] line above for which area and why.",
+                   s_cnFallback, s_fbPeak);
+    }
     s_cnFogCulled = 0;
     s_cnBlocks = s_cnFallback = 0;
     {
