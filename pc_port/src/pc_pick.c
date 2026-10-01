@@ -13,11 +13,15 @@
  * ortho (g_PcWorldOrthoRect) rather than assuming a 320x224 frame is what keeps
  * the test honest under hfov/vfov, pillarbox, Hor+ and stretch alike.
  *
- * SCALE multiplies the root bone's matrix through Chara_ModelBoneScaleSet, the
- * same call Twinfeeler and map4_s03 use to resize a character. The skeleton is
- * re-posed from keyframes every frame, so the multiply is re-applied every
- * frame and never compounds. Collision is not scaled: a giant Groaner still
- * has a normal-sized hitbox.
+ * SCALE publishes g_PcCharaDrawScale for the character about to be drawn, and
+ * the skeleton draw scales each bone final matrices about the root. It used to
+ * multiply bone 0 coord instead, but bone 0 only reaches bones the ANM
+ * parented, and a skeleton built from the LM can carry parts beyond that --
+ * which is why the Incubator scaled only from the waist down. Nothing is left
+ * in the bone coords either, so a scale can never compound.
+ *
+ * Collision is separate (Pc_Pick_CollScale) and does scale, except the
+ * player's map-collision cylinder -- see Pc_Pick_MoveScale.
  */
 #include "game.h"
 
@@ -82,7 +86,6 @@ static s32         s_selPropX, s_selPropY, s_selPropZ;
  * recorded for so a recycled slot starts clean (same reason as
  * s_npcScaleChara). -1 = nothing recorded. */
 static s32 s_frozenChara[NPC_COUNT_MAX];
-static s32 s_bakedScale[NPC_COUNT_MAX]; /* scale the slot's bones were last drawn at */
 static s32 s_maxHealth[NPC_COUNT_MAX];
 static s32 s_maxHealthChara[NPC_COUNT_MAX];
 static int s_npcStateInit;
@@ -99,7 +102,6 @@ static void NpcStateInit(void)
         s_frozenChara[i]    = -1;
         s_maxHealth[i]      = 0;
         s_maxHealthChara[i] = -1;
-        s_bakedScale[i]     = Q12(1.0f);
     }
     s_npcStateInit = 1;
 }
@@ -535,25 +537,22 @@ void Pc_Pick_CharaPreDraw(struct _SubCharacter* charaPtr, int slot, void* boneCo
         *scale = Q12(1.0f);
     }
 
-    if (kind == PcPick_Npc && Pc_Pick_IsFrozen(slot))
+    /* Published for the skeleton draw rather than multiplied into bone 0.
+     *
+     * Bone 0 only reaches bones the ANM parented. Anim_BoneInit parents
+     * indices 1..boneCount-1, but the SKELETON is built from the LM, which can
+     * carry more models than the ANM has bones (BoneHierarchy_MultiModel).
+     * Those extra parts keep super == NULL, so they are not under bone 0 and a
+     * bone-0 scale never reached them: the Incubator scaled from the waist down
+     * and bosses whose body is mostly such parts did not appear to scale.
+     *
+     * Scaling at the draw also means nothing is left in the bone coords, so
+     * there is no compounding and no need to track what was baked in -- which
+     * is what the frozen-NPC ratio dance here existed for. A frozen NPC is not
+     * re-posed, but it is still drawn, so it scales like anything else. */
     {
-        /* A frozen NPC is not re-posed, so its bones still carry the scale
-         * applied on its last live frame. Re-applying it would compound it;
-         * only a change made while frozen is applied, as the ratio. */
-        s32 want = (scale != NULL) ? *scale : Q12(1.0f);
-        if (boneCoords != NULL && want != s_bakedScale[slot] && s_bakedScale[slot] > 0)
-        {
-            s32 ratio = (s32)(((s64)want << 12) / s_bakedScale[slot]);
-            Chara_ModelBoneScaleSet(boneCoords, 0, ratio, ratio, ratio);
-        }
-        s_bakedScale[slot] = want;
-    }
-    else
-    {
-        if (scale != NULL && *scale != Q12(1.0f) && boneCoords != NULL)
-            Chara_ModelBoneScaleSet(boneCoords, 0, *scale, *scale, *scale);
-        if (kind == PcPick_Npc && slot >= 0 && slot < NPC_COUNT_MAX)
-            s_bakedScale[slot] = (scale != NULL) ? *scale : Q12(1.0f);
+        extern s32 g_PcCharaDrawScale;
+        g_PcCharaDrawScale = (scale != NULL) ? *scale : Q12(1.0f);
     }
 
     if (s_pendState != 1)
