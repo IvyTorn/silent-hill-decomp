@@ -69,6 +69,9 @@ extern int         FMV_GetCount(void);
 extern const char* FMV_GetName(int tableIdx);
 extern int         FMV_GetFileIdx(int tableIdx);
 
+/* game_main.c */
+extern int g_PcFmvClockDiscard;
+
 /* Same toggle as debug key 0: player_control.c skips Collision_WallDetect and
  * substitutes the floor surface directly, so Harry keeps walking on ground. */
 extern int g_DebugNoWallCollision;
@@ -607,6 +610,7 @@ void Pc_ConsoleFmvUpdate(void)
     fileIdx             = s_pendingFmvFileIdx;
     s_pendingFmvFileIdx = -1;
     FMV_Play(fileIdx, 0);
+    g_PcFmvClockDiscard = 1;
     ScreenFade_Start(true, true, false);
 }
 
