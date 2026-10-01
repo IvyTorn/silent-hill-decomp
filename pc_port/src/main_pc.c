@@ -1499,6 +1499,11 @@ int main(int argc, char* argv[])
     /* Before PsyX_Initialise: the window is confined as soon as it is created. */
     g_cfg_confineCursor = g_PcConfig.confineCursor;
 
+    /* Before PsyX_Initialise: the controllers SDL finds at startup are assigned
+     * as their ADDED events arrive, and that has to see the preference. */
+    snprintf(g_cfg_preferredController, sizeof(g_cfg_preferredController), "%s",
+             g_PcConfig.preferredController);
+
     /* Initialize PsyCross (creates SDL2 window + OpenGL context) */
     SH_LOG("Initializing PsyCross (SDL2 + OpenGL)...");
     PsyX_Initialise("Silent Hill", windowWidth, windowHeight, g_PcConfig.fullscreen);

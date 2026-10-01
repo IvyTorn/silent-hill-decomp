@@ -376,6 +376,9 @@ static const QoRowDef s_pageControls[] = {
     /* The controls panel, controller columns only on a phone. With no
      * controller connected it shows a toast instead of opening. */
     { ROW_ACTION, NULL, QO_A_KEYBINDS,         "Controller Config" },
+    /* Which pad drives the game when a TV remote or a second pad is also
+     * connected. Saved, so it is the default next launch too. */
+    { ROW_OPT,   "preferred_controller",   0, "Controller" },
     { ROW_OPT,   "touch_style",            0, NULL },  /* Context or Gamepad */
     { ROW_OPT,   "control_2d",             0, NULL },  /* screen-relative movement */
     { ROW_OPT,   "touch_controls",         0, NULL },  /* Automatic / On / Off */
