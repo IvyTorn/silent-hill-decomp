@@ -1059,18 +1059,10 @@ int main(int argc, char* argv[])
      * android:screenOrientation in the manifest. A 4:3 window on a device whose
      * rotation is locked to portrait ends up portrait, letterboxed top and
      * bottom. The game is landscape, so say so explicitly before SDL_Init. */
-    /* screen_orientation: 0 = lock landscape (default, and what the port has
-     * always done), 1 = follow the sensor, 2 = lock portrait. Stated rather
-     * than inferred for the reason above -- SDL picks from the window's
-     * proportions otherwise, and a device held in portrait letterboxes the
-     * game into a strip. */
-    if (g_PcConfig.screenOrientation == 2)
-        SDL_SetHint(SDL_HINT_ORIENTATIONS, "Portrait PortraitUpsideDown");
-    else if (g_PcConfig.screenOrientation == 1)
-        SDL_SetHint(SDL_HINT_ORIENTATIONS,
-                    "LandscapeLeft LandscapeRight Portrait PortraitUpsideDown");
-    else
-        SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    /* The screen_orientation key that once chose portrait or sensor here is
+     * gone: on device every choice still came up landscape, and a stale value
+     * left in config.cfg must not be able to come back. */
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 
     /* A handheld's pad keeps talking while the app is briefly unfocused (the
      * notification shade, the recents overlay); without this SDL drops those
@@ -1542,6 +1534,11 @@ int main(int argc, char* argv[])
 
     /* Before PsyX_Initialise: the window is confined as soon as it is created. */
     g_cfg_confineCursor = g_PcConfig.confineCursor;
+
+    /* Before PsyX_Initialise: the controllers SDL finds at startup are assigned
+     * as their ADDED events arrive, and that has to see the preference. */
+    snprintf(g_cfg_preferredController, sizeof(g_cfg_preferredController), "%s",
+             g_PcConfig.preferredController);
 
     /* Initialize PsyCross (creates SDL2 window + OpenGL context) */
     SH_LOG("Initializing PsyCross (SDL2 + OpenGL)...");
