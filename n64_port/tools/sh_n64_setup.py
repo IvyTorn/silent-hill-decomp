@@ -50,11 +50,19 @@ AREAS = [
 # with ShT3d_HeldItemNative's slot table in t3d_world.c.
 WEAPONS = ["KNIFE", "HAMMER", "AXE", "HANDGUN", "RIFLE", "SHOTGUN"]
 
+# Keys whose DEFAULTS are already right are left out on purpose. An earlier
+# version of this wrote "zbuffer=2", which is character-only depth, and that one
+# line cost a test session: the world stopped depth-testing, so the police
+# station's reception counter and other furniture were erased by the foreground
+# world pass, 2D objects showed through Harry, and geometry outdoors vanished
+# and came back only at point-blank range. The engine default is 1 (world AND
+# character). Write a key here only to CHANGE a default, never to restate one.
 DEFAULT_CFG = """# Silent Hill N64 - settings. Delete a line to get its default back.
 # A full list of keys is in the port's README.
 
-zbuffer=2
-world_fog=1
+refresh_rate = 30
+control_style = classic
+map=map0_s00
 """
 
 README = """Silent Hill (N64 port) - SD card contents
