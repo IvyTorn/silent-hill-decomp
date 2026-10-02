@@ -225,6 +225,7 @@ typedef struct {
     int crosshair;          /* 1 = draw a center crosshair while aiming in TPS/OTS (config key: crosshair) */
     int crosshairStyle;     /* reticle shape: 0 = cross (+), 1 = dot, 2 = circle, 3 = dashes/gap (config key: crosshair_style) */
     float crosshairSize;    /* reticle scale in percent, 25..125 (config key: crosshair_size) */
+    float textSize;         /* subtitle/message text scale in percent, 100..150 (config key: text_size) */
     int aimAssist;          /* 1 = OTS/TPS free-aim aim assist (mouse body-coverage + controller auto-aim) (config key: aim_assist) */
     int mouseCursor;        /* 1 = mouse controls cursor puzzles + clickable main menu (config key: mouse_cursor) */
     int altButtonSprint;    /* "Always use button based sprinting": 1 = walk by default, sprint ONLY while the bound run control is held — applies to alt cameras (TPS/OTS/FPS) AND 2D control under any camera; 0 = a near-full stick push also sprints (config key: altcam_button_sprint) */
@@ -314,6 +315,7 @@ typedef struct {
     char keyQuickOptions[24]; /* PC-only: in-game quick options overlay hotkey (config key: key_quick_options); default F10 */
     char padQuickOptions[24]; /* PC-only: OPTIONAL controller bind for the same overlay (config key: pad_quick_options); unbound by default */
     char keySwapShoulder[24]; /* PC-only: swap OTS shoulder side (default Mouse3) */
+    char padSwapShoulder[24]; /* PC-only: controller bind for the same (config key: pad_swap_shoulder); unbound by default */
     char keyConsole[24]; /* PC-only: dev console toggle key (default tilde "`"); keyboard-only */
     /* PC-only graphics-effect tuning keys (keyboard-only). keyGfxCycle switches
      * which enabled effect (flashlight / post-process / tonemap) is being tuned;
@@ -360,6 +362,14 @@ typedef struct {
      * US/NTSC content); 0 = retail PAL Mumblers (default). No effect on
      * US/NTSC-J discs, which already render their retail creature. */
     int uncensored;
+
+    /* Append a "PC Port Credits" block to the end of the staff roll, and back
+     * the ABOUT console command (config key: pc_port_credits, console:
+     * PCCREDITS). 1 = on (default), 0 = the PSX roll exactly as shipped. The
+     * roll's scroll rate is its length divided by the line count, so the extra
+     * lines tighten the per-line step slightly rather than outrunning the
+     * credits music. */
+    int pcPortCredits;
 
     /* Play as another character (config key: player_character): harry (default),
      * lisa, cybil, kaufmann, dahlia. Swaps the player's rendered model while
@@ -447,6 +457,33 @@ typedef struct {
     char keyChatCycle[24];     /* pick channel global<->game (key_chat_cycle); default U */
 
     char mapName[64];    /* e.g. "map0_s00" */
+
+    /* With minimap_require_map on and this area's paper map not found yet:
+     * 1 = still draw an empty panel with Harry's arrow (the old behaviour),
+     * 0 = hide the minimap until the map is found. Appended last so plugins
+     * built against the earlier layout still read the fields above.
+     * (config-only key: minimap_show_without_map; console: minimapnomap) */
+    int  minimapShowWithoutMap;
+
+    /* The dream/ghosting screen blur: full-screen prims that sample the
+     * previous frame out of the PSX display buffers (Lisa, after Split Head,
+     * the otherworld rooms). 1 = on, 0 = only the loading-screen trail, which
+     * is the same mechanism and has always been allowed. The effect feeds on
+     * its own output, so any per-frame error compounds into visible garbage --
+     * the reason it sat disabled -- and a switch to turn it off in game is
+     * worth more than a rebuild. (config key: dream_blur; console: dreamblur) */
+    int  dreamBlur;
+
+    /* Strength of that blur: the gain of its feedback loop, 0 to 1. 1.0 is
+     * hardware, where the overlay's own 50/50 composite is the only decay.
+     * Lower fades the ghost faster. (config key: dream_blur_strength) */
+    float dreamBlurStrength;
+
+    /* Minimum time, in seconds, the Harry-running loading screen stays up.
+     * Fast loads finish in a frame or two, which flashed the screen; the load
+     * itself is never slowed, the new area just waits. 0 = no minimum.
+     * (config key: load_screen_min; console: loadmin) */
+    float loadScreenMin;
 } s_PcConfig;
 
 extern s_PcConfig g_PcConfig;
@@ -496,6 +533,22 @@ void PcConfig_ApplyXaVolume(float norm);
  * alternate (_2) bind. Returns the config's own name ("C", "Left Shift",
  * "Mouse1", "lefttrigger"), or "" when unbound. Never NULL. */
 const char* PcConfig_BindName(unsigned short btnFlag, int device, int scheme, int slot);
+
+/* Rewrite (or append) several `key = value` lines in one read/write pass. */
+void PcConfig_SaveKeyValues(const char* const* keys, const char* const* values, int count);
+
+/* The in-game controls panel edits binds through these. BindField returns the
+ * live 24-byte field behind a bind config key (key_cross, pad_reload,
+ * key_quicksave, ...) for scheme 0 = classic / 1 = altcam, or NULL for an
+ * unknown key; *outPerScheme says whether the key is per-scheme, in which case
+ * the altcam copy is saved under key + "_altcam", exactly as the launcher does.
+ * BindDefault is the built-in value of the same field ("" if none). */
+char*       PcConfig_BindField(const char* key, int scheme, int* outPerScheme);
+const char* PcConfig_BindDefault(const char* key, int scheme);
+
+/* Bumped whenever a bind changes at runtime. Code that resolves a bind once
+ * and caches it compares its copy against this to know when to re-resolve. */
+extern int g_PcBindsGen;
 
 #endif /* PC_CONFIG_H */
 

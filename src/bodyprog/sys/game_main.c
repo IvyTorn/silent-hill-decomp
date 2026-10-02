@@ -39,6 +39,10 @@ int g_PcHorPlusGate = 0;
 /* Set by a freeze-frame state (pause, map messages) when it hands control back,
  * instead of dropping g_PsxPresentLastFrame on the spot. See the release below. */
 int g_PcFreezeReleasePending = 0;
+/* Set by open_main when a blocking FMV returns. The movie's whole runtime lands
+ * in the next frame's dt; the game clock never ran during it on PSX either, so
+ * it must not become cutscene catch-up debt. */
+int g_PcFmvClockDiscard = 0;
 
 /* [SLOWFRAME] phase clocks. A stall report needs to say WHICH part of the frame
  * took the time -- "worst=9470ms" in [PERF] separates a stall from slow
@@ -169,6 +173,7 @@ int g_DebugCamEnabled = 0;  /* 0 = normal camera, 1 = debug camera */
 int g_DebugFogDisabled = 0; /* 0 = fog normal, 1 = fog forced off (debug cam only) */
 int g_DebugNoWallCollision = 0;  /* 0 = wall collision on, 1 = walk through walls */
 int g_PcGodMode = 0;             /* 1 = god mode: no combat damage + health held full. ONE shared flag toggled by the `god` console cmd AND debug key 7, so turning it off either way fully disables it. */
+int g_PcInfiniteAmmo = 0;        /* 1 = firing does not spend ammo. Suppresses the two decrements and lets an empty clip fire; never writes to the inventory, so no round is ever added or removed. */
 int g_DebugNoFloorCollision = 0; /* 0 = floor collision on, always on (toggle removed) */
 int g_DebugThirdPersonCam = 0;   /* 0 = game camera, 1 = static third-person follow cam */
 int g_DebugNoTarget = 0;         /* 0 = normal AI detection, 1 = enemies ignore Harry */
@@ -1276,6 +1281,12 @@ void Pc_FreeCam_Set(int on)
         g_DebugCamSavedMapIdx    = g_SavegamePtr ? g_SavegamePtr->mapIdx     : -1;
         g_DebugCamSavedRoomIdx   = g_SavegamePtr ? g_SavegamePtr->mapRoomIdx : -1;
         SDL_GetRelativeMouseState(NULL, NULL); /* drop travel accumulated before capture */
+        /* Fog off by default. Outdoors the fog wall sits a few units past
+         * Harry, so a camera that flies anywhere useful is already behind it
+         * and the whole world renders as flat fog colour -- the grey void.
+         * Numpad . turns it back on when the fog itself is what you want to
+         * look at. */
+        g_DebugFogDisabled = 1;
         SH_DBG_ECHO("[FREECAM] on -- mouse look, W/A/S/D move, Space/C up/down, Shift fast, Ctrl slow");
     } else {
         /* Only hand back a snapshot that still belongs to the room Harry is in
@@ -1535,196 +1546,28 @@ void DebugCamera_Update(void)
 
     /* Fog toggle moved to main loop (runs after game sets fog params) */
 
-    /* Numpad 0: cycle to next map overlay (edge-triggered)
-     * DISABLED: runtime map switching crashes (map data not safely teardown-able).
-     * Use config.cfg map= setting instead. */
-#if 0
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_KP_0];
-        if (cur && !prevKey) {
-            int curId = (int)g_SavegamePtr->mapIdx;
-            int nextId = (curId + 1) % (MapOverlayId_MAPX_S00 + 1);
-            g_SavegamePtr->mapIdx = nextId;
-            MapRegistry_Load((e_MapOverlayId)nextId);
-            extern void GameBoot_MapLoad(s32 mapIdx);
-            GameBoot_MapLoad(nextId);
-            SH_DBG("[DEBUG] Switched to map %s (overlay %d)",
-                MapRegistry_GetName(nextId), nextId);
-        }
-        prevKey = cur;
-    }
-#endif
 
     /* Numpad 1: (unbound — collision toggle moved to top-row 0) */
 
-    /* Top-row 0: toggle wall collision (noclip) */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_0];
-        if (cur && !prevKey) {
-            g_DebugNoWallCollision = !g_DebugNoWallCollision;
-            Sd_PlaySfx(g_DebugNoWallCollision ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 0: Wall collision: %s", g_DebugNoWallCollision ? "OFF (noclip)" : "ON");
-        }
-        prevKey = cur;
-    }
     /* (Third-person camera toggle moved out of debug controls: it's now the
      * rebindable Change-Camera action / control_style config, handled every
      * frame by Pc_ControlStyleUpdate.) */
 
     /* Kill Harry moved to the `kill` console command (was number key 1). */
-    /* Number keys 4/5: cycle the `map` config value (4 = previous, 5 = next,
-     * wrapping). Prints the new map + description and saves it to config.cfg so
-     * a warm-reset (Esc) + New Game loads the chosen map. */
-    {
-        static int prevKey4 = 0, prevKey5 = 0;
-        int cur4 = g_sdlKeyboardState[SDL_SCANCODE_4];
-        int cur5 = g_sdlKeyboardState[SDL_SCANCODE_5];
-        int dir  = 0;
-        if (cur5 && !prevKey5)      dir = 1;
-        else if (cur4 && !prevKey4) dir = -1;
-        if (dir != 0) {
-            int count = MapRegistry_Count();
-            int id    = MapRegistry_FindByName(g_PcConfig.mapName);
-            const char* name;
-            if (id < 0) id = 0;
-            id = (id + dir + count) % count;
-            name = MapRegistry_GetName(id);
-            strncpy(g_PcConfig.mapName, name, sizeof(g_PcConfig.mapName) - 1);
-            g_PcConfig.mapName[sizeof(g_PcConfig.mapName) - 1] = '\0';
-            PcConfig_SaveMapName(name);
-            SH_DBG_ECHO("[DEBUG] Map config value changed to %s - %s",
-                        name, MapRegistry_GetDescription(id));
-        }
-        prevKey4 = cur4;
-        prevKey5 = cur5;
-    }
 
-    /* Number key 6: kill every active enemy near Harry (debug). Each enemy's own
-     * update applies damage.amount to its health (health = MAX(health - amount, 0))
-     * and then runs its normal death path, so forcing a huge damage.amount routes
-     * the kill through each enemy's real death/cleanup — works for every type, and
-     * the value clears all per-enemy damage thresholds (e.g. Creeper needs >=200).
-     * Replaces the old (non-working) Grey Child spawn. */
-    {
-        static int prevKey6 = 0;
-        int cur6 = g_sdlKeyboardState[SDL_SCANCODE_6];
-        if (cur6 && !prevKey6) {
-            s_SubCharacter* hr   = &g_SysWork.playerWork.player;
-            s32             killed = 0;
-            s32             i;
-            for (i = 0; i < NPC_COUNT_MAX; i++) {
-                s_SubCharacter* npc = &g_SysWork.npcs[i];
-                if (npc->model.charaId == Chara_None || npc->model.charaId == Chara_Harry ||
-                    npc->health <= Q12(0.0f)) {
-                    continue;
-                }
-                if (ABS(npc->position.vx - hr->position.vx) > Q12(50.0f) ||
-                    ABS(npc->position.vz - hr->position.vz) > Q12(50.0f)) {
-                    continue;
-                }
-                npc->damage.amount = Q12(99999.0f);
-                killed++;
-            }
-            SH_DBG_ECHO("[DEBUG] Key 6: killed %d nearby enemies", (int)killed);
-        }
-        prevKey6 = cur6;
-    }
 
-    /* Top-row 7: toggle god mode (same shared g_PcGodMode flag as the `god` console cmd) */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_7];
-        if (cur && !prevKey) {
-            g_PcGodMode = !g_PcGodMode;
-            Sd_PlaySfx(g_PcGodMode ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 7: Invincibility: %s", g_PcGodMode ? "ON" : "OFF");
-        }
-        prevKey = cur;
-    }
-    /* Top-row 8: give 15 handgun bullets */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_8];
-        if (cur && !prevKey) {
-            Inventory_AddSpecialItem(0xC0, 15);
-            Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 8: Added 15 handgun bullets");
-        }
-        prevKey = cur;
-    }
-    /* Top-row 9: toggle no-target (enemies ignore Harry via CharaFlag_Unk4) */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_9];
-        if (cur && !prevKey) {
-            g_DebugNoTarget = !g_DebugNoTarget;
-            Sd_PlaySfx(g_DebugNoTarget ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key 9: No-target: %s", g_DebugNoTarget ? "ON (enemies ignore Harry)" : "OFF");
-        }
-        prevKey = cur;
-    }
-    /* Top-row -: give Hunting Rifle (skip if owned) + a stack of rifle shells.
-     * Stands down while the K keyframe view is on — there - / = cycle the
-     * play-as character instead. */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_MINUS];
-        if (cur && !prevKey && !g_DebugAnimKfView) {
-            bool hasRifle = false;
-            for (int i = 0; i < INV_ITEM_COUNT_MAX; i++) {
-                if (g_SavegamePtr->items[i].id_0 == InvItemId_HuntingRifle) {
-                    hasRifle = true;
-                    break;
-                }
-            }
-            if (!hasRifle) Inventory_AddSpecialItem(InvItemId_HuntingRifle, 1);
-            Inventory_AddSpecialItem(InvItemId_RifleShells, 30);
-            Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key -: Added%s Rifle Shells x30", hasRifle ? "" : " Hunting Rifle +");
-        }
-        prevKey = cur;
-    }
-    /* Top-row =: give Shotgun (skip if owned) + a stack of shotgun shells.
-     * Stands down while the K keyframe view is on (see - above). */
-    {
-        static int prevKey = 0;
-        int cur = g_sdlKeyboardState[SDL_SCANCODE_EQUALS];
-        if (cur && !prevKey && !g_DebugAnimKfView) {
-            bool hasShotgun = false;
-            for (int i = 0; i < INV_ITEM_COUNT_MAX; i++) {
-                if (g_SavegamePtr->items[i].id_0 == InvItemId_Shotgun) {
-                    hasShotgun = true;
-                    break;
-                }
-            }
-            if (!hasShotgun) Inventory_AddSpecialItem(InvItemId_Shotgun, 1);
-            Inventory_AddSpecialItem(InvItemId_ShotgunShells, 30);
-            Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-            SH_DBG_ECHO("[DEBUG] Key =: Added%s Shotgun Shells x30", hasShotgun ? "" : " Shotgun +");
-        }
-        prevKey = cur;
-    }
 
-    /* Keyframe inspector: K toggles freezing Harry's whole skeleton on one
-     * absolute keyframe; , / . step the keyframe down / up. Used to find the
+    /* Keyframe inspector scrub. The viewer itself is a Quick Options > Debug
+     * row now (the K key is gone); , / . step the keyframe down / up while it
+     * is on. Used to find the
      * exact authored pose index for the aim shim (e.g. the gun-forward frame).
      * The actual pose override + clamp to the anim header's keyframe count live
      * in Player_Update (player_control.c); here we just drive the index. */
     {
-        static int    prevK = 0, prevComma = 0, prevPeriod = 0;
+        static int    prevComma = 0, prevPeriod = 0;
         static Uint32 commaPress = 0, commaLast = 0, periodPress = 0, periodLast = 0;
-        int curK      = g_sdlKeyboardState[SDL_SCANCODE_K];
         int curComma  = g_sdlKeyboardState[SDL_SCANCODE_COMMA];
         int curPeriod = g_sdlKeyboardState[SDL_SCANCODE_PERIOD];
-        if (curK && !prevK) {
-            g_DebugAnimKfView = !g_DebugAnimKfView;
-            if (!g_DebugAnimKfView) g_DebugAnimPlaying = 0;
-            Sd_PlaySfx(g_DebugAnimKfView ? Sfx_MenuConfirm : Sfx_MenuCancel, 0, 64);
-            SH_DBG_ECHO("[DEBUG] K: Keyframe view: %s (KF %d)",
-                        g_DebugAnimKfView ? "ON" : "OFF", g_DebugAnimKf);
-        }
         if (g_DebugAnimKfView) {
             /* Hold , / . to scroll, accelerating up to 10/s the longer it's held.
              * Any manual scrub also stops loop playback. */
@@ -1743,34 +1586,10 @@ void DebugCamera_Update(void)
                 SH_DBG_ECHO("[DEBUG] KF %d", g_DebugAnimKf);
             }
         }
-        prevK      = curK;
         prevComma  = curComma;
         prevPeriod = curPeriod;
     }
 
-    /* - / = while the inspector is on: cycle the play-as character
-     * (Harry / Lisa / Cybil / Kaufmann / Dahlia). The swap is synchronous and
-     * sticks after K is turned off — that's how you pick who to play as. The
-     * rifle/shotgun give cheats on these keys stand down while K view is on. */
-    {
-        static int prevMinus = 0, prevEquals = 0;
-        int curMinus  = g_sdlKeyboardState[SDL_SCANCODE_MINUS];
-        int curEquals = g_sdlKeyboardState[SDL_SCANCODE_EQUALS];
-        if (g_DebugAnimKfView) {
-            int step = 0;
-            if (curMinus && !prevMinus)   step = -1;
-            if (curEquals && !prevEquals) step = 1;
-            if (step != 0) {
-                extern int         Pc_PlayAs_Cycle(int step);
-                extern const char* Pc_PlayAs_Label(int idx);
-                int idx = Pc_PlayAs_Cycle(step);
-                Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
-                SH_DBG_ECHO("[PLAYAS] %s", Pc_PlayAs_Label(idx));
-            }
-        }
-        prevMinus  = curMinus;
-        prevEquals = curEquals;
-    }
 
     /* `/` while the inspector is on: cycle the equipped weapon's UPPER-BODY anims
      * (HARRY_BASE_ANIM_INFOS entries 56..75 = anim indices 28..37: aim / fire /
@@ -2001,48 +1820,6 @@ void DebugCamera_Update(void)
      * are unnecessary here. Re-add when an in-progress later-map test
      * needs an item that isn't in the world yet. */
 
-    /* ==== First-person eye tuning (numpad) ====
-     * Active only in FPS mode (not debug-cam). The eye sits at Harry's root +
-     * g_PcFpsOffset, a LOCAL offset in his BODY frame. Every key below is a
-     * straight-line nudge along one body axis — no rotation, no orbit — so the
-     * eye moves exactly where you'd expect. Press KP_5 to print values to bake:
-     *   KP_8/KP_2  move eye forward / back    (offset vz, held)
-     *   KP_6/KP_4  move eye right / left       (offset vx, held)
-     *   KP_9/KP_7  move eye up / down          (offset vy, held, coarse)
-     *   KP_+/KP_-  move eye up / down          (offset vy, held, fine)
-     *   KP_5       log g_PcFpsOffset (paste to bake) */
-    if (g_PcFpsCam && !g_DebugCamEnabled &&
-        g_GameWork.gameState == GameState_InGame)
-    {
-        #define FPS_MOVE_STEP 64
-        #define FPS_VFINE     12   /* fine vertical step for KP_- / KP_+ */
-
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_8]) g_PcFpsOffset.vz += FPS_MOVE_STEP; /* forward */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_2]) g_PcFpsOffset.vz -= FPS_MOVE_STEP; /* back */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_6]) g_PcFpsOffset.vx += FPS_MOVE_STEP; /* right */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_4]) g_PcFpsOffset.vx -= FPS_MOVE_STEP; /* left */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_9]) g_PcFpsOffset.vy -= FPS_MOVE_STEP; /* up (PSX +Y is down) */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_7]) g_PcFpsOffset.vy += FPS_MOVE_STEP; /* down */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_PLUS])  g_PcFpsOffset.vy -= FPS_VFINE; /* fine up */
-        if (g_sdlKeyboardState[SDL_SCANCODE_KP_MINUS]) g_PcFpsOffset.vy += FPS_VFINE; /* fine down */
-
-        {
-            static int prev5 = 0;
-            int cur5 = g_sdlKeyboardState[SDL_SCANCODE_KP_5];
-            if (cur5 && !prev5) {
-                extern VECTOR3 g_PcFpsHeadRefDbg, g_PcFpsHeadLocalDbg;
-                SH_DBG_ECHO("[FPSCAM-TUNE] g_PcFpsOffset = { %d, %d, %d }",
-                            (int)g_PcFpsOffset.vx, (int)g_PcFpsOffset.vy, (int)g_PcFpsOffset.vz);
-                SH_DBG_ECHO("[FPSCAM-HEADREF] s_fpsHeadRef = { %d, %d, %d }  headLocal = { %d, %d, %d }",
-                            (int)g_PcFpsHeadRefDbg.vx, (int)g_PcFpsHeadRefDbg.vy, (int)g_PcFpsHeadRefDbg.vz,
-                            (int)g_PcFpsHeadLocalDbg.vx, (int)g_PcFpsHeadLocalDbg.vy, (int)g_PcFpsHeadLocalDbg.vz);
-            }
-            prev5 = cur5;
-        }
-
-        #undef FPS_MOVE_STEP
-        #undef FPS_VFINE
-    }
 
 
     /* If free-fly debug cam is off */
@@ -2473,15 +2250,27 @@ void MainLoop(void) // 0x80032EE0
                 Pc_QuickOptions_Close();
             if (g_PcQuickOptionsActive) {
                 const s_ControllerConfig* cc = &g_GameWorkPtr->config.controllerConfig;
+                /* The panel reads the mouse itself, so a mouse button that is
+                 * ALSO bound to a PSX button (key_cross = Mouse1 is common)
+                 * reached it twice: one left click activated the row under the
+                 * pointer and then, as Cross, "confirm" on the selected row --
+                 * after a Next page click that was a row on the NEW page, and
+                 * everywhere else a double activation. Pad bits the mouse is
+                 * producing right now are dropped here; keyboard and controller
+                 * presses of the same buttons still count. */
+                extern unsigned int Pc_MouseCursor_BoundPadBits(void);
+                const u32 pcMouseBits = Pc_MouseCursor_BoundPadBits();
+                const u32 pcQoHeld    = g_Controller0->heldBtnFlags    & ~pcMouseBits;
+                const u32 pcQoClicked = g_Controller0->clickedBtnFlags & ~pcMouseBits;
                 Pc_QuickOptions_Update(
-                    (g_Controller0->heldBtnFlags    & (ControllerFlag_LStickUp    | ControllerFlag_DpadUp))    != 0,
-                    (g_Controller0->heldBtnFlags    & (ControllerFlag_LStickDown  | ControllerFlag_DpadDown))  != 0,
-                    (g_Controller0->heldBtnFlags    & (ControllerFlag_LStickLeft  | ControllerFlag_DpadLeft))  != 0,
-                    (g_Controller0->heldBtnFlags    & (ControllerFlag_LStickRight | ControllerFlag_DpadRight)) != 0,
-                    (g_Controller0->clickedBtnFlags & (cc->enter | cc->action))  != 0,
-                    (g_Controller0->clickedBtnFlags & (cc->cancel | cc->option)) != 0,
-                    (g_Controller0->clickedBtnFlags & ControllerFlag_R1) != 0,
-                    (g_Controller0->clickedBtnFlags & ControllerFlag_L1) != 0);
+                    (pcQoHeld    & (ControllerFlag_LStickUp    | ControllerFlag_DpadUp))    != 0,
+                    (pcQoHeld    & (ControllerFlag_LStickDown  | ControllerFlag_DpadDown))  != 0,
+                    (pcQoHeld    & (ControllerFlag_LStickLeft  | ControllerFlag_DpadLeft))  != 0,
+                    (pcQoHeld    & (ControllerFlag_LStickRight | ControllerFlag_DpadRight)) != 0,
+                    (pcQoClicked & (cc->enter | cc->action))  != 0,
+                    (pcQoClicked & (cc->cancel | cc->option)) != 0,
+                    (pcQoClicked & ControllerFlag_R1) != 0,
+                    (pcQoClicked & ControllerFlag_L1) != 0);
                 s_pcQoHeldStash      = g_Controller0->heldBtnFlags;
                 s_pcQoHeldStashValid = 1;
                 g_Controller0->heldBtnFlags      = 0;
@@ -2630,13 +2419,18 @@ void MainLoop(void) // 0x80032EE0
         }
 
         /* "Disable D-pad for movement" applies ONLY during gameplay, so the D-pad
-         * still navigates menus / inventory / the map. Re-evaluated every frame. */
+         * still navigates menus / inventory / the map. Re-evaluated every frame.
+         * The quick options overlay (and the controls panel it opens) sits on
+         * top of gameplay without leaving SysState_Gameplay, so it is excluded
+         * by name. */
         {
             extern int g_cfg_disableDpadMovement;
+            extern int g_PcQuickOptionsActive;
             g_cfg_disableDpadMovement =
                 (g_PcConfig.disableDpadMovement &&
                  g_GameWork.gameState == GameState_InGame &&
-                 g_SysWork.sysState   == SysState_Gameplay) ? 1 : 0;
+                 g_SysWork.sysState   == SysState_Gameplay &&
+                 !g_PcQuickOptionsActive) ? 1 : 0;
         }
 
         /* Mouse cursor: drive free-cursor puzzles + the main menu from the mouse.
@@ -3002,6 +2796,34 @@ void MainLoop(void) // 0x80032EE0
                 ML_TRACE("VSync-Wait");
                 VSync(SyncMode_Wait);
                 ML_TRACE("VSync-Wait-done");
+#ifdef SH_PC_PORT
+                /* Backstop that makes the wait above a real one-per-frame gate.
+                 * In-game cutscenes run here (SysState_EventCallback), and this
+                 * single wait is the whole reason they cannot exceed 60. But
+                 * PsyX_WaitForTimestep keeps ONE static of "when did I last
+                 * wait", shared with every other VSync caller in the frame, so
+                 * a wait somewhere else can satisfy it and this one returns
+                 * immediately — the scene then runs at whatever the machine
+                 * does. Wait on the loop's own count instead, which nothing
+                 * else can consume. No-op whenever the wait above did its job.
+                 *
+                 * Fast-forward is exempt: holding it through a scene is the
+                 * point of the key, and it drives the counter itself. */
+                {
+                    extern int g_PcFastForward;
+
+                    if (!g_PcFastForward)
+                    {
+                        const s32    target   = g_PrevVBlanks + 1;
+                        const Uint32 deadline = SDL_GetTicks() + 50; /* never hang on a stalled counter */
+
+                        while (VSync(SyncMode_Count) < target && SDL_GetTicks() < deadline)
+                        {
+                            VSync(SyncMode_Wait);
+                        }
+                    }
+                }
+#endif
             }
             else
             {
@@ -3068,7 +2890,13 @@ void MainLoop(void) // 0x80032EE0
                          * a skipped scene, a load, a death or a scene that ends
                          * early restores the user's cap on the very next frame
                          * with nothing to unwind. */
-                        if (Pc_ScriptOwnsShot() &&
+                        /* Pc_ScriptOwnsScene, not Pc_ScriptOwnsShot: the Shot
+                         * form drops the post-load fade of a room transition on
+                         * purpose, because that is about how a FRAME LOOKS. For
+                         * pacing the question is only "is an authored scene
+                         * running", and those fade frames were the one part of a
+                         * scripted shot still free to run at 240. */
+                        if (Pc_ScriptOwnsScene() &&
                             (effectiveFps <= 0 || effectiveFps > 60))
                             effectiveFps = 60;
 
@@ -3194,7 +3022,10 @@ void MainLoop(void) // 0x80032EE0
                         }
                     }
                     s_perfVbAccum += (u32)g_UncappedVBlanks;
-                    if (++s_perfFrames >= 256)
+                    /* A 30-second window, not 256 frames: at 240 fps the frame count
+                     * logged every second and was the third-largest source in the log. */
+                    s_perfFrames++;
+                    if (s_perfAccumMs >= 30000)
                     {
                         SH_DBG("[PERF] avg=%.1fms (%.1f fps) worst=%lums vblanks/frame=%.2f over %lu frames",
                                (double)s_perfAccumMs / s_perfFrames,
@@ -3326,6 +3157,15 @@ void MainLoop(void) // 0x80032EE0
 
             dtRaw    = MIN(dtTrue, PC_DT_STEP_15FPS);
             dtCapped = MIN(dtRaw, PC_DT_STEP_30FPS);
+
+            /* The ~22s escape-run movie in the Good+ ending (ME_03300) otherwise
+             * banked the 2s debt maximum and fast-forwarded the scene after it. */
+            if (g_PcFmvClockDiscard)
+            {
+                g_PcFmvClockDiscard = 0;
+                s_cutsceneDebt      = 0;
+                dtTrue              = dtCapped;
+            }
 
             if (pcInCutscene && !pcConsoleFrozen)
             {
@@ -3504,10 +3344,28 @@ void MainLoop(void) // 0x80032EE0
              * Honour bg2dHeld immediately (these are stable screens, not a fade
              * transient to ride out — the countdown would flash a stretched
              * frame before snapping). */
+            /* The store-protect flag doubles as the paper-map "2D screen up"
+             * signal, but the map7_s03 ending raises it too, for its palettes,
+             * while drawing a full 3D scene under letterbox bars. A cutscene is
+             * never a 2D screen, so the flag must not narrow one. (Only reaches
+             * here since the map DLLs stopped carrying a private copy of the
+             * flag; before that the ending's write never left the DLL.) */
+            const int cutsceneLive = ((g_SysWork.sysFlags & SysFlag_CutsceneActive) ||
+                                      g_SysWork.cutsceneBorderState != CutsceneBorderState_None) ? 1 : 0;
             int wantHorPlus = (g_GameWork.gameState == GameState_InGame &&
-                               !g_PsxSkipFramebufferStore &&
+                               !(g_PsxSkipFramebufferStore && !cutsceneLive) &&
                                !g_PcMapScreenActive &&
                                !bg2dHeld) ? 1 : 0;
+
+            /* The same question the renderer needs answered for texture
+             * filtering: is this frame the 3D world, or one of the flat screens
+             * that runs inside the in-game state? A POLY primitive on a world
+             * frame is world geometry, and marking it so is what stops walls
+             * and tree quads rendering point-sampled because their vertices
+             * missed the view-space shadow. Deliberately the same expression
+             * rather than a second opinion -- the two must not disagree about
+             * what a world frame is. */
+            { extern int g_PsxFrame3dClass; g_PsxFrame3dClass = wantHorPlus; }
             /* The grace period below used to be a FRAME count (6), i.e. 200ms at
              * 30fps but only 100ms at 60 and 42ms at 144 -- while the fade it
              * exists to ride out takes a fixed wall-clock time. At high
@@ -3528,6 +3386,15 @@ void MainLoop(void) // 0x80032EE0
                  * the deadline elapsed so a following non-bg2d frame stays 4:3. */
                 s_narrowOffAtMs    = 1;
                 g_PcHorPlusEnabled = 0;
+            }
+            else if ((g_Screen_FadeStatus & 0x7) >= ScreenFadeState_ResetTimestep &&
+                     (g_Screen_FadeStatus & 0x7) <= ScreenFadeState_FadeInStart)
+            {
+                /* The fade tile is fully opaque, so it IS the image: nothing
+                 * behind it can be squished, but narrowing clips the tile to the
+                 * 4:3 viewport. Black-on-black hides that; the white fade into
+                 * the post-Floatstinger map load showed as a pillarboxed white
+                 * frame. Keep whatever framing the fade started under. */
             }
             else if (!g_PcWorldDrawnThisFrame)
             {
@@ -3663,29 +3530,6 @@ void MainLoop(void) // 0x80032EE0
 
             SetGeomOffset(0, ofy);
 
-#ifdef SH_PC_PORT
-            /* [CUTDIAG] one line/second: which framing knobs are live, so a
-             * "cutscene squashed/shifted vs emulator" report names the cause
-             * (vshift ofy vs vscale crop vs HorPlus mode) instead of guessing. */
-            {
-                extern int   g_PcHorPlusEnabled;
-                extern int   g_PsxCutsceneActive;
-                extern int   g_PsxFixedCamActive;
-                extern float g_PsxWorldVScale;
-                extern float g_PsxCutsceneVScale;
-                static s32   s_cutDiagCtr = 0;
-                if (++s_cutDiagCtr >= 60)
-                {
-                    s_cutDiagCtr = 0;
-                    SH_DBG("[CUTDIAG] state=%d sys=%d cut=%d border=%d fixed=%d tpc=%d ofy=%d | horplus=%d vscale=%.3f cutvscale=%.3f wsmode=%d",
-                           (int)g_GameWork.gameState, (int)g_SysWork.sysState,
-                           (int)g_PsxCutsceneActive, (int)g_SysWork.cutsceneBorderState,
-                           (int)g_PsxFixedCamActive, (int)g_DebugThirdPersonCam, (int)ofy,
-                           (int)g_PcHorPlusEnabled, g_PsxWorldVScale, g_PsxCutsceneVScale,
-                           (int)g_PcConfig.widescreenMode);
-                }
-            }
-#endif
         }
 
         /* Suppress dither on 2D-only states (logos, menus, map screen,
@@ -4316,6 +4160,16 @@ void MainLoop(void) // 0x80032EE0
          * frozen pause / "no map" image (which used to ghost the live console against the
          * frozen copy when the console was already open before pausing). Not drawn here. */
         ML_TRACE("PsyX_EndScene");
+        /* [GREYFRAME] game-side context for the renderer's flash detector. */
+        {
+            extern int g_PsxGreyTag[6];
+            g_PsxGreyTag[0] = g_GameWork.gameState;
+            g_PsxGreyTag[1] = g_SysWork.sysState;
+            g_PsxGreyTag[2] = g_VBlanks;
+            g_PsxGreyTag[3] = g_PcWorldDrawnThisFrame;
+            g_PsxGreyTag[4] = g_DeltaTime;
+            g_PsxGreyTag[5] = g_PsxPresentLastFrame;
+        }
         PsyX_EndScene();
         /* Demand-driven texture-pack composes (pc_port/src/texpack_lazy.c). Runs
          * HERE, after the OT submit and after the swap inside PsyX_EndScene,

@@ -160,11 +160,27 @@ static int SwapShoulder_MouseButton(const char* name)
     return 0;
 }
 
+/* Menus force the classic scheme into the input layer (see the block at the
+ * end of Pc_ControlStyleUpdate); kept at file scope so a runtime bind edit can
+ * re-apply whichever scheme is live right now. */
+static int s_forcedClassic = 0;
+
+void Pc_ControlStyle_ReapplyBinds(void)
+{
+    extern void Pc_ApplyClassicControlScheme(void);
+    extern void Pc_ApplyActiveControlScheme(void);
+
+    if (s_forcedClassic)
+        Pc_ApplyClassicControlScheme();
+    else
+        Pc_ApplyActiveControlScheme();
+}
+
 void Pc_ControlStyleUpdate(void)
 {
     static SDL_Scancode scCam[2] = { SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN };
     static int          scPad[2] = { -1, -1 }; /* [scheme] SDL_GameControllerButton, -1 = unbound */
-    static int          resolved = 0;
+    static int          resolved = 0; /* g_PcBindsGen + 1 when resolved */
     static int          prevKey  = 0;
     static int          prevPad  = 0;
 
@@ -179,7 +195,7 @@ void Pc_ControlStyleUpdate(void)
 
     /* Resolve BOTH schemes once; index by the live camera mode each frame so a
      * classic<->altcam switch takes effect immediately. */
-    if (!resolved)
+    if (resolved != g_PcBindsGen + 1)
     {
         const ControlScheme* sc[2];
         int i;
@@ -192,7 +208,7 @@ void Pc_ControlStyleUpdate(void)
                            ? (int)PsyX_LookupGameControllerMapping(sc[i]->padChangeCam, SDL_CONTROLLER_BUTTON_INVALID)
                            : SDL_CONTROLLER_BUTTON_INVALID;
         }
-        resolved = 1;
+        resolved = g_PcBindsGen + 1;
     }
 
     inGameplay = (g_GameWork.gameState == GameState_InGame &&
@@ -224,7 +240,6 @@ void Pc_ControlStyleUpdate(void)
      * world but isn't a menu — keep the alternate-camera scheme so the player's
      * configured confirm/cancel binds still dismiss the description. */
     {
-        static int s_forcedClassic = 0;
         int examining = (g_SysWork.sysState == SysState_ReadMessage);
         int wantForceClassic = (!inGameplay && !examining && g_DebugThirdPersonCam) ? 1 : 0;
         if (wantForceClassic != s_forcedClassic)
@@ -243,21 +258,27 @@ void Pc_ControlStyleUpdate(void)
     {
         static SDL_Scancode scSwap   = SDL_SCANCODE_UNKNOWN;
         static int          mbSwap   = 0;
-        static int          swapRes  = 0;
+        static int          padSwap  = SDL_CONTROLLER_BUTTON_INVALID;
+        static int          swapRes  = 0; /* g_PcBindsGen + 1 when resolved */
         static int          prevSwap = 0;
         int                 curSwap  = 0;
 
-        if (!swapRes)
+        if (swapRes != g_PcBindsGen + 1)
         {
             mbSwap = SwapShoulder_MouseButton(g_PcConfig.keySwapShoulder);
-            if (mbSwap == 0) scSwap = SDL_GetScancodeFromName(g_PcConfig.keySwapShoulder);
-            swapRes = 1;
+            scSwap = (mbSwap == 0) ? SDL_GetScancodeFromName(g_PcConfig.keySwapShoulder) : SDL_SCANCODE_UNKNOWN;
+            padSwap = (g_PcConfig.padSwapShoulder[0])
+                          ? (int)PsyX_LookupGameControllerMapping(g_PcConfig.padSwapShoulder, SDL_CONTROLLER_BUTTON_INVALID)
+                          : SDL_CONTROLLER_BUTTON_INVALID;
+            swapRes = g_PcBindsGen + 1;
         }
 
         if (mbSwap != 0)
             curSwap = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(mbSwap)) != 0;
         else if (keys && scSwap != SDL_SCANCODE_UNKNOWN)
             curSwap = keys[scSwap];
+        if (PsyX_RawControllerBindHeld(padSwap))
+            curSwap = 1;
 
         /* Thirdperson borrows the shoulder-swap bind too when tps_ots_aim is on —
          * it uses the OTS framing while aiming, so the player needs to be able to
@@ -267,7 +288,7 @@ void Pc_ControlStyleUpdate(void)
              (g_ControlStyle == ControlStyle_Tps && g_PcConfig.tpsOtsAim)))
         {
             g_OtsSide = -g_OtsSide;
-            SH_DBG_ECHO("[CTRLSTYLE] OTS shoulder: %s", g_OtsSide > 0 ? "right" : "left");
+            SH_DBG("[CTRLSTYLE] OTS shoulder: %s", g_OtsSide > 0 ? "right" : "left");
         }
         prevSwap = curSwap;
     }

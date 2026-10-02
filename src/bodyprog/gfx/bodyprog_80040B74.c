@@ -2399,7 +2399,11 @@ void Ipd_ChunkMaterialsApply(s_MapTerrain* map) // 0x800433B8
      * never be exhausted before the player's own cell gets its pages"); this
      * path never was. Two cells keeps the flight's surroundings textured while
      * claiming a small fraction of the pool. */
-    q19_12 _matDist = (g_PcConfig.preloadChunks && g_DebugCamEnabled && !g_DebugFogDisabled)
+    /* Not gated on the fog toggle: which chunks keep their texture pages has
+     * nothing to do with fog, and tying the two meant Numpad . silently
+     * changed what was textured -- the free camera now starts with fog off,
+     * which would have taken this path with it. */
+    q19_12 _matDist = (g_PcConfig.preloadChunks && g_DebugCamEnabled)
                           ? (q19_12)(2 * Q12_TO_Q8(CHUNK_CELL_SIZE))
                           : Q12(0.0f);
     if (g_PcConfig.drawDistancePct > 100 && _matDist == Q12(0.0f))
@@ -2980,6 +2984,16 @@ bool Ipd_CellPositionMatchCheck(s_Chunk* chunk, s_MapTerrain* map)
          * chase cam can face any direction. No-op where a room is a single
          * self-contained cell (mapRoomIdxGet differs across the gap); loaded
          * state is already gated by the caller. */
+        /* Not in the two boss arenas. Each is one open room in one cell, with
+         * nothing but black past its edge on PSX, and the same-room test above
+         * cannot tell them apart from their neighbours: it samples cell CENTRES,
+         * and Map_RoomIdxGet maps any point outside its room bands to the same
+         * table entry, so most of map1_s05's column-0 cells "match" and the
+         * school rooms around the Split Head arena drew across the void. This is
+         * the exact-cell rule bdf8daa69 gave these arenas, which the July
+         * widening reopened. */
+        if (g_SavegamePtr->mapIdx == MapIdx_MAP1_S05 || g_SavegamePtr->mapIdx == MapIdx_MAP7_S03)
+            return false;
         {
             s32 dx = (s32)chunk->cellX - map->cellX;
             s32 dz = (s32)chunk->cellZ - map->cellZ;

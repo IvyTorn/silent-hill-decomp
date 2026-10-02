@@ -15,6 +15,7 @@
 #include <PsyX/PsyX_public.h>
 #include <PsyX/PsyX_render.h> /* GR_ReadVRAM */
 #include "pc_confirm_dialog.h"
+#include "pc_bind_panel.h"
 #include "pc_quick_options.h"
 #include <libgs.h>
 
@@ -132,6 +133,28 @@ int Pc_MouseCursor_RightClicked(void)
 int Pc_MouseCursor_WheelStep(void)
 {
     return Mc_Enabled() ? s_wheelStep : 0;
+}
+
+unsigned int Pc_MouseCursor_BoundPadBits(void)
+{
+    extern unsigned short g_cfg_mouseButtonMask[8];
+    extern int            g_PsyX_WheelUpFrames, g_PsyX_WheelDownFrames;
+    const Uint32          mb   = SDL_GetMouseState(NULL, NULL);
+    unsigned int          bits = 0;
+    int                   b;
+
+    for (b = 1; b <= 5; b++)
+    {
+        if (mb & SDL_BUTTON(b))
+            bits |= g_cfg_mouseButtonMask[b];
+    }
+    if (g_PsyX_WheelUpFrames > 0)   bits |= g_cfg_mouseButtonMask[6];
+    if (g_PsyX_WheelDownFrames > 0) bits |= g_cfg_mouseButtonMask[7];
+    if (bits & ControllerFlag_DpadUp)    bits |= ControllerFlag_LStickUp;
+    if (bits & ControllerFlag_DpadDown)  bits |= ControllerFlag_LStickDown;
+    if (bits & ControllerFlag_DpadLeft)  bits |= ControllerFlag_LStickLeft;
+    if (bits & ControllerFlag_DpadRight) bits |= ControllerFlag_LStickRight;
+    return bits;
 }
 
 int Pc_MouseCursor_PuzzleActive(void)
@@ -293,7 +316,7 @@ void Pc_MouseCursor_Draw(void)
         return;
     /* A GL overlay dialog composites above this whole frame, so it draws the
      * cursor itself (Pc_MouseCursor_SpriteRgba/GlRect); ours would sit under it. */
-    if (Pc_ConfirmDialog_IsOpen() || Pc_QuickOptions_IsOpen())
+    if (Pc_ConfirmDialog_IsOpen() || Pc_QuickOptions_IsOpen() || Pc_BindPanel_IsOpen())
         return;
 
     cx = (s32)s_gx - MC_OFFSET_X;

@@ -96,6 +96,10 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="VabFile.cs" />
+    <Compile Include="VabDuplicates.cs" />
+    <Compile Include="DuplicateSoundsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="MsgTable.cs" />
     <Compile Include="DiscText.cs" />
     <Compile Include="JpnMsgMap.cs" />
@@ -124,6 +128,9 @@
     </Compile>
     <Compile Include="Loc.cs" />
     <Compile Include="Loc.Strings.cs" />
+    <Compile Include="Loc.Strings.ModManager.cs" />
+    <Compile Include="Loc.Strings.Dialogs.cs" />
+    <Compile Include="Loc.Strings.Tools.cs" />
     <Compile Include="LauncherSettings.cs" />
     <Compile Include="ChangelogViewer.cs" />
     <Compile Include="BuildSettingsForm.cs">

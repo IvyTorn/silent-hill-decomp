@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <PsyX/PsyX_public.h> /* PsyX_LookupGameControllerMapping / RawControllerBindHeld */
 #include "game.h"
+#include "pc_pick.h"
 #include "bodyprog/bodyprog.h"
 #include "bodyprog/screen/screen_data.h"
 #include "bodyprog/player.h"
@@ -153,9 +154,11 @@ static int          s_padReload[2] = { -2, -2 }; /* [scheme]; -2 = unresolved */
 
 static void Pc_ReloadBindsResolve(void)
 {
+    static int s_gen = -1;
     const ControlScheme* sc[2];
     int i;
-    if (s_padReload[0] != -2) return;
+    if (s_padReload[0] != -2 && s_gen == g_PcBindsGen) return;
+    s_gen = g_PcBindsGen;
     sc[0] = &g_PcConfig.classic;
     sc[1] = &g_PcConfig.altcam;
     for (i = 0; i < 2; i++) {
@@ -396,7 +399,30 @@ void Pc_QuickHeal(void)
         else if (drink != NO_VALUE) chosen = InvItemId_HealthDrink;
         else if (amp   != NO_VALUE) chosen = InvItemId_Ampoule;
     }
-    if (chosen == InvItemId_Empty) return; /* nothing owned */
+    /* Nothing owned. This compared a u8 against the enum constant: chosen holds
+     * (u8)InvItemId_Empty = 255 while InvItemId_Empty itself is NO_VALUE (-1),
+     * so the test never matched. Player_ItemRemove(255) then found the first
+     * EMPTY slot (id 255), "removed" one from its count (0 wrapping to 255 and
+     * counting down), reported success, and Harry healed off nothing -- as
+     * often as the key was pressed, with the toast falling through to
+     * "Ampoule". Only the three healing items may ever be spent here. */
+    if (chosen != InvItemId_HealthDrink && chosen != InvItemId_FirstAidKit && chosen != InvItemId_Ampoule)
+        return;
+
+    /* [QUICKHEAL] One line per use: which slot paid for it and the whole live
+     * inventory. A heal "with no healing items" (2026-09-17, a New Game warped
+     * straight to map1_s05) could not be traced from the code: this path only
+     * spends an item the game's own Player_ItemRemove finds in a live slot. */
+    {
+        char inv[256];
+        int  n = 0, i;
+        for (i = 0; i < g_SavegamePtr->inventorySlotCount && i < INV_ITEM_COUNT_MAX && n < (int)sizeof(inv) - 12; i++)
+            n += snprintf(inv + n, sizeof(inv) - (size_t)n, " %d:%d", (int)g_SavegamePtr->items[i].id_0,
+                          (int)g_SavegamePtr->items[i].count_1);
+        inv[n] = '\0';
+        SH_DBG("[QUICKHEAL] hp=%d chose item %d (slot %d) | slots=%d:%s", (int)hp, (int)chosen,
+               (int)Pc_FindItemSlot(chosen), (int)g_SavegamePtr->inventorySlotCount, inv);
+    }
 
     /* Spend the item FIRST, through the game's own removal, and heal only if it
      * really came out of the inventory. Healing before removing is how a ghost
@@ -584,8 +610,10 @@ void Pc_ExtraActionsUpdate(void)
 
     g_PcInputFrame++; /* frame identity for the edge caches — see g_PcInputFrame */
 
-    if (s_padCycle[0] == -2) {
+    static int          s_actGen = -1;
+    if (s_padCycle[0] == -2 || s_actGen != g_PcBindsGen) {
         const ControlScheme* sc[2];
+        s_actGen = g_PcBindsGen;
         int i;
         sc[0] = &g_PcConfig.classic;
         sc[1] = &g_PcConfig.altcam;
@@ -654,9 +682,11 @@ void Pc_RearLookUpdate(void)
     const Uint8*        keys;
     int                 sch, held;
 
-    if (s_pad[0] == -2) {
+    static int          s_rlGen = -1;
+    if (s_pad[0] == -2 || s_rlGen != g_PcBindsGen) {
         const ControlScheme* sc[2];
         int i;
+        s_rlGen = g_PcBindsGen;
         sc[0] = &g_PcConfig.classic;
         sc[1] = &g_PcConfig.altcam;
         for (i = 0; i < 2; i++) {
@@ -744,6 +774,7 @@ s32 Pc_AimAssistFind(const VECTOR3* camPos, const VECTOR3* camFwd, s32 aimRange,
             continue;
 
         radius = npc->collision.cylinder.field_2;
+        radius = (s32)(((s64)radius * Pc_Pick_CollScale(npc)) >> 12); /* console SCALE */
         if (radius <= 0)
             continue;
 
@@ -770,6 +801,11 @@ s32 Pc_AimAssistFind(const VECTOR3* camPos, const VECTOR3* camFwd, s32 aimRange,
          * hits while manual free-aim only hit near the neck). */
         yA = npc->position.vy + npc->collision.box.top;
         yB = npc->position.vy + npc->collision.box.height;
+        {
+            q19_12 cs = Pc_Pick_CollScale(npc); /* console SCALE */
+            yA = Pc_Pick_ScaleAbout(npc->position.vy, yA, cs);
+            yB = Pc_Pick_ScaleAbout(npc->position.vy, yB, cs);
+        }
         yLo = (yA < yB) ? yA : yB;
         yHi = (yA < yB) ? yB : yA;
         bodyH  = yHi - yLo;

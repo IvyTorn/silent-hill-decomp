@@ -1,5 +1,292 @@
 # Silent Hill PC Port — Changelog
 
+## beta-2026.09.29.1 -- 2026-09-29
+- Issue related to quick turn that could cause player to get stuck running in place has been fixed (thanks to thetrexx for sharing)
+- Added infinite ammo cheat (unlimited clip), console command infammo
+- NTSC-J: The title menu and inventory now show in the chosen language (Chinese or Japanese)
+- Added new console commands for functions that didn't exist as console commands, meaning they can be bound using the "bind" function. New commands:
+notarget [0|1]  - Enemies do not attack player
+freecam [0|1] - Toggle freecam mode
+collvis [0|1] - Collision visualizer debug tool
+fastforward [0|1] / ff - Make gameplay double speed
+wireframe [0|1] - Turn on wireframe mode
+notex [0|1] - turn on no texture mode
+Example: bind p "freecam; wireframe; notex" - Entering  this command will enable you to press p to toggle free cam with wireframe + no textures.
+
+Commit summaries: 
+- Movement freeze fix attempt 1
+- localization: no-subtitles text override mod for voiced lines
+- Console: type the punctuation bind needs, and commands for six menu-only cheats
+- docs: console punctuation, quoted bind lists, and the six new toggles
+- Infinite ammo cheat (console INFAMMO + Quick Options > Cheats)
+- NTSC-J: title menu and inventory in Japanese and Chinese
+- tools: the Chinese glyph finder behind lang_jpn_ui.inc
+- Capitalized Eugene's name
+
+## beta-2026.09.27.1 -- 2026-09-27
+- Launcher is now almost 100% translated in all places for all 9 additional languages
+- Added ability to select objects by clicking them while in the console. Hold tab with console open to hide the window and click a character in the scene to select it
+- Repurposed kill console command to work with selected npc (or player)
+- Added scale command to resize player, npcs, and props. Scales collision
+- Fixed positional audio spots from being able to play continuously past their original range
+- Added PC port credits after original credits (can be turned off with pccredits command)
+- Removed all of the randomly placed debug and cheat keys that were added during testing, see below bind command to restore what's wanted
+- Added bind (+ unbind / unbindall) commands so that you can bind console commands to custom keys, separate from other keybinds in the config. Multiple commands per key supported    
+- Fix free camera outdoors so that it doesn't display a void
+- Adjusted memory card load so that other regions' saves can be loaded. You can load PAL or NTSC-J Duckstation saves just by renaming the MCD to 0 or 8 and putting it in gamedata\save
+- Save editor tool built into website at https://sh1pc.com/savetool.html - works with port or emulator saves 
+- Stopped excess save files from being created PC, now only 0.MCD and 8.MCD are ever written as they are the only ones used. 
+- PC Options and Quick Menu now support non-English languages and are built into the localization helper file
+- Results screen now displays in every supported language
+- Updated Polish translation from rafalekkb
+
+Commit summaries:
+- docs: modding guide, sound section rewritten around the Audio tool
+- PC port credits block in the staff roll + ABOUT console command
+- Console object picking: click a character to select, SCALE to resize it
+- Document scene selection and SCALE in the console reference
+- SCALE now scales the hitbox too
+- Picking: props, TAB to click through the console, bigger character hit box 
+- SCALE: gate it properly, scale melee reach, keep the player's collision vanilla
+- Retire the cheat/tool debug keys, add a Starting map row to Quick Options
+- Custom key binds: bind / unbind / unbindall
+- Free camera: show the world outdoors; mod manager: unpack "name .zip"
+- tools: Silent Hill save converter (PSX / DuckStation <-> PC port cards)
+- memcard: PC saves get a Shift-JIS title and the real save icon
+- savecard: ask for the target disc instead of defaulting to USA names
+- kill acts on the selection, select nearest, retire the stale numpad keys
+- memcard: read saves under any region's name; new files follow the disc
+- PsyCross: memcard no-multitap + channel mapping + standard directory writes
+- docs: save format notes for no-multitap and standard directory writes
+- Positional SFX loops keep attenuating after their caller stops updating
+- savecard: save editor (flags, inventory, position, stats, slot order)
+- Audio tool: the Sound ids column now matches how the engine picks a sample
+- savecard: version the script URLs so hosts serve fresh copies after an update
+- localization: one translation file with PC Options, Quick Options and Controls
+- savecard: clearer flag editing, Hyper Blaster colour
+- localization: Russian review file pre-filled from the Team Raccoon disc
+- Quick Options, Controls panel and confirm boxes follow the game language
+- Polish: the translator's revised pack, merged with the PC Options rows
+- Results screen translated in every language; Polish September pass
+- localization: results screen gets its own section in every template again
+- Polish: translator's wording for the results screen's melee-kills row
+- Launcher: translate the rest of the UI into all nine languages
+
+## beta-2026.09.19.1 -- 2026-09-19
+- Fixed Alessa antique shop cutscene and Lisa cutscene so that proper dream blur effect applies, intensity can be controlled in Quick Menu
+- Allowed binding of Swap Shoulder to Controller
+- Added controller icons in quick menu for navigation (visible based on last used device)
+- Added option in quick menu to disable DPAD for movement
+
+Commit summaries:
+- PsyCross: feedback captures read the scene target (Alessa/Lisa soft-focus, dream blur)
+- Swap Shoulder can be bound to a controller button
+- PsyCross: scene-scratch capture carries the mask bit (Alessa/Lisa soft focus)
+- OT0 sanitizer walks the whole chain (Alessa/Lisa soft focus was never drawn)
+- PsyCross: [SCRATCHDBG] scene-scratch composite trace
+- PsyCross: [SCRATCHDBG] whole-rect counts
+- PsyCross: mid-pass capture restores the vertex array (Alessa/Lisa soft focus)
+- Revert "OT0 sanitizer walks the whole chain" -- misdiagnosed
+- PsyCross: soft focus spans the widened frame and obeys dream_blur
+- PsyCross: dream_blur_strength scales the Alessa/Lisa soft focus
+- Controls panel: Quick Options row (keyboard + controller)
+- Quick options: cancel pages back on the nav row, hold closes; D-pad row
+- Quick options: page back / hold-to-close is Circle (B), not the cancel set
+- Quick options: D-pad icons on the page row after controller input
+- Disable D-pad for movement: keep the D-pad in the quick options overlay
+- OTS shoulder swap: log only, no on-screen toast
+
+## beta-2026.09.18.2 -- 2026-09-18
+- Fixed black screen in various scenarios when on OpenGL with AA
+
+Commit summaries:
+- PsyCross: std headers outside the _WIN32 block (Linux/macOS CI build fix)
+- PsyCross: MSAA resolve keeps the DRAW framebuffer (black pickup/save screens on GL)
+
+## beta-2026.09.18.1 -- 2026-09-18
+- Fixed distant fog rendering so that object outlines are no longer visible
+- Snowflakes greatly improved and more faithful to the original
+- "Dream blur" effect restored for loading screen, certain cutscenes, and anywhere else it is used. Turn off in the quick menu or with dreamblur console command
+- Cleaned up a lot of spam logging
+- Reworked SFX replacements (Mod Manager > Audio > Sound Banks), now the tools in the mod manager automatically detect all duplicate VABs an audio file is in, and will let you replace the sound in all of them at once. Video guide coming soon
+- SFX Editor now plays replacement audio instead of original after replacing audio
+- Controls: In Game menu to adjust controls, can adjust either classic or alternate camera controls depending on which you are in when the menu is opened
+- Controller Support: Added probes for controllers, if your controller doesn't work please send me a log after running the game with it connected and I will fix
+- Split Head:  Fixed glitchy saliva and issues that could break the boss fight. Background SFX now stops appropriately before Alessa scene
+- Cutscenes now locked to 60 FPS like they used to be
+- Added additional support for Steam Controller
+- Fixed regression where pillarboxing was in ending cutscene always
+- Minimap: Changed behavior so that it is hidden unless you are changing settings, have the map, or have the setting on to show it regardless of the map
+- Quick Heal: Finally fixed healing with no health items (thought this was fixed already, my bad)
+- Fixed parts of other areas showing in boss arenas
+- Save/Load: Made mouse input less trigger happy, easier to navigate without accidentally loading a save
+- Fixed certain effects so they take up the whole screen in widescreen
+- Adjusted Harry running loading screen so that it always lasts at least a couple of seconds, configurable with LOADMIN command
+- Cleaned up quick menu to make it more user friendly to navigate
+- Fixed latent memory bug in sewers that caused crashes on certain platforms
+
+Commit summaries:
+- Texture packs: log one line per page composed, and stop dropping upscaler names
+- Add [SLOWFRAME]: say which phase of a stalled frame took the time
+- Port the two latent memory bugs the Android crash handler caught
+- Publish the 3D-world frame class, and carry v0 fog on character triangles
+- Bump PsyCross: fog eases into full instead of leaving a residue or a wall
+- Console VOIDPROBE: arm the renderer's void/fog readback and print the game-side values
+- VOIDPROBE: mirror the arm line into the log, and record game/sys state with it
+- Fog: objects were fogged with a different formula from the world they stand in
+- Bump PsyCross: Steam Controller and Steam Deck pad support
+- Bump PsyCross: Steam Controller ownership diagnostic
+- Split Head: the eat death never reached Game Over above 30fps, and the blood drops spawned per frame
+- Bump PsyCross: fog ease lands by 0.95 with a sub-half-unit snap; VOIDPROBE reads the window without an internal target
+- Audio tool: a replaced sound is offered to every other bank that carries it
+- Bump PsyCross: VOIDPROBE samples the full frame height
+- Bump PsyCross: VOIDPROBE samples every pixel
+- Audio tool: save is one dialog, and a second round of edits merges into the first
+- Ending cutscene no longer pillarboxes: the palette-protect flag is not a 2D screen
+- Bump PsyCross: fog colour-space snap; VOIDPROBE real histogram
+- Fog: cull world and object faces on the nearest vertex so the drawn world ends beyond full fog
+- PsyCross: smooth dead zone around the fog colour
+- PsyCross: revert the fog dead zone (flattened mid fog into a wall, crushed inventory item shading)
+- PsyCross: plain PSX fog mix, easing curve and colour snaps removed
+- PsyCross: step to the void at 97% fog
+- PsyCross: two-phase VOIDPROBE
+- Item TMDs: zero p1, p2 and pad2 on the GT3 emitters
+- Wide drawer: GT3 carries v0 fog in pad2 with the marker
+- PsyCross: VOIDPROBE frame dump
+- PsyCross: VOIDPROBE dump build fix
+- PsyCross: untextured prims draw their vertex colour exactly (fog void fix)
+- Log cleanup: drop CUTDIAG, PERF every 30 s, silent SFX override probes
+- Interior cell gate samples five points per cell, not the centre (from ios-port cd43e3862)
+- Texture_Get: debugStr is 13 bytes, the missing-TIM path writes [12] (from ios-port 64206b223)
+- Sidestep: hold works under 2D controls, held steps keep travelling, taps age at 30 Hz
+- PsyCross: loop stop reaches the live SPU engine; libmcrd fopen check
+- Revert "Sidestep: hold works under 2D controls, held steps keep travelling, taps age at 30 Hz"
+- Revert "Interior cell gate samples five points per cell, not the centre (from ios-port cd43e3862)"
+- PsyCross: back out the SPU loop-stop routing
+- PsyCross: drop the unused SPUCore loop-stop method
+- Split Head: the mouth strands' endpoint table was 48 bytes short
+- Split Head: a bite Harry escapes ends the eat and the fight resumes
+- [WALL-HIT] probe: once per wall face, repeat after 30 s
+- Minimap: hidden until the area map is found, unless the quick menu is on its settings
+- Split Head: a bite that registers takes Harry; escape only by clearing the mouth first
+- In-game controls panel: rebind keyboard, mouse and controller from Options > Controller Config
+- Split Head: Game Over after the eat actually fires; the kill key kills the boss
+- Keybind panel: nothing drawn behind it; reachable from a new quick menu Controls page
+- Split Head: remove the bite fallback; it froze Harry in the eat
+- Keybind panel: fixed layout rect, and no old controls screen on the way out
+- Boss arenas (map1_s05, map7_s03) draw exactly the player's cell again
+- [QUICKHEAL] log every use with the slot and the live inventory
+- Quick heal: never spend the empty slot (u8 vs NO_VALUE comparison)
+- Quick menu and randomizer panel: one mouse click acts once
+- Snow flakes: draw the sprite box, not half of it
+- PsyCross: additive sprite edges fade by texture coverage (round snow flakes)
+- FMV: stop XA and lingering SFX voices before a movie plays
+- FMV: key the pre-movie audio stop to the Alessa scene only
+- Save list clicks, controls-exit flash, cutscene frame gate
+- Dream screen blur restored, with a switch
+- Dream blur: fills the window, and lands in the quick menu
+- Carousel scene effects fill widescreen
+- Audio tool: Play plays a staged replacement before the bank is saved
+- map7_s03: lift the ending's framebuffer-store guards
+- Audio tool: re-replacing a sound ticks the banks that hold your earlier edit of it
+- PsyCross: widen feedback strips in the UI pass only
+- Audio tool: compare against the real disc extract, and edit either the pristine or the edited bank
+- Loading-screen trail follows the PS1 loop exactly
+- Loading screen visuals step on a console-length frame clock
+- Revert "Loading screen visuals step on a console-length frame clock"
+- Loading trail: short, sharp ghost as on real hardware
+- PsyCross: loading-trail ghost strength default 0.65
+- Harry loading screen: console-paced jog and a 2.5 s minimum
+- Harry loading screen defaults: LOADPACE 2, LOADMIN 3 s
+- PsyCross: sprites ending on the page edge keep their last texel
+- Loading screen: no per-pixel flashlight on Harry; fbdamp 0.8
+- Loading screen minimum time is a config option (load_screen_min)
+- diag: [GREYFRAME] tag each frame for the grey-flash detector
+- Quick options: split the long pages, one text size, clearer page row
+- PC Options: take Dream Blur back out; it lives in the quick menu only
+- Quick options: action rows left-aligned with the option labels
+- Quick options: Edit Keybinds centred at the bottom of Controls
+- Quick options: Spawn draws like any other row
+- diag: [PANELMISS] arm the controls panel for the present-time check
+- PsyCross: swap interval only on change; [PANELMISS] live line
+- PsyCross: native GL always draws the scene offscreen (grey flash, panel blink)
+- Quick options: F10 can no longer strand the controls panel on screen
+- PsyCross: loading-screen blur (fbdamp) defaults to 0.7
+
+## beta-2026.09.11.1 -- 2026-09-11
+- Fixed Rock Drill and Chainsaw attacks not working
+- Fixed sound replacement mods not playing at right pitch in some cases
+- Restored menus to 60 FPS limit as letting them go higher seemed to cause issues. You can put 'menu_fps_unlock = 1' in your config to unlock them again.
+- Fixed issues that would prevent Linux builds from compiling
+
+Commit summaries:
+- Bump PsyCross: whole-bank sound mods play at the right pitch again
+- Rock drill and chainsaw: the attack input was dropped at PC frame rates
+- Menus run at 60fps again, the rate the PSX ran them at
+- CI: the optional ffmpeg header step can no longer hang the Linux build
+- CI: bound the apt install step too, and one Linux run per branch
+
+## beta-2026.09.10.1 -- 2026-09-10
+- Fixed rain effect being oddly slanted in certain conditions
+- Fixed SFX mods like weapon sound replacements so that they work again
+- Set weather back to 60hz by default and added option in quick menu and PC options to set it back to 30hz
+- Fixed PC options pages so none run off the screen
+- Can now have more than one text override file and multiple text override mods installed at once (check the modding guide under docs for details)
+- Fixed issue where real game would show real gameplay frames in the background after warm reset (may not be fully fixed, needs testing)
+- Fixed launcher not showing real resolutions like 2560x1440 and instead showing DPI resolutions
+- You can now select custom experimental builds in the launcher under "Build Settings" - downloading these will replace the current installed build until you switch it back. The experimental builds will contain test features not in the main branch, but they also may never be finished.
+
+Commit summaries:
+- Release script: -Name publishes a custom opt-in build; launcher lists it under "Custom builds"
+- Launcher: custom builds update within their own name, never across mods or into beta
+- docs: document the text_overrides system in the modding guide
+- Text overrides: several text mods at once, mod-list order settles a conflict
+- Release script: custom builds leave the launcher out unless -WithLauncher
+- Rain: the fence clamp moved the streak's head without its tail (issue #134)
+- TEMP [RAINSLANT] probe: dump the terms behind a leaning rain streak (issue #134)
+- [RAINSLANT] probe rewritten so it actually fires, and it now samples the draw too
+- [RAINSLANT] probe v3: spend the budget on the seconds that show the artifact
+- Bump PsyCross: sound replacements work under the software SPU
+- [RAINSLANT] probe: measure the streak in SCREEN PIXELS, where the artifact is
+- Rain: a drop that lands on grating smeared with the camera (issue #134)
+- Fix the main menu drawing over the last gameplay frame
+- Launcher: 1440p missing from the resolution list on scaled displays
+- PC Options: a Weather Rate row for the 30/60 Hz weather simulation
+
+## beta-2026.09.08.3 -- 2026-09-08
+- Fixed regression where fog had sudden hard edge instead of gradient
+- Fixed mod manager issue where it would prompt that you were overwriting files when it was just due to one mod being higher priority than another
+
+Commit summaries:
+- xa_wav.h: include stddef.h for size_t (Linux/macOS build fix)
+- Mod Manager: no "your file" prompt when a higher-priority mod outranks another mod's copy
+- Bump PsyCross: drop the fog snap-to-full (the fog "wall" got harder)
+
+## beta-2026.09.08.2 -- 2026-09-08
+- Fixed support for additional voiced dialog that wasn't originally in the game (tested with locked door text)
+Commit summary: Text-box voice files were mixed into a switched-off CD input
+
+## beta-2026.09.08.1 -- 2026-09-08
+- Mod Manager: Implemented voice (XA) replacements, can be replaced with WAV and mod manager has built in viewer, editor, voice recorder, and mod maker. Fan dubs have never been easier to make. Let me know if you have any questions. (Audio > Voices in Mod Manager)
+- In addition to voice replacements, it is now possible to add voices to lines that never had them. Some things may not work yet and it still needs testing, but these are all listed in a separate tab in the voice editor.
+- Map editor has been updated to support triggers/flag editing and will also display 3D models. Will be posted in Discord.
+
+Commit summaries:
+- xa: voice line replacements from gamedata/load/XA
+- launcher: Voices (XA) tool for voice mods and fan dubs (2026.9.7.1)
+- docs: document trigger/flag editing in the TrenchBroom guide
+- Voice files for unvoiced text boxes (load/XA/msg_<KEY>.wav)
+- Launcher: Voices tool lists text boxes for msg_<KEY>.wav files
+- Launcher: no space before punctuation in the text-box list
+- Launcher: subtitle text and key on the disc voice-line list
+- Voice WAV overrides for the software SPU XA player too
+- Resample loose voice WAVs to 37800 Hz for the software SPU
+- Launcher: record and import voice files at the disc's 37800 Hz
+- Launcher: Voices tool picks the disc and shows the script in its languages
+- Launcher: "Create voice mod" packs load/XA into a mod and hands it to the Mod Manager
+- Launcher: Voices tool tells mod-placed files from the user's own; packing stops at the zip
+- PsyCross -> 5d320bc ([PGXPCLIP] probe); Flashlight self-shadow task doc
+
 ## beta-2026.09.06.2 -- 2026-09-06
 - Fixed issue where Harry would get back up very quickly when breaking out of a grab attack
 - Mod manager will now not re-extract files that have already been extracted, and will prompt you before overwriting anything that already exists

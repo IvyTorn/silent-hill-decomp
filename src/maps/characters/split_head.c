@@ -4,8 +4,12 @@
 #include "main/rng.h"
 #include "maps/shared.h"
 #include "maps/characters/split_head.h"
+#ifdef SH_PC_PORT
+#include "pc_timing.h"
+#endif
 
 #define splitHeadProps splitHead->properties.splitHead
+
 
 void SplitHead_Update(s_SubCharacter* splitHead, s_AnmHeader* anmHdr, GsCOORDINATE2* boneCoords)
 {
@@ -227,7 +231,17 @@ void SplitHead_DamageTake(s_SubCharacter* splitHead)
     }
     splitHead->health = newHealth;
 
+#ifdef SH_PC_PORT
+    /* A hit that crosses the 24000 phase line AND zero at once (the debug kill
+     * key's 99999) took this branch and skipped the death below, so the boss
+     * kept fighting at 0 HP; the early return above then locked that in, and
+     * Player_DisableDamage(health == 0) made Harry immune to every bite. No
+     * weapon reaches this in one hit, so the order only matters there: death
+     * wins. */
+    if (splitHead->health < 24000 && splitHead->health != 0 && !(splitHeadProps.flags & SplitHeadFlag_4))
+#else
     if (splitHead->health < 24000 && !(splitHeadProps.flags & SplitHeadFlag_4))
+#endif
     {
         splitHead->model.controlState = SplitHeadControl_4;
         splitHeadProps.flags   |= SplitHeadFlag_4;
@@ -383,7 +397,16 @@ void SplitHead_Control_1(s_SubCharacter* splitHead)
             splitHead->rotation.vy = Math_AngleBetweenPositionsGet(splitHead->position, g_SysWork.playerWork.player.position);
         }
 
+#ifdef SH_PC_PORT
+        /* One burst per call while the eat loop sits on keyframe 35: PSX made that
+         * call 30 times a second, 240fps makes it 240. Burst at the PSX rate. */
+        static int s_pcBloodAccum = 0;
+        const bool pcBloodTick    = PC_Tick30HzReady(&s_pcBloodAccum);
+
+        if (pcBloodTick && FP_FROM(splitHead->model.anim.time, Q12_SHIFT) == 35)
+#else
         if (FP_FROM(splitHead->model.anim.time, Q12_SHIFT) == 35)
+#endif
         {
             unkPos.vx = Rng_AddGeneratedUInt(g_SysWork.playerWork.player.position.vx, Q12(-0.25f), Q12(0.0f) - 1);
             unkPos.vy = (g_SysWork.playerWork.player.position.vy - Rng_GenerateUInt(0, Q12(0.5f) - 1)) - Q12(1.0f); // TODO: Doesn't match with `Rng_AddGeneratedUInt`?
@@ -1737,11 +1760,25 @@ void sharedFunc_800D4070_1_s05(s_SubCharacter* splitHead)
 
     if (g_DeltaTime != Q12(0.0f))
     {
+#ifdef SH_PC_PORT
+        /* The blood drops are rolled per CALL: a 1-in-32 (or 1-in-4) chance each
+         * tick, plus an unconditional drop every tick inside one window of the
+         * anim. PSX called this 30 times a second; at 240fps it is 240, so the
+         * boss shed eight times the blood and each drop's floor splat (the
+         * "dripping" sound) played eight times as often. Roll at the PSX
+         * cadence. The drops themselves fly on delta time, so they look the same. */
+        static int s_pcDropAccum = 0;
+        int        pcDropTick    = PC_Tick30HzReady(&s_pcDropAccum);
+#endif
         new_var = Q12(2.0f);
 
         animIdx = ANIM_STATUS_IDX_GET(splitHead->model.anim.status);
 
-        if ((ANIM_STATUS_IDX_GET(splitHead->model.anim.status) != SplitHeadAnim_12) && animIdx != SplitHeadAnim_13)
+        if (
+#ifdef SH_PC_PORT
+            pcDropTick &&
+#endif
+            (ANIM_STATUS_IDX_GET(splitHead->model.anim.status) != SplitHeadAnim_12) && animIdx != SplitHeadAnim_13)
         {
             if ((FP_FROM(splitHead->model.anim.time, Q12_SHIFT) < 20 || FP_FROM(splitHead->model.anim.time, Q12_SHIFT) > 35) &&
                 (FP_FROM(splitHead->model.anim.time, Q12_SHIFT) > 14 && FP_FROM(splitHead->model.anim.time, Q12_SHIFT) < 20 ||

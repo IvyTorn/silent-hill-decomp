@@ -29,6 +29,9 @@
 #include "pc_mouse_cursor.h"
 #include "map_registry.h"
 #include "lang_text.h" /* PAL Language row (title-screen options) */
+#ifdef SH_PC_PORT
+#include "lang_quick.h" /* quick-menu row values */
+#endif
 #include "lang_pack.h" /* PC-side pack language label (Polish) */
 #define LAYER_24   PSX_OT_OFS(24)
 #define LAYER_40   PSX_OT_OFS(40)
@@ -81,6 +84,8 @@ extern int g_cfg_bilinearFiltering;
 extern int g_cfg_anisoLevel;
 extern int g_PsxUsePgxp;
 extern int g_cfg_postProcess;
+extern int g_cfg_dreamFeedback;
+extern float g_PsxFeedbackDampBlend;
 extern int g_cfg_tonemap;
 extern int g_PsyX_UsePerPixelFlashlight;
 extern int g_PsyX_UseFlashlightShadows;
@@ -199,7 +204,7 @@ static const s_PcOpt PCOPT_G[] = {
     { "Tone_Mapping",   &g_PcConfig.tonemap,            "tonemap",              VAL_TONE,  4, LBL_TONE,  &g_cfg_tonemap,                1, PCK_INT    },
     /* New-Game start map. Moved here from the Camera page, which had run to 12
      * rows (the practical maximum) while this page had room to spare. */
-    { "Map",            NULL,                           "map",                  NULL,      0, NULL,      NULL,                          1, PCK_MAP    },
+    { "Map",           NULL,                           "map",                  NULL,      0, NULL,      NULL,                          1, PCK_MAP    },
     { "Next_Page",      NULL,                           NULL,                   NULL,      0, NULL,      NULL,                          0, PCK_NEXT   },
     { "Back",           NULL,                           NULL,                   NULL,      0, NULL,      NULL,                          0, PCK_BACK   },
 };
@@ -296,6 +301,9 @@ static const s_PcOpt PCOPT_H[] = {
     /* From the System page; a crosshair is HUD, and that page needed the room. */
     { "Crosshair",         &g_PcConfig.crosshair,          "crosshair",             VAL_ONOFF, 2, LBL_ONOFF, NULL, 1, PCK_INT },
     { "Crosshair_Size",    NULL, "crosshair_size",         NULL, 0, NULL, NULL, 1, PCK_SLIDER, &g_PcConfig.crosshairSize, NULL, 25.0f, 125.0f, 5.0f },
+    /* Subtitles, memos and other map messages (text_draw.c Pc_MsgScaleSetup).
+     * Menus keep their fixed layouts. */
+    { "Text_Size",         NULL, "text_size",              NULL, 0, NULL, NULL, 1, PCK_SLIDER, &g_PcConfig.textSize,      NULL, 100.0f, 150.0f, 5.0f },
     { "Prev_Page",         NULL,                           NULL,                    NULL,      0, NULL,      NULL, 0, PCK_PREV },
     { "Back",              NULL,                           NULL,                    NULL,      0, NULL,      NULL, 0, PCK_BACK },
 };
@@ -551,7 +559,8 @@ enum { QO_X_SHADOW = 0, QO_X_SPEAKERS, QO_X_BGM, QO_X_SFX,
        QO_X_FPSHEADX, QO_X_FPSHEADY, QO_X_FPSHEADZ, QO_X_FPSSWING,
        QO_X_OTSFOV, QO_X_TPSAIMZOOM, QO_X_OTSAIMZOOM, QO_X_TPSOTSAIM,
        QO_X_TPSRESTX, QO_X_TPSRESTY, QO_X_TPSAIMX, QO_X_TPSAIMY,
-       QO_X_OTSRESTX, QO_X_OTSRESTY, QO_X_OTSAIMX, QO_X_OTSAIMY };
+       QO_X_OTSRESTX, QO_X_OTSRESTY, QO_X_OTSAIMX, QO_X_OTSAIMY,
+       QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE };
 
 /* display_aspect = crt puts the picture on (4:3 x trim), so one framebuffer
  * pixel lands on screen this many times wider than tall at trim 1.0. It is the
@@ -572,8 +581,17 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         return buf;
     case QO_X_SPEAKERS: {
         int a = g_PcConfig.audioOutput;
-        return (a >= 0 && a < 5) ? QO_SPEAKER_LBL[a] : "HRTF";
+        return Pc_LangQuick((a >= 0 && a < 5) ? QO_SPEAKER_LBL[a] : "HRTF");
     }
+    /* Quick menu only: the PC Options graphics page is already at its row limit. */
+    case QO_X_DREAMBLUR:
+        return Pc_LangQuickMenu(g_PcConfig.dreamBlur ? "On" : "Off");
+    case QO_X_DPADMOVE:
+        return Pc_LangQuickMenu(g_PcConfig.disableDpadMovement ? "On" : "Off");
+    case QO_X_DREAMSTR:
+        if (!g_PcConfig.dreamBlur) { snprintf(buf, bufsz, "%d%%  %s", (int)(g_PcConfig.dreamBlurStrength * 100.0f + 0.5f), Pc_LangQuick("(off)")); return buf; }
+        snprintf(buf, bufsz, "%d%%", (int)(g_PcConfig.dreamBlurStrength * 100.0f + 0.5f));
+        return buf;
     case QO_X_BGM:
         snprintf(buf, bufsz, "%d / 16", g_GameWork.config.volumeBgm / 8);
         return buf;
@@ -581,12 +599,12 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%d / 16", g_GameWork.config.volumeSe / 8);
         return buf;
     case QO_X_ASPECT:
-        return g_PcConfig.aspectRaw ? "Advanced" : "Simple";
+        return Pc_LangQuick(g_PcConfig.aspectRaw ? "Advanced" : "Simple");
     /* Advanced gets its shape from hfov x vfov / par instead, so the trim is
       * inert there and says so rather than reading as a knob that failed. */
     case QO_X_CRTTRIM:
-        snprintf(buf, bufsz, g_PcConfig.aspectRaw ? "%.2f  (simple)" : "%.2f",
-                 g_PcConfig.crtAspectTrim);
+        snprintf(buf, bufsz, "%.2f%s%s", g_PcConfig.crtAspectTrim,
+                 g_PcConfig.aspectRaw ? "  " : "", g_PcConfig.aspectRaw ? Pc_LangQuick("(simple)") : "");
         return buf;
     /* Simple hides this row entirely: its pixel-aspect solve divides hfov
       * straight back out, so the knob genuinely does nothing there. */
@@ -600,18 +618,22 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%.3f", g_PcConfig.pixelAspect);
         return buf;
     case QO_X_VSHIFT:
-        snprintf(buf, bufsz, "%+d rows", (int)g_PcConfig.worldVShift);
-        return buf;
     case QO_X_CUTSHIFT:
-        snprintf(buf, bufsz, "%+d rows", (int)g_PcConfig.cutsceneVShift);
+    {
+        char n[16];
+        snprintf(n, sizeof(n), "%+d", (int)(which == QO_X_VSHIFT ? g_PcConfig.worldVShift : g_PcConfig.cutsceneVShift));
+        snprintf(buf, bufsz, "%s", Pc_LangQuickFill("{n} rows", "{n}", n));
         return buf;
+    }
     case QO_X_TPSFOV:
-        snprintf(buf, bufsz, "%.0f%s", g_PcConfig.tpsFov,
-                 (g_PcConfig.tpsFov > 71.0f && g_PcConfig.tpsFov < 71.2f) ? " (default)" : "");
+        snprintf(buf, bufsz, "%.0f%s%s", g_PcConfig.tpsFov,
+                 (g_PcConfig.tpsFov > 71.0f && g_PcConfig.tpsFov < 71.2f) ? " " : "",
+                 (g_PcConfig.tpsFov > 71.0f && g_PcConfig.tpsFov < 71.2f) ? Pc_LangQuick("(default)") : "");
         return buf;
     case QO_X_FPSFOV:
-        snprintf(buf, bufsz, "%.0f%s", g_PcConfig.fpsFov,
-                 (g_PcConfig.fpsFov > 71.0f && g_PcConfig.fpsFov < 71.2f) ? " (default)" : "");
+        snprintf(buf, bufsz, "%.0f%s%s", g_PcConfig.fpsFov,
+                 (g_PcConfig.fpsFov > 71.0f && g_PcConfig.fpsFov < 71.2f) ? " " : "",
+                 (g_PcConfig.fpsFov > 71.0f && g_PcConfig.fpsFov < 71.2f) ? Pc_LangQuick("(default)") : "");
         return buf;
     case QO_X_FPSHEADX:
         snprintf(buf, bufsz, "%+d", g_PcConfig.fpsHeadX);
@@ -624,12 +646,13 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%+d", g_PcConfig.fpsHeadZ);
         return buf;
     case QO_X_FPSSWING:
-        if (g_PcConfig.fpsMeleeSwing <= 0.0001f) return "Off";
+        if (g_PcConfig.fpsMeleeSwing <= 0.0001f) return Pc_LangQuickMenu("Off");
         snprintf(buf, bufsz, "%.2f", g_PcConfig.fpsMeleeSwing);
         return buf;
     case QO_X_OTSFOV:
-        snprintf(buf, bufsz, "%.0f%s", g_PcConfig.otsFov,
-                 (g_PcConfig.otsFov > 71.0f && g_PcConfig.otsFov < 71.2f) ? " (default)" : "");
+        snprintf(buf, bufsz, "%.0f%s%s", g_PcConfig.otsFov,
+                 (g_PcConfig.otsFov > 71.0f && g_PcConfig.otsFov < 71.2f) ? " " : "",
+                 (g_PcConfig.otsFov > 71.0f && g_PcConfig.otsFov < 71.2f) ? Pc_LangQuick("(default)") : "");
         return buf;
     case QO_X_TPSAIMZOOM:
         snprintf(buf, bufsz, "%+d%%", (int)(g_PcConfig.tpsAimZoom + (g_PcConfig.tpsAimZoom < 0.0f ? -0.5f : 0.5f)));
@@ -638,7 +661,7 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         snprintf(buf, bufsz, "%+d%%", (int)(g_PcConfig.otsAimZoom + (g_PcConfig.otsAimZoom < 0.0f ? -0.5f : 0.5f)));
         return buf;
     case QO_X_TPSOTSAIM:
-        return g_PcConfig.tpsOtsAim ? "On" : "Off";
+        return Pc_LangQuickMenu(g_PcConfig.tpsOtsAim ? "On" : "Off");
     /* Position offsets, raw Q12; Y shown up-positive (stored PSX-down). */
     case QO_X_TPSRESTX: snprintf(buf, bufsz, "%+d", g_PcConfig.tpsRestX);  return buf;
     case QO_X_TPSRESTY: snprintf(buf, bufsz, "%+d", -g_PcConfig.tpsRestY); return buf;
@@ -901,6 +924,21 @@ void PcOpt_QuickExtraAdjust(int which, int dir)
                        "cutscene_vshift", -60.0f, 60.0f, 1.0f, dir, 2);
         break;
     }
+    case QO_X_DREAMSTR: {
+        /* Gain of the blur's feedback loop. 1.0 is hardware, where the
+         * overlay's own 50/50 composite is the only decay; lower fades the
+         * ghost out faster. Same value as the second FBDAMP argument. */
+        float v = g_PcConfig.dreamBlurStrength + (float)dir * 0.05f;
+        if (v < 0.0f) v = 0.0f;
+        if (v > 1.0f) v = 1.0f;
+        if (v == g_PcConfig.dreamBlurStrength) { SD_Call(Sfx_MenuError); break; }
+        g_PcConfig.dreamBlurStrength = v;
+        g_PsxFeedbackDampBlend       = v;
+        snprintf(buf, sizeof(buf), "%.2f", v);
+        PcConfig_SaveKeyValue("dream_blur_strength", buf);
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
+    }
     case QO_X_BGM:
     case QO_X_SFX: {
         /* 16 notches of 8 over 0..128, exactly the main Options sliders. */
@@ -953,6 +991,18 @@ void PcOpt_QuickExtraAdjust(int which, int dir)
     case QO_X_TPSOTSAIM:
         g_PcConfig.tpsOtsAim = !g_PcConfig.tpsOtsAim;
         PcConfig_SaveKeyValue("tps_ots_aim", g_PcConfig.tpsOtsAim ? "1" : "0");
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
+    case QO_X_DREAMBLUR:
+        g_PcConfig.dreamBlur = !g_PcConfig.dreamBlur;
+        g_cfg_dreamFeedback  = g_PcConfig.dreamBlur;
+        PcConfig_SaveKeyValue("dream_blur", g_PcConfig.dreamBlur ? "1" : "0");
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
+    /* Read every frame by the gameplay gate in game_main.c, so it applies live. */
+    case QO_X_DPADMOVE:
+        g_PcConfig.disableDpadMovement = !g_PcConfig.disableDpadMovement;
+        PcConfig_SaveKeyValue("disable_dpad_movement", g_PcConfig.disableDpadMovement ? "1" : "0");
         Sd_PlaySfx(Sfx_MenuMove, 0, 64);
         break;
     /* Position offsets: config-only (live = NULL), 128 = ~0.03 units per press.
@@ -1043,6 +1093,7 @@ void Pc_Options_ResetToDefaults(void)
 #ifdef SH_PC_PORT
 #include <SDL.h>
 #include "pc_confirm_dialog.h"
+#include "pc_bind_panel.h"
 
 /* Shared with the header draw: 1 while the reset dialog is up (label turns red). */
 int g_PcOptResetConfirmActive = 0;
@@ -4075,6 +4126,60 @@ void Options_ControllerMenu_Control(void) // 0x801E69BC
     s32                                     boundActionIdx = NO_VALUE;
     e_InputAction                           actionIdx;
     static s_ControllerMenu_SelectedEntries selectedEntries;
+
+#ifdef SH_PC_PORT
+    /* PC: this screen is the in-game controls panel (pc_bind_panel.c), a GL
+     * overlay over the PSX layout. It opens once per visit, and the screen
+     * leaves the way EXIT does when the panel closes. The PSX actions pane
+     * only ever re-mapped PSX buttons onto game actions, which on PC sits
+     * under the launcher's physical binds and only confused them. */
+    {
+        static int s_bindPanelShown = 0;
+
+        if (g_GameWork.gameStateSteps[1] == ControllerMenuState_Leave)
+        {
+            /* The PSX leave path would draw the old layout under the fade-out;
+             * leave the same way without drawing anything. */
+            s_bindPanelShown = 0;
+            if (ScreenFade_IsFinished())
+            {
+                ScreenFade_Start(true, true, false);
+                g_GameWork.gameStateSteps[0] = OptionsMenuState_LeaveController;
+                g_SysWork.counters_1C[1]     = 0;
+                g_GameWork.gameStateSteps[1] = 0;
+                g_GameWork.gameStateSteps[2] = 0;
+            }
+            return;
+        }
+        else
+        {
+            if (!s_bindPanelShown)
+            {
+                Pc_BindPanel_Open();
+                s_bindPanelShown = 1;
+            }
+            if (Pc_BindPanel_Update())
+            {
+                ScreenFade_Start(false, true, false);
+                g_Controller0->clickedBtnFlags   = 0;
+                g_Controller0->pulsedBtnFlags    = 0;
+                g_Controller0->pulsedGuiBtnFlags = 0;
+                return;
+            }
+            ScreenFade_Start(false, false, false);
+            g_GameWork.gameStateSteps[1] = ControllerMenuState_Leave;
+            g_GameWork.gameStateSteps[2] = 0;
+            s_bindPanelShown             = 0;
+
+            /* Return on the closing frame too. Without this the function ran on
+             * into the stock controller layout below and drew it once, which is
+             * the old screen flashing up for a frame as the panel exits. The
+             * Leave branch above handles every frame after this one and draws
+             * nothing. */
+            return;
+        }
+    }
+#endif
 
 #ifdef SH_PC_PORT
     /* Mouse: hover selects in both panes; click confirms ONLY in the presets

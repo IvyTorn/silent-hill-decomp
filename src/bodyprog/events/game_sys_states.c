@@ -27,6 +27,9 @@ extern s_WorldEnvWork g_WorldEnvWork;
 #include "bodyprog/events/bodyprog_data_800A99B4.h"
 #include "bodyprog/events/events_main.h"
 #include "bodyprog/events/npc_main.h"
+#ifdef SH_PC_PORT
+#include "pc_pick.h"
+#endif
 #include "bodyprog/events/radio.h"
 #include "bodyprog/demo.h"
 #include "bodyprog/gfx/map_effects.h"
@@ -365,6 +368,7 @@ void GameState_InGame_Update(void) // 0x80038BD4
              * back negative — fixed at the lookup itself (PC_FOG_VTX_RAMP
              * in bodyprog_80055028.c), so the full fog+lighting pipeline
              * is safe for characters. */
+            Pc_Pick_CharaPreDraw(&g_SysWork.playerWork.player, -1, g_SysWork.playerBoneCoords);
             func_8003DA9C(Chara_Harry, g_SysWork.playerBoneCoords, 1, g_SysWork.playerWork.player.timer_C6, 0);
 #else
             func_8003DA9C(Chara_Harry, g_SysWork.playerBoneCoords, 1, g_SysWork.playerWork.player.timer_C6, 0);
@@ -379,6 +383,11 @@ void GameState_InGame_Update(void) // 0x80038BD4
         Game_NpcUpdate();
         func_8005E89C();
         Ipd_CloseRangeChunksInit();
+#ifdef SH_PC_PORT
+        /* Last point in the gameplay update, so every map/event caller has had
+         * its chance to write a positional sfx this frame. */
+        { extern void Pc_3dAudio_SustainPositionalLoops(void); Pc_3dAudio_SustainPositionalLoops(); }
+#endif
         Gfx_InGameDraw(1);
 #ifdef SH_PC_PORT
         /* The world is in the OT for this frame, so the fog-colored clear behind
@@ -396,7 +405,11 @@ void GameState_InGame_Update(void) // 0x80038BD4
         {
             extern int g_PcHorPlusEnabled, g_PcMapScreenActive, g_PsxSkipFramebufferStore;
             extern int g_PcWorldHorPlus;
-            if (!g_PcMapScreenActive && !g_PsxSkipFramebufferStore)
+            /* Same exemption as MainLoop's gate: the ending raises the protect
+             * flag for its palettes while drawing a 3D cutscene. */
+            const int cutsceneLive = ((g_SysWork.sysFlags & SysFlag_CutsceneActive) ||
+                                      g_SysWork.cutsceneBorderState != CutsceneBorderState_None) ? 1 : 0;
+            if (!g_PcMapScreenActive && !(g_PsxSkipFramebufferStore && !cutsceneLive))
                 g_PcHorPlusEnabled = 1;
             /* Record what the world is actually being drawn with, for HUD
              * elements that lay out before this point in the frame. */
@@ -423,13 +436,17 @@ void SysState_Gameplay_Update(void) // 0x80038BD4
         if (Pc_RandoSettings_IsOpen())
         {
             const s_ControllerConfig* cc = &g_GameWorkPtr->config.controllerConfig;
+            /* Same as the quick menu: the panel handles the mouse itself, so
+             * pad bits a mouse bind is producing must not act a second time. */
+            extern unsigned int Pc_MouseCursor_BoundPadBits(void);
+            const unsigned int  mouseBits = Pc_MouseCursor_BoundPadBits();
             Pc_RandoSettings_Update(
-                (g_Controller0->pulsedBtnFlags  & ControllerFlag_LStickUp)    != 0,
-                (g_Controller0->pulsedBtnFlags  & ControllerFlag_LStickDown)  != 0,
-                (g_Controller0->pulsedBtnFlags  & ControllerFlag_LStickLeft)  != 0,
-                (g_Controller0->pulsedBtnFlags  & ControllerFlag_LStickRight) != 0,
-                (g_Controller0->clickedBtnFlags & (cc->enter | cc->action))   != 0,
-                (g_Controller0->clickedBtnFlags & (cc->cancel | cc->map))     != 0);
+                (g_Controller0->pulsedBtnFlags  & ~mouseBits & ControllerFlag_LStickUp)    != 0,
+                (g_Controller0->pulsedBtnFlags  & ~mouseBits & ControllerFlag_LStickDown)  != 0,
+                (g_Controller0->pulsedBtnFlags  & ~mouseBits & ControllerFlag_LStickLeft)  != 0,
+                (g_Controller0->pulsedBtnFlags  & ~mouseBits & ControllerFlag_LStickRight) != 0,
+                (g_Controller0->clickedBtnFlags & ~mouseBits & (cc->enter | cc->action))   != 0,
+                (g_Controller0->clickedBtnFlags & ~mouseBits & (cc->cancel | cc->map))     != 0);
             g_Controller0->clickedBtnFlags = 0;
             g_Controller0->pulsedBtnFlags  = 0;
             return;
