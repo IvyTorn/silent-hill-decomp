@@ -320,12 +320,16 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
              * are suppressed for it too. */
             if (Pc_CoopMenu_IsOpen())
             {
+                /* The overlay handles the mouse itself (hover + click), so drop
+                 * mouse-bound pad bits here or a click confirms twice. */
+                extern unsigned int Pc_MouseCursor_BoundPadBits(void);
+                unsigned int clk = g_Controller0->clickedBtnFlags & ~Pc_MouseCursor_BoundPadBits();
                 Pc_CoopMenu_Update(
-                    (g_Controller0->clickedBtnFlags & g_GameWorkPtr->config.controllerConfig.cancel) != 0,
+                    (clk & g_GameWorkPtr->config.controllerConfig.cancel) != 0,
                     (g_Controller0->pulsedBtnFlags & ControllerFlag_LStickUp) != 0,
                     (g_Controller0->pulsedBtnFlags & ControllerFlag_LStickDown) != 0,
-                    (g_Controller0->clickedBtnFlags & (g_GameWorkPtr->config.controllerConfig.enter |
-                                                       g_GameWorkPtr->config.controllerConfig.action)) != 0);
+                    (clk & (g_GameWorkPtr->config.controllerConfig.enter |
+                            g_GameWorkPtr->config.controllerConfig.action)) != 0);
                 g_Controller0->clickedBtnFlags   = 0;
                 g_Controller0->pulsedBtnFlags    = 0;
                 g_Controller0->releasedBtnFlags  = 0;

@@ -30,6 +30,10 @@ const char* Pc_CoopMenu_Title(void);
 void        Pc_CoopMenu_RowText(int i, char* out, int cap);
 void        Pc_CoopMenu_StatusText(char* out, int cap);
 
+/* Mouse: the renderer maps the pointer to a row and drives selection/confirm. */
+void        Pc_CoopMenu_SetSelected(int i);
+void        Pc_CoopMenu_Confirm(void);
+
 #ifdef __cplusplus
 }
 #endif

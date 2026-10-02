@@ -210,6 +210,25 @@ static void Coop_Confirm(void)
     }
 }
 
+/* Mouse hover drives the selection; a click selects then confirms. The renderer
+ * (sh_net_ui.c) owns the row geometry, so it maps the pointer to a row and calls
+ * these. */
+void Pc_CoopMenu_SetSelected(int i)
+{
+    if (s_open && i >= 0 && i < Pc_CoopMenu_RowCount())
+    {
+        s_sel = i;
+    }
+}
+
+void Pc_CoopMenu_Confirm(void)
+{
+    if (s_open)
+    {
+        Coop_Confirm();
+    }
+}
+
 void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm)
 {
     int rows;

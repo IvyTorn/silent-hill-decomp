@@ -48,6 +48,7 @@
 #include "sh_net_chat.h"
 #include "sh_net_session.h"
 #include "pc_coop_menu.h"
+#include "pc_mouse_cursor.h"
 #include "pc_config.h"
 #include "pc_discord.h" /* Pc_MapAreaName */
 #include "sh_log.h"
@@ -1196,19 +1197,56 @@ static void Nu_FillPx(float x, float y, float w, float h,
     Nu_Fill(x0, yT, x1, yB, r, g, b, a);
 }
 
+/* The arrow sprite, drawn in the overlay so it sits above the modal panel. The
+ * post-capture overlay composites over the PSX frame, so the game's own cursor
+ * (drawn into that frame) would be hidden behind the panel -- same reason the
+ * achievement browser draws its own. Re-uploaded each frame; Nu_Upload recycles
+ * the slot, so it does not leak. */
+static void Nu_DrawCursor(void)
+{
+    unsigned char rgba[32 * 32 * 4];
+    float  nx, ny, cw, ch, x, y;
+    GLuint slot;
+
+    if (!Pc_MouseCursor_ViewportPos(&nx, &ny))
+    {
+        return;
+    }
+    if (!Pc_MouseCursor_SpriteRgba(rgba))
+    {
+        return;
+    }
+    slot = Nu_Upload(rgba, 32, 32);
+    if (!slot)
+    {
+        return;
+    }
+    ch = s_vpH * 0.05f;
+    if (ch < 16.0f) ch = 16.0f;
+    cw = ch; /* 32x32 */
+    x  = nx * s_vpW;
+    y  = ny * s_vpH;
+    Nu_Quad(slot,
+            (x / s_vpW) * 2.0f - 1.0f, 1.0f - (y / s_vpH) * 2.0f,
+            ((x + cw) / s_vpW) * 2.0f - 1.0f, 1.0f - ((y + ch) / s_vpH) * 2.0f,
+            1.0f, 1.0f, 1.0f, 1.0f);
+}
+
 /* The co-op front end (pc_coop_menu.c), drawn as a centred modal panel so it
  * matches the quick menu / achievements popup. Used on the title screen and in
- * game alike -- both reach here through the same post-capture hook. */
+ * game alike -- both reach here through the same post-capture hook. Mouse hover
+ * drives the selection and a click confirms it, hit-tested against the same row
+ * geometry the rows are drawn with. */
 static void Nu_DrawCoopMenu(int px)
 {
     const int n   = Pc_CoopMenu_RowCount();
-    const int sel = Pc_CoopMenu_Selected();
     const float rowH   = (float)px * 1.75f;
     const float padY   = (float)px * 1.1f;
     const float titleH = (float)px * 1.9f;
     char  status[128];
     float statusH, panelW, panelH, panelX, panelY, cx, y;
-    int   i;
+    int   i, sel, hovered = -1;
+    float mnx, mny;
 
     Pc_CoopMenu_StatusText(status, sizeof(status));
     statusH = status[0] ? (float)px * 1.7f : 0.0f;
@@ -1219,6 +1257,32 @@ static void Nu_DrawCoopMenu(int px)
     panelX = (s_vpW - panelW) * 0.5f;
     panelY = (s_vpH - panelH) * 0.5f;
     cx     = s_vpW * 0.5f;
+
+    /* Mouse: which row is under the pointer? Hover sets the selection (only on
+     * actual movement, so the pad/keyboard are not fought by an idle pointer). */
+    if (Pc_MouseCursor_ViewportPos(&mnx, &mny))
+    {
+        float mx = mnx * s_vpW;
+        float my = mny * s_vpH;
+        if (mx >= panelX && mx <= panelX + panelW)
+        {
+            for (i = 0; i < n; i++)
+            {
+                float top = panelY + titleH + (float)i * rowH - (float)px * 0.2f;
+                if (my >= top && my <= top + rowH)
+                {
+                    hovered = i;
+                    break;
+                }
+            }
+        }
+        if (hovered >= 0 && Pc_MouseCursor_Moved())
+        {
+            Pc_CoopMenu_SetSelected(hovered);
+        }
+    }
+
+    sel = Pc_CoopMenu_Selected();
 
     Nu_Panel(panelX, panelY, panelW, panelH, 1.0f);
     Nu_DrawTextCentered(Pc_CoopMenu_Title(), cx, panelY + padY * 0.5f,
@@ -1248,6 +1312,16 @@ static void Nu_DrawCoopMenu(int px)
         Nu_DrawTextCentered(status, cx, panelY + panelH - statusH + (float)px * 0.3f,
                             (int)((float)px * 0.82f), 0.80f, 0.76f, 0.64f, 0.95f);
     }
+
+    /* Click confirms the hovered row. Done after the draw so a page change does
+     * not desync this frame's geometry; the new page draws next frame. */
+    if (hovered >= 0 && Pc_MouseCursor_LeftClicked())
+    {
+        Pc_CoopMenu_SetSelected(hovered);
+        Pc_CoopMenu_Confirm();
+    }
+
+    Nu_DrawCursor();
 }
 
 void ShNetUi_Draw(void)
