@@ -452,7 +452,8 @@ typedef struct {
     int  onlineSteamAutoHost;  /* 1 = open a lobby at startup (online_steam_autohost) */
     int  coopMode;             /* 1 = the simple co-op mode: Multiplayer main-menu
                                 * entry + in-game M menu (host/join Steam lobbies).
-                                * Default on; 0 leaves only the living-world path.
+                                * Default OFF so a plain build is identical to
+                                * single-player; set coop_mode = 1 to enable.
                                 * (config key: coop_mode) */
 
     char keyOnlinePlayers[24]; /* who-is-online panel hotkey (key_online_players); default F11 */

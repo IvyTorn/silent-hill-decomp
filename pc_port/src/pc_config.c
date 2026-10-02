@@ -68,7 +68,9 @@ s_PcConfig g_PcConfig = {
     .onlineSteamMaxPlayers = 4,
     .onlineSteamPublic     = 0,   /* friends only: an invite is the point */
     .onlineSteamAutoHost   = 0,
-    .coopMode              = 1, /* simple co-op: Multiplayer menu + M menu, default on */
+    .coopMode              = 0, /* OFF by default: a plain build is identical to
+                                 * single-player. Set coop_mode = 1 for the
+                                 * Multiplayer menu + M menu + Steam co-op. */
     .keyOnlinePlayers = "F11",
     .keyOnlineMemo    = "M",
     .keyChatGame      = "Y",

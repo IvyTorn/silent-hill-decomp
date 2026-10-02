@@ -539,7 +539,7 @@ static const char* const HELP_LINES[] = {
     " net coop 0|1  force co-op mode (blocks pausing) for testing",
     " net model 0|1 EXPERIMENTAL: draw ghosts as full character models",
     " status        co-op: session, players, pings, pausing",
-    " bgm <1-41>    play a music track (in-game) to identify it; bgm stop",
+    " bgm <2-41>    play a track from THIS area's music bank; bgm stop",
     " steam         Steam session status",
     " steam host    open a co-op lobby (friends only)",
     " steam invite  Steam overlay friend invite",
@@ -1494,19 +1494,23 @@ void Pc_ConsoleExec(const char* line)
                         m->linked ? "" : "  (no link)");
         }
     } else if (strcmp(cmd, "BGM") == 0) {
-        /* Play a sequenced music track by number so a track can be identified by
-         * ear (e.g. finding "Killing Time" for the co-op lobby). In-game only --
-         * the title screen has not loaded the gameplay instrument bank. */
+        /* Play a sequenced music track by number. IMPORTANT: a track only plays
+         * if its sequence is in the CURRENT area's sound bank -- the engine
+         * loads BGM per map, there is no global jukebox -- so most numbers do
+         * nothing on a given map, and a map with no music (e.g. the police
+         * station) plays none at all. Stop is a one-shot layer mute;
+         * Bgm_CrossfadeToTrack is a multi-frame fade a console call can't pump. */
+        extern void Bgm_AllLayersMute(void);
         if (strcmp(arg, "STOP") == 0 || strcmp(arg, "OFF") == 0) {
-            Bgm_CrossfadeToTrack(0); /* BgmTrackIdx_None */
-            cprintf("bgm: stopped");
+            Bgm_AllLayersMute();
+            cprintf("bgm: muted (a running map may restart its own track)");
         } else {
             int n = atoi(arg);
-            if (n >= 1 && n <= 41) {
+            if (n >= 2 && n <= 41) {
                 Bgm_PlayNewTrack(n);
-                cprintf("bgm: playing track %d  (in-game only; `bgm stop` to stop)", n);
+                cprintf("bgm: track %d  (plays only if this area's bank has it; bgm stop)", n);
             } else {
-                cprintf("bgm <1-41>  play a track to identify it;  bgm stop");
+                cprintf("bgm <2-41>  play a track in THIS area's bank;  bgm stop");
             }
         }
     } else if (strcmp(cmd, "STEAM") == 0) {
