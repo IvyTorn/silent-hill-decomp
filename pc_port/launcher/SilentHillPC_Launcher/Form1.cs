@@ -134,7 +134,7 @@ public partial class Form1 : Form
              * appears during a download). Created in code rather than the designer (the flag
              * is custom-painted), so it cannot be nudged from the design surface;
              * re-check this against Form1.Designer.cs after any layout change. */
-            Location = new System.Drawing.Point(416, 504),
+            Location = new System.Drawing.Point(416, 532),
             Size = new System.Drawing.Size(30, 22),
             Text = "",
             FlatStyle = FlatStyle.Standard,
