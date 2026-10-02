@@ -1885,8 +1885,19 @@ void DbgOverlay_Update(void)
             !ShNetChat_IsOpen() &&
             g_GameWork.gameState == GameState_InGame &&
             !(g_SysWork.sysFlags & SysFlag_DemoActive)) {
-            extern void ShNetMemo_ComposerToggle(void);
-            ShNetMemo_ComposerToggle();
+            /* In co-op mode, M is the multiplayer menu (Resume / players / leave),
+             * not the living-world memo composer. It is a floating overlay, so it
+             * never pauses the session. */
+            if (g_PcConfig.coopMode) {
+                extern int  Pc_CoopMenu_IsOpen(void);
+                extern void Pc_CoopMenu_OpenInGame(void);
+                extern void Pc_CoopMenu_Close(void);
+                if (Pc_CoopMenu_IsOpen()) Pc_CoopMenu_Close();
+                else                      Pc_CoopMenu_OpenInGame();
+            } else {
+                extern void ShNetMemo_ComposerToggle(void);
+                ShNetMemo_ComposerToggle();
+            }
         }
         s_prevList = curList;
         s_prevMemo = curMemo;

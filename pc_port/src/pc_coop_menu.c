@@ -23,13 +23,16 @@
 
 typedef enum
 {
-    COOP_PAGE_ROOT = 0,
+    COOP_PAGE_ROOT = 0,     /* main-menu: Host / Join / Back */
     COOP_PAGE_HOST_SETUP,
     COOP_PAGE_HOST,
-    COOP_PAGE_JOIN
+    COOP_PAGE_JOIN,
+    COOP_PAGE_INGAME,       /* in-game M menu: Resume / prefs / players / leave */
+    COOP_PAGE_PLAYERS       /* member list (in-game) */
 } CoopPage;
 
 static int      s_open;
+static int      s_inGame;   /* 1 = opened in-game (M menu), 0 = main-menu popup */
 static CoopPage s_page;
 static int      s_sel;
 
@@ -42,10 +45,25 @@ static int s_setFps        = 60;
 
 void Pc_CoopMenu_Open(void)
 {
-    s_open = 1;
-    s_page = COOP_PAGE_ROOT;
-    s_sel  = 0;
+    s_open   = 1;
+    s_inGame = 0;
+    s_page   = COOP_PAGE_ROOT;
+    s_sel    = 0;
     SH_DBG("[COOP] menu opened");
+}
+
+void Pc_CoopMenu_OpenInGame(void)
+{
+    s_open   = 1;
+    s_inGame = 1;
+    s_page   = COOP_PAGE_INGAME;
+    s_sel    = 0;
+    SH_DBG("[COOP] in-game M menu opened");
+}
+
+int Pc_CoopMenu_InGame(void)
+{
+    return s_open && s_inGame;
 }
 
 void Pc_CoopMenu_Close(void)
@@ -91,6 +109,8 @@ int Pc_CoopMenu_RowCount(void)
     case COOP_PAGE_HOST_SETUP: return 5; /* Players, Visibility, FPS, Start, Back */
     case COOP_PAGE_HOST:       return 3; /* Invite, Leave, Back */
     case COOP_PAGE_JOIN:       return 1; /* Back */
+    case COOP_PAGE_INGAME:     return 4; /* Resume, Nameplates, Players, Leave */
+    case COOP_PAGE_PLAYERS:    return ShSession_MemberCount() + 1; /* members + Back */
     default:                   return 1;
     }
 }
@@ -107,6 +127,8 @@ const char* Pc_CoopMenu_Title(void)
     case COOP_PAGE_HOST_SETUP: return "HOST GAME";
     case COOP_PAGE_HOST:       return "LOBBY";
     case COOP_PAGE_JOIN:       return "JOIN GAME";
+    case COOP_PAGE_INGAME:     return "MULTIPLAYER";
+    case COOP_PAGE_PLAYERS:    return "PLAYERS";
     default:                   return "MULTIPLAYER";
     }
 }
@@ -140,6 +162,32 @@ void Pc_CoopMenu_RowText(int i, char* out, int cap)
         else snprintf(out, cap, "Back");
         break;
 
+    case COOP_PAGE_INGAME:
+        if (i == 0) snprintf(out, cap, "Resume");
+        else if (i == 1) snprintf(out, cap, "Nameplates:  %s",
+                                  g_PcConfig.onlineNameplates ? "On" : "Off");
+        else if (i == 2) snprintf(out, cap, "Players");
+        else snprintf(out, cap, "Leave to Title");
+        break;
+
+    case COOP_PAGE_PLAYERS:
+    {
+        int mc = ShSession_MemberCount();
+        if (i < mc)
+        {
+            const ShSessionMember* m = ShSession_Member(i);
+            if (m && m->pingMs >= 0)
+                snprintf(out, cap, "%s  (%dms)", m->name, m->pingMs);
+            else if (m)
+                snprintf(out, cap, "%s", m->name);
+        }
+        else
+        {
+            snprintf(out, cap, "Back");
+        }
+        break;
+    }
+
     case COOP_PAGE_JOIN:
     default:
         snprintf(out, cap, "Back");
@@ -171,7 +219,12 @@ void Pc_CoopMenu_StatusText(char* out, int cap)
         snprintf(out, cap, "Accept a Steam invite from a friend to join.");
         break;
 
+    case COOP_PAGE_INGAME:
+        ShSession_StatusLine(out, cap);
+        break;
+
     case COOP_PAGE_HOST_SETUP:
+    case COOP_PAGE_PLAYERS:
     default:
         break;
     }
@@ -200,6 +253,27 @@ static void Coop_Confirm(void)
         if (s_sel == 0)      { ShSession_RequestInvite(); }
         else if (s_sel == 1) { ShSession_RequestLeave(); s_page = COOP_PAGE_ROOT; s_sel = 0; }
         else                 { s_page = COOP_PAGE_ROOT; s_sel = 0; }
+        break;
+
+    case COOP_PAGE_INGAME:
+        if (s_sel == 0)      { Pc_CoopMenu_Close(); }                       /* Resume */
+        else if (s_sel == 1) { g_PcConfig.onlineNameplates = !g_PcConfig.onlineNameplates; }
+        else if (s_sel == 2) { s_page = COOP_PAGE_PLAYERS; s_sel = 0; }     /* Players */
+        else
+        {
+            /* Leave to Title. Save & Exit (its own save) lands with the MP save
+             * system; this is the plain disconnect-and-return for now. */
+            ShSession_RequestLeave();
+            g_SysWork.sysFlags |= SysFlag_DoWarmReset;
+            Pc_CoopMenu_Close();
+        }
+        break;
+
+    case COOP_PAGE_PLAYERS:
+        /* Rows above Back are members; host-kick lands with the session kick
+         * API. Back returns to the in-game root. */
+        s_page = COOP_PAGE_INGAME;
+        s_sel  = 2;
         break;
 
     case COOP_PAGE_JOIN:
@@ -252,13 +326,18 @@ void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm)
     }
     if (cancel)
     {
-        if (s_page == COOP_PAGE_ROOT)
+        if (s_page == COOP_PAGE_PLAYERS)
         {
-            Pc_CoopMenu_Close();
+            s_page = COOP_PAGE_INGAME; /* back out of the member list */
+            s_sel  = 2;
+        }
+        else if (s_page == COOP_PAGE_ROOT || s_page == COOP_PAGE_INGAME)
+        {
+            Pc_CoopMenu_Close(); /* top level: close / resume */
         }
         else
         {
-            s_page = COOP_PAGE_ROOT;
+            s_page = s_inGame ? COOP_PAGE_INGAME : COOP_PAGE_ROOT;
             s_sel  = 0;
         }
     }

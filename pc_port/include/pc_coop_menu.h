@@ -14,9 +14,11 @@
 extern "C" {
 #endif
 
-void Pc_CoopMenu_Open(void);
+void Pc_CoopMenu_Open(void);        /* main-menu popup (Host / Join) */
+void Pc_CoopMenu_OpenInGame(void);  /* in-game M menu (Resume / players / leave) */
 void Pc_CoopMenu_Close(void);
 int  Pc_CoopMenu_IsOpen(void);
+int  Pc_CoopMenu_InGame(void);      /* 1 while the in-game M menu is up */
 
 /* One frame of input, edges already derived by the caller. */
 void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm);

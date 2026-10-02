@@ -2349,6 +2349,33 @@ void MainLoop(void) // 0x80032EE0
                 g_Controller0->pulsedGuiBtnFlags = 0;
             }
         }
+
+        /* Co-op in-game menu (M): a floating overlay over the live session. It
+         * NEVER freezes the game -- pausing a shared world is the one thing it
+         * must not do -- so it only swallows the pad while open so Harry does not
+         * walk. The mouse is handled in the draw hook; drop mouse-bound pad bits
+         * so a click is not also seen here. */
+        {
+            extern int  Pc_CoopMenu_InGame(void);
+            extern void Pc_CoopMenu_Update(int, int, int, int);
+            if (Pc_CoopMenu_InGame()) {
+                const s_ControllerConfig* cc = &g_GameWorkPtr->config.controllerConfig;
+                extern unsigned int Pc_MouseCursor_BoundPadBits(void);
+                unsigned int clk = g_Controller0->clickedBtnFlags & ~Pc_MouseCursor_BoundPadBits();
+                Pc_CoopMenu_Update(
+                    (clk & cc->cancel) != 0,
+                    (g_Controller0->pulsedBtnFlags & (ControllerFlag_LStickUp   | ControllerFlag_DpadUp))   != 0,
+                    (g_Controller0->pulsedBtnFlags & (ControllerFlag_LStickDown | ControllerFlag_DpadDown)) != 0,
+                    (clk & (cc->enter | cc->action)) != 0);
+                g_Controller0->heldBtnFlags        = 0;
+                g_Controller0->clickedBtnFlags     = 0;
+                g_Controller0->releasedBtnFlags    = 0;
+                g_Controller0->pulsedBtnFlags      = 0;
+                g_Controller0->pulsedGuiBtnFlags   = 0;
+                g_Controller0->sticks_20.rawData_0 = 0;
+                g_Controller0->sticks_24.rawData_0 = 0;
+            }
+        }
         /* Free camera: Harry is frozen in place and W/A/S/D fly the camera
          * (the alt-cam scheme walks with the same keys), so none of his pad
          * input may reach the game. */
