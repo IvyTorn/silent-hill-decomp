@@ -41,13 +41,17 @@ Merge the latest `pc-port` (167 commits ahead) into `silenthill-online`, bump th
 PsyCross submodule pointer, resolve the three integration conflicts
 (`AssemblyInfo.cs`, `dbg_overlay.c`, `pc_console_cmd.c`), get a clean build.
 
-### Phase B — Entry point + config
+### Phase B — Entry point + config  ✅
 - `coop_mode` config flag (default 1).
-- Main-menu **Multiplayer** entry, drawn *before* Option (extend
-  `e_MainMenuEntry`, the visible-entry flags, `NEXT_GAME_STATES`, the entry-text
-  table). `M` on the main menu opens it too.
-- Multiplayer menu overlay (reuse the quick-options / achievements UI style):
-  **Host** or **Join**.
+- Main-menu **Multiplayer** entry, drawn *before* Option. Done.
+- Multiplayer menu overlay — rendered through sh_net_ui's clean panel
+  (`Nu_DrawCoopMenu`), with **mouse** support (hover/click + own cursor). Done.
+
+> **Status (2026-10-02):** B ✅, C1 ✅ (host setup page), E ✅ (in-game M menu),
+> D ✅ core (MP save files + Save/Save & Exit; load + notepad reroute pending),
+> no-pause-in-session ✅, G partial ✅ (`status`). Remaining: the game-start boot
+> into co-op, the pregame lobby screen + "Killing Time" BGM + minimap, the public
+> browser, host kick, and Phase F gameplay sync. See the online branch memory.
 
 ### Phase C — Lobby host / join
 - **Join:** Steam overlay invite / friends list; a public lobby list if the
