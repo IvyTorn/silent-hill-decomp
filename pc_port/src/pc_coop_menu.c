@@ -13,6 +13,7 @@
 #include "bodyprog/bodyprog.h"
 
 #include "pc_coop_menu.h"
+#include "pc_coop_save.h"
 #include "pc_config.h"
 #include "sh_net_session.h"
 #include "sh_net_steam.h"
@@ -35,6 +36,7 @@ static int      s_open;
 static int      s_inGame;   /* 1 = opened in-game (M menu), 0 = main-menu popup */
 static CoopPage s_page;
 static int      s_sel;
+static char     s_msg[64];  /* transient feedback shown on the in-game status line */
 
 /* Pending host settings, seeded from config when the setup page is entered and
  * written back to config just before the lobby is opened (the worker reads them
@@ -58,6 +60,7 @@ void Pc_CoopMenu_OpenInGame(void)
     s_inGame = 1;
     s_page   = COOP_PAGE_INGAME;
     s_sel    = 0;
+    s_msg[0] = '\0';
     SH_DBG("[COOP] in-game M menu opened");
 }
 
@@ -109,7 +112,7 @@ int Pc_CoopMenu_RowCount(void)
     case COOP_PAGE_HOST_SETUP: return 5; /* Players, Visibility, FPS, Start, Back */
     case COOP_PAGE_HOST:       return 3; /* Invite, Leave, Back */
     case COOP_PAGE_JOIN:       return 1; /* Back */
-    case COOP_PAGE_INGAME:     return 4; /* Resume, Nameplates, Players, Leave */
+    case COOP_PAGE_INGAME:     return 6; /* Resume, Save, Save&Exit, Nameplates, Players, Leave */
     case COOP_PAGE_PLAYERS:    return ShSession_MemberCount() + 1; /* members + Back */
     default:                   return 1;
     }
@@ -164,9 +167,11 @@ void Pc_CoopMenu_RowText(int i, char* out, int cap)
 
     case COOP_PAGE_INGAME:
         if (i == 0) snprintf(out, cap, "Resume");
-        else if (i == 1) snprintf(out, cap, "Nameplates:  %s",
+        else if (i == 1) snprintf(out, cap, "Save");
+        else if (i == 2) snprintf(out, cap, "Save & Exit");
+        else if (i == 3) snprintf(out, cap, "Nameplates:  %s",
                                   g_PcConfig.onlineNameplates ? "On" : "Off");
-        else if (i == 2) snprintf(out, cap, "Players");
+        else if (i == 4) snprintf(out, cap, "Players");
         else snprintf(out, cap, "Leave to Title");
         break;
 
@@ -220,13 +225,39 @@ void Pc_CoopMenu_StatusText(char* out, int cap)
         break;
 
     case COOP_PAGE_INGAME:
-        ShSession_StatusLine(out, cap);
+        if (s_msg[0]) { snprintf(out, cap, "%s", s_msg); }
+        else          { ShSession_StatusLine(out, cap); }
         break;
 
     case COOP_PAGE_HOST_SETUP:
     case COOP_PAGE_PLAYERS:
     default:
         break;
+    }
+}
+
+/* Write the co-op save (named after the player), refused during a boss fight.
+ * andExit also disconnects and returns to the title. Feedback goes to s_msg. */
+static void Coop_DoSave(int andExit)
+{
+    const char* nm = (g_PcConfig.onlineName[0]) ? g_PcConfig.onlineName : "coop";
+
+    if (Pc_Save_BossActive())
+    {
+        snprintf(s_msg, sizeof(s_msg), "Can't save during a boss fight");
+        return;
+    }
+    if (!Pc_CoopSave_Write(nm))
+    {
+        snprintf(s_msg, sizeof(s_msg), "Save failed");
+        return;
+    }
+    snprintf(s_msg, sizeof(s_msg), "Saved as \"%s\"", nm);
+    if (andExit)
+    {
+        ShSession_RequestLeave();
+        g_SysWork.sysFlags |= SysFlag_DoWarmReset;
+        Pc_CoopMenu_Close();
     }
 }
 
@@ -257,12 +288,13 @@ static void Coop_Confirm(void)
 
     case COOP_PAGE_INGAME:
         if (s_sel == 0)      { Pc_CoopMenu_Close(); }                       /* Resume */
-        else if (s_sel == 1) { g_PcConfig.onlineNameplates = !g_PcConfig.onlineNameplates; }
-        else if (s_sel == 2) { s_page = COOP_PAGE_PLAYERS; s_sel = 0; }     /* Players */
+        else if (s_sel == 1) { Coop_DoSave(0); }                            /* Save */
+        else if (s_sel == 2) { Coop_DoSave(1); }                            /* Save & Exit */
+        else if (s_sel == 3) { g_PcConfig.onlineNameplates = !g_PcConfig.onlineNameplates; }
+        else if (s_sel == 4) { s_page = COOP_PAGE_PLAYERS; s_sel = 0; }     /* Players */
         else
         {
-            /* Leave to Title. Save & Exit (its own save) lands with the MP save
-             * system; this is the plain disconnect-and-return for now. */
+            /* Leave to Title without saving. */
             ShSession_RequestLeave();
             g_SysWork.sysFlags |= SysFlag_DoWarmReset;
             Pc_CoopMenu_Close();
@@ -271,9 +303,9 @@ static void Coop_Confirm(void)
 
     case COOP_PAGE_PLAYERS:
         /* Rows above Back are members; host-kick lands with the session kick
-         * API. Back returns to the in-game root. */
+         * API. Back returns to the in-game root (the Players row). */
         s_page = COOP_PAGE_INGAME;
-        s_sel  = 2;
+        s_sel  = 4;
         break;
 
     case COOP_PAGE_JOIN:
@@ -329,7 +361,7 @@ void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm)
         if (s_page == COOP_PAGE_PLAYERS)
         {
             s_page = COOP_PAGE_INGAME; /* back out of the member list */
-            s_sel  = 2;
+            s_sel  = 4;
         }
         else if (s_page == COOP_PAGE_ROOT || s_page == COOP_PAGE_INGAME)
         {

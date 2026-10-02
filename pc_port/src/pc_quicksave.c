@@ -24,7 +24,8 @@
  * without a hand-maintained room table, and lifts by itself the moment the boss
  * dies — the walk back out of the chamber stays saveable. Quick LOAD is left
  * alone: getting out is never the problem. */
-static int Pc_QuickSave_BossActive(void)
+/* Shared with the co-op save path (pc_coop_save.h). */
+int Pc_Save_BossActive(void)
 {
     static const unsigned char s_bossCharas[] = {
         Chara_SplitHead,    /* school basement / sewer */
@@ -108,7 +109,7 @@ void Pc_QuickSaveLoadUpdate(void)
         g_SysWork.sysState == SysState_Gameplay &&
         !g_PcConsoleInputActive)
     {
-        if (curSave && !prevSave && Pc_QuickSave_BossActive()) {
+        if (curSave && !prevSave && Pc_Save_BossActive()) {
             SH_DBG_ECHO("Can't quick save during a boss fight");
         } else if (curSave && !prevSave) {
             SH_DBG("[QUICK] opening save screen (%s)", g_PcConfig.keyQuickSave);
