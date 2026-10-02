@@ -83,7 +83,9 @@ void ShSession_Init(void)
     memset(&s_pub, 0, sizeof(s_pub));
     s_req.presenceMap = -1;
 
-    if (!g_PcConfig.onlineSteam)
+    /* coop_mode runs co-op over Steam, so it needs Steam up even when the
+     * standalone online_steam toggle is off. */
+    if (!g_PcConfig.onlineSteam && !g_PcConfig.coopMode)
     {
         SDL_strlcpy(s_pub.status, "Steam: disabled", sizeof(s_pub.status));
         return;

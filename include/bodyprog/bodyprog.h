@@ -87,18 +87,22 @@ typedef enum _MainMenuEntry
     MainMenuEntry_Load     = 0,
     MainMenuEntry_Continue = 1,
     MainMenuEntry_Start    = 2,
-    MainMenuEntry_Option   = 3,
-    MainMenuEntry_Extra    = 4, /** @unused The extra options menu may have been accessible via the main menu. */
 
 #ifdef SH_PC_PORT
-    /* PC port: the port's Exit row reuses the unused Extra slot. It sits
-     * directly under Option in draw order and inside the existing
-     * MainMenuEntry_Count, so the row layout, selection wrap and mouse
-     * hit-test all keep working untouched. */
-    MainMenuEntry_Exit     = 4,
-#endif
-
+    /* PC port: a Multiplayer row (simple co-op) sits directly above Option, with
+     * the Exit row below it. All three stay inside MainMenuEntry_Count, so the
+     * row layout, selection wrap and mouse hit-test keep working. The row is
+     * shown only when coop_mode is set; everything else is indexed by these
+     * values, so the ordering here is the ordering on screen. */
+    MainMenuEntry_Multiplayer = 3,
+    MainMenuEntry_Option      = 4,
+    MainMenuEntry_Exit        = 5,
+    MainMenuEntry_Count       = 6
+#else
+    MainMenuEntry_Option   = 3,
+    MainMenuEntry_Extra    = 4, /** @unused The extra options menu may have been accessible via the main menu. */
     MainMenuEntry_Count    = 5
+#endif
 } e_MainMenuEntry;
 
 typedef enum _MainMenuState

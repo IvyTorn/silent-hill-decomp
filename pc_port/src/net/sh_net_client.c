@@ -1084,7 +1084,9 @@ void ShNet_Init(void)
     s_sh.tickMs   = SHNET_STATE_MS;
 
     s_masterOn = g_PcConfig.onlineEnabled;
-    if (!s_masterOn && !g_PcConfig.onlineSteam)
+    /* Simple co-op runs over Steam, so coop_mode brings the worker (and the
+     * Steam session half) up on its own, without the living-world master. */
+    if (!s_masterOn && !g_PcConfig.onlineSteam && !g_PcConfig.coopMode)
     {
         s_enabled = 0;
         ShNet_SetStatus(SHNET_ST_OFF, "Online disabled");

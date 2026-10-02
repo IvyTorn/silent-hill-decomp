@@ -7,6 +7,7 @@
 #include "pc_config.h"
 #include "map_registry.h"
 #include "lang_text.h" /* menu translations + width for recentred entries */
+#include "pc_coop_menu.h" /* simple co-op front end (Multiplayer row) */
 #include "main/fileinfo.h" /* g_GameRegion: PAL repositions the achievements hint */
 #endif
 
@@ -86,6 +87,23 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
      * map must have NO effect until New Game selects it (title.c New Game
      * path below). */
 #endif
+#ifdef SH_PC_PORT
+    /* PC inserts the Multiplayer row at index 3, pushing Option to 4 and Exit to
+     * 5 (see e_MainMenuEntry). This array is indexed by the selected entry, so
+     * the slots must line up even though Multiplayer never reaches it (it opens
+     * its overlay in place) and Exit never reaches it (it calls exit()). */
+    #define MAIN_MENU_GAME_STATE_COUNT 6
+
+    s32 NEXT_GAME_STATES[MAIN_MENU_GAME_STATE_COUNT] =
+    {
+        GameState_LoadSavegameScreen, /* Load */
+        GameState_AutoLoadSavegame,   /* Continue */
+        GameState_MovieOpening,       /* Start */
+        GameState_MainMenu,           /* Multiplayer (overlay; slot unused) */
+        GameState_OptionScreen,       /* Option */
+        GameState_MainMenu            /* Exit (exit(); slot unused) */
+    };
+#else
     #define MAIN_MENU_GAME_STATE_COUNT 5
 
     s32 NEXT_GAME_STATES[MAIN_MENU_GAME_STATE_COUNT] =
@@ -96,6 +114,7 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
         GameState_OptionScreen,
         GameState_MovieIntro
     };
+#endif
 
     bool        playInGameDemo;
     s32         prevGameDifficultyIdx;
@@ -216,6 +235,15 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                 }
             }
 
+#ifdef SH_PC_PORT
+            /* The Multiplayer row is shown only when coop_mode is set, so a
+             * build with it off has exactly the old menu. */
+            if (g_PcConfig.coopMode)
+            {
+                g_MainMenu_VisibleEntryFlags |= (1 << MainMenuEntry_Multiplayer);
+            }
+#endif
+
             g_MainMenu_VisibleEntryFlags |= g_MainMenu_VisibleEntryFlags << MainMenuEntry_Count;
 
             if (g_Controller0->pulsedBtnFlags & (ControllerFlag_LStickUp | ControllerFlag_LStickDown))
@@ -285,6 +313,27 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
             }
 #endif
 
+#ifdef SH_PC_PORT
+            /* Simple co-op menu: while it is up it owns the pad (like the
+             * achievement browser above) and the title screen stays behind it.
+             * browserOpen is reused so the mouse row-select and the attract demo
+             * are suppressed for it too. */
+            if (Pc_CoopMenu_IsOpen())
+            {
+                Pc_CoopMenu_Update(
+                    (g_Controller0->clickedBtnFlags & g_GameWorkPtr->config.controllerConfig.cancel) != 0,
+                    (g_Controller0->pulsedBtnFlags & ControllerFlag_LStickUp) != 0,
+                    (g_Controller0->pulsedBtnFlags & ControllerFlag_LStickDown) != 0,
+                    (g_Controller0->clickedBtnFlags & (g_GameWorkPtr->config.controllerConfig.enter |
+                                                       g_GameWorkPtr->config.controllerConfig.action)) != 0);
+                g_Controller0->clickedBtnFlags   = 0;
+                g_Controller0->pulsedBtnFlags    = 0;
+                g_Controller0->releasedBtnFlags  = 0;
+                g_Controller0->pulsedGuiBtnFlags = 0;
+                browserOpen = true;
+            }
+#endif
+
             if (g_Controller0->pulsedBtnFlags & ControllerFlag_LStickUp)
             {
                 g_MainMenu_SelectedEntry += MainMenuEntry_Count;
@@ -333,6 +382,23 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                 g_MainMenu_SelectedEntry        = MainMenuEntry_Start;
                 g_Controller0->clickedBtnFlags |= g_GameWorkPtr->config.controllerConfig.enter;
                 skipToGameStep                  = 2;
+            }
+#endif
+
+#ifdef SH_PC_PORT
+            /* The Multiplayer row opens the co-op overlay in place -- no game
+             * start, no state transition. Consume the press so the generic
+             * start/transition block below stays inert for this row. */
+            if ((g_Controller0->clickedBtnFlags &
+                 (g_GameWorkPtr->config.controllerConfig.enter |
+                  g_GameWorkPtr->config.controllerConfig.action)) &&
+                g_MainMenu_SelectedEntry == MainMenuEntry_Multiplayer)
+            {
+                Pc_CoopMenu_Open();
+                SD_Call(Sfx_MenuConfirm);
+                g_Controller0->clickedBtnFlags &=
+                    ~(g_GameWorkPtr->config.controllerConfig.enter |
+                      g_GameWorkPtr->config.controllerConfig.action);
             }
 #endif
 
@@ -388,6 +454,13 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                         GameFs_OptionBinLoad();
                         break;
 
+#ifdef SH_PC_PORT
+                    /* Handled before this block (the overlay opens in place and
+                     * the press is consumed), so this is only a safety net. */
+                    case MainMenuEntry_Multiplayer:
+                        Pc_CoopMenu_Open();
+                        break;
+#endif
 #ifdef SH_PC_PORT
                     /* Retail leaves this slot dead (never made visible, empty
                      * handler). The port shows it as Exit and quits here, the
@@ -671,6 +744,10 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
             MainMenu_MainTextDraw();
 #ifdef SH_PC_PORT
             MainMenu_AchievementHintDraw();
+            /* Co-op overlay draws over the menu text; it sets browserOpen while
+             * up, so the cursor below is suppressed the same way the achievement
+             * panel suppresses it. */
+            Pc_CoopMenu_Draw();
             /* The achievement panel draws its own pointer over the top, so the
              * game's would just be a second cursor tracking the same mouse
              * underneath it. */
@@ -804,14 +881,23 @@ static void MainMenu_MainTextDraw(void) // 0x8003B568
         "LOAD",
         "CONTINUE",
         "START",
-        "OPTION",
 #ifdef SH_PC_PORT
-        "EXIT" /* PC port: quits the game. Reuses the unused Extra slot. */
+        "MULTIPLAYER", /* simple co-op; opens the co-op overlay in place */
+        "OPTION",
+        "EXIT" /* PC port: quits the game. */
 #else
+        "OPTION",
         "EXTRA" /** @unused See `e_MainMenuEntry`. */
 #endif
     };
+#ifdef SH_PC_PORT
+    /* MULTIPLAYER (index 3) and EXIT (index 5) have no authored centre, so they
+     * are centred from measured width below; OPTION keeps its retail offset at
+     * its new index 4. */
+    static const u8 STR_OFFSETS_X[] = { 29, 50, 32, 33, 39, 33 };
+#else
     static const u8 STR_OFFSETS_X[] = { 29, 50, 32, 39, 33 }; // @unused Element at index 4. See `g_MainMenu_VisibleEntryFlags`.
+#endif
 
     s32 i;
 
@@ -833,7 +919,8 @@ static void MainMenu_MainTextDraw(void) // 0x8003B568
              * keep using them when the text is untranslated. The port's Exit row
              * has no authored offset (index 4's was for "EXTRA"), so centre it
              * from the measured width in every language, English included. */
-            s32         offX = (tr == MAIN_MENU_ENTRY_STRINGS[i] && i != MainMenuEntry_Exit)
+            s32         offX = (tr == MAIN_MENU_ENTRY_STRINGS[i] &&
+                                i != MainMenuEntry_Exit && i != MainMenuEntry_Multiplayer)
                                    ? STR_OFFSETS_X[i]
                                    : ((Pc_LangMenuTextWidth(tr) + 6) >> 1);
             Gfx_StringSetPosition(COLUMN_POS_X - offX, COLUMN_POS_Y + (i * STR_OFFSET_Y));
