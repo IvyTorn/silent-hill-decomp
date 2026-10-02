@@ -30,7 +30,10 @@ s_PcConfig g_PcConfig = {
     .cutsceneLineGapMs = 300,
     .skipIntros     = 0,
     .showConsole    = 0,
-    .psxDither      = 1, /* 0=off, 1=PSX dither, 2=bilinear */
+    .psxDither      = -1, /* -1 = absent; see the dithering/texture_filter migration */
+    .dithering      = 1,  /* PSX ordered dither on, the long-standing default */
+    .textureFilter  = 0,  /* point sampling */
+    .scaling        = 2,  /* bilinear: what the present blit always did */
     .widescreenMode  = 1, /* 0=pillarbox, 1=Hor+ (default, no bars + correct proportions), 2=stretch */
     .menuPillarbox   = 1, /* 1=pillarbox 2D screens (black bars), 0=stretch to fill */
     .allowLooseFiles = 0, /* 0=disc image only, 1=scan gamedata/load/ first */
@@ -372,6 +375,9 @@ static void TrimWhitespace(char* s)
  * without one, mode is derived from the legacy pp/shadows keys after the parse. */
 static int s_sawFlashlightMode = 0;
 static int s_minimapSeen       = 0;
+/* Either independent key present means this config predates nothing and the
+ * legacy psx_dither must NOT overwrite it. */
+static int s_sawDitherKeys = 0;
 static int s_minimapShapeSeen  = 0;
 
 void Pc_FlashlightModeApply(int mode, int persist)
@@ -598,6 +604,25 @@ void PcConfig_Load(const char* path)
             if (v < 0) v = 0;
             if (v > 7) v = 7;
             g_PcConfig.psxDither = v;
+        }
+        else if (strcmp(key, "dithering") == 0)
+        {
+            g_PcConfig.dithering = (atoi(value) != 0);
+            s_sawDitherKeys = 1;
+        }
+        else if (strcmp(key, "texture_filter") == 0)
+        {
+            int v = atoi(value);
+            if (v < 0) v = 0;
+            if (v > 6) v = 6;
+            g_PcConfig.textureFilter = v;
+            s_sawDitherKeys = 1;
+        }
+        else if (strcmp(key, "scaling") == 0)
+        {
+            int v = atoi(value);
+            if (v < 0 || v > 3) v = 2;
+            g_PcConfig.scaling = v;
         }
         else if (strcmp(key, "menu_filter") == 0)
         {
@@ -1360,6 +1385,27 @@ else if (strcmp(key, "enable_plugins") == 0)
         g_PcConfig.minimap == 1 && g_PcConfig.minimapShape != 0)
     {
         g_PcConfig.minimap = 2;
+    }
+
+    /* psx_dither used to carry the dither flag AND the filtering mode in one
+     * value, so the two could not be combined. Translate it into the pair when
+     * the config has not been written by a build that knows them, and leave the
+     * player's look exactly as it was. */
+    if (g_PcConfig.psxDither >= 0 && !s_sawDitherKeys)
+    {
+        switch (g_PcConfig.psxDither)
+        {
+            case 1:  g_PcConfig.dithering = 1; g_PcConfig.textureFilter = 0; break;
+            case 2:  g_PcConfig.dithering = 0; g_PcConfig.textureFilter = 1; break;
+            case 3:  g_PcConfig.dithering = 0; g_PcConfig.textureFilter = 2; break;
+            case 4:  g_PcConfig.dithering = 0; g_PcConfig.textureFilter = 3; break;
+            case 5:  g_PcConfig.dithering = 0; g_PcConfig.textureFilter = 4; break;
+            case 6:  g_PcConfig.dithering = 0; g_PcConfig.textureFilter = 5; break;
+            case 7:  g_PcConfig.dithering = 0; g_PcConfig.textureFilter = 6; break;
+            default: g_PcConfig.dithering = 0; g_PcConfig.textureFilter = 0; break;
+        }
+        SH_LOG("[CFG] psx_dither = %d migrated to dithering = %d, texture_filter = %d",
+               g_PcConfig.psxDither, g_PcConfig.dithering, g_PcConfig.textureFilter);
     }
 
     /* Default migration: reapply a changed persisted DEFAULT to users still sitting

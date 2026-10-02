@@ -194,6 +194,8 @@ public partial class Form1 : Form
         Loc.LocalizeItems(comboSkipIntros);
         Loc.LocalizeItems(comboPillarbox);
         Loc.LocalizeItems(comboFiltering);
+        Loc.LocalizeItems(comboDithering);
+        Loc.LocalizeItems(comboScaling);
         Loc.LocalizeItems(comboAA);
         Loc.LocalizeItems(comboPost);
         Loc.LocalizeItems(comboTone);
@@ -604,12 +606,28 @@ public partial class Form1 : Form
 
         const string filteringTip =
             "Off: crisp PSX pixels.\n" +
-            "Dithering: the original PSX dither pattern.\n" +
             "Bilinear: smooths textures.\n" +
             "Trilinear: bilinear plus mip blending (only replacement textures with mips).\n" +
             "Anisotropic: sharper surfaces at steep angles; higher costs more GPU.";
         Set(filteringLabel, filteringTip);
         Set(comboFiltering, filteringTip);
+
+        const string ditheringTip =
+            "The PSX 4x4 ordered dither plus a 5-bit quantize: the original look.\n" +
+            "It also hides texture-page seams as noise instead of hard edges.\n" +
+            "Separate from Filtering, so the two can be combined.";
+        Set(ditheringLabel, ditheringTip);
+        Set(comboDithering, ditheringTip);
+
+        const string scalingTip =
+            "How a render resolution SMALLER than the window is scaled up to fill it.\n" +
+            "Integer: whole-number scale, centred, with a border. Nothing shimmers.\n" +
+            "Nearest Neighbor: fills the screen, no blending, edges can crawl.\n" +
+            "Bilinear: fills the screen, smoothly blended. Default.\n" +
+            "Sharp Bilinear: whole-number scale first, then blend the remainder.\n" +
+            "No effect when the resolution already matches the window.";
+        Set(scalingLabel, scalingTip);
+        Set(comboScaling, scalingTip);
 
         const string menuFilterTip =
             "Also smooth menus and 2D screens with bilinear filtering.\n" +
@@ -1060,16 +1078,42 @@ public partial class Form1 : Form
         else
             comboFps.SelectedItem = "30";
 
-        /* Filtering. psx_dither carries BOTH the mode and, for anisotropic, the
-         * strength: 0 off, 1 dithering, 2 bilinear, 3 trilinear, 4..7
-         * anisotropic 2x/4x/8x/16x. One value means the launcher, the in-game
-         * row and config.cfg cannot disagree about what is selected, which two
-         * separate keys would have allowed. Index maps to it directly. */
+        /* Dithering and Filtering used to share one key (psx_dither), which meant
+         * the authentic dither could not be combined with a smoothing mode. They
+         * are separate keys now; a config that still only has the old one is
+         * translated here the same way the game translates it, so the launcher
+         * shows what is actually in effect.
+         *
+         * texture_filter indexes comboFiltering directly: 0 off, 1 bilinear,
+         * 2 trilinear, 3..6 anisotropic 2x/4x/8x/16x. */
+        int ditherOn = config.Get("dithering", "") == "1" ? 1 : 0;
         int filterIdx;
-        if (!int.TryParse(config.Get("psx_dither", "1"), out filterIdx))
-            filterIdx = 1; // default to dithering
-        if (filterIdx < 0 || filterIdx >= comboFiltering.Items.Count) filterIdx = 1;
+        bool haveNewKeys = config.Get("dithering", "") != "" ||
+                           config.Get("texture_filter", "") != "";
+
+        if (!int.TryParse(config.Get("texture_filter", "0"), out filterIdx))
+            filterIdx = 0;
+
+        if (!haveNewKeys)
+        {
+            int legacy;
+            if (!int.TryParse(config.Get("psx_dither", "1"), out legacy))
+                legacy = 1;
+            ditherOn  = (legacy == 1) ? 1 : 0;
+            filterIdx = (legacy <= 1) ? 0 : legacy - 1;  // 2..7 -> 1..6
+        }
+
+        if (filterIdx < 0 || filterIdx >= comboFiltering.Items.Count) filterIdx = 0;
         comboFiltering.SelectedIndex = filterIdx;
+        comboDithering.SelectedIndex = ditherOn;
+
+        /* Scaling: how a render resolution below the window is scaled up to it.
+         * 0 integer, 1 nearest, 2 bilinear, 3 sharp bilinear. */
+        int scaleIdx;
+        if (!int.TryParse(config.Get("scaling", "2"), out scaleIdx))
+            scaleIdx = 2;
+        if (scaleIdx < 0 || scaleIdx >= comboScaling.Items.Count) scaleIdx = 2;
+        comboScaling.SelectedIndex = scaleIdx;
 
         // "Menus:" checkbox — also bilinear-filter menu/2D screens (config key menu_filter)
         checkBox1.Checked = config.Get("menu_filter", "0") == "1";
@@ -1257,9 +1301,15 @@ public partial class Form1 : Form
         if (comboFps.SelectedItem != null)
             config.Set("fps_cap", comboFps.SelectedItem.ToString());
 
-        // Filtering: dropdown index (0=Off, 1=Dithering, 2=Bilinear) -> int
+        /* Filtering and Dithering are independent keys. psx_dither is deliberately
+         * not written back: it only exists so an old config still loads, and
+         * leaving it alone keeps it from overriding these two on the next boot. */
         if (comboFiltering.SelectedIndex >= 0)
-            config.Set("psx_dither", comboFiltering.SelectedIndex.ToString());
+            config.Set("texture_filter", comboFiltering.SelectedIndex.ToString());
+        if (comboDithering.SelectedIndex >= 0)
+            config.Set("dithering", comboDithering.SelectedIndex == 1 ? "1" : "0");
+        if (comboScaling.SelectedIndex >= 0)
+            config.Set("scaling", comboScaling.SelectedIndex.ToString());
         config.Set("menu_filter", checkBox1.Checked ? "1" : "0");
 
         // Antialiasing (MSAA): dropdown index 0..3 -> msaa 0/2/4/8

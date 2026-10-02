@@ -1115,28 +1115,40 @@ int main(int argc, char* argv[])
      * everything while dither keeps the original look but masks the
      * texture-page seam artifacts and adds the authentic PSX noise. */
     { extern int g_cfg_textureFilter, g_cfg_anisoLevel; }
-    switch (g_PcConfig.psxDither) {
-    case 1:  g_cfg_psxDither = 1; g_cfg_textureFilter = 0; break;
-    case 2:  g_cfg_psxDither = 0; g_cfg_textureFilter = 1; break;
-    case 3:  g_cfg_psxDither = 0; g_cfg_textureFilter = 2; break;
-    /* 4..7 = anisotropic 2x/4x/8x/16x: one value carries mode AND strength. */
-    case 4:  g_cfg_psxDither = 0; g_cfg_textureFilter = 3; g_cfg_anisoLevel = 2;  break;
-    case 5:  g_cfg_psxDither = 0; g_cfg_textureFilter = 3; g_cfg_anisoLevel = 4;  break;
-    case 6:  g_cfg_psxDither = 0; g_cfg_textureFilter = 3; g_cfg_anisoLevel = 8;  break;
-    case 7:  g_cfg_psxDither = 0; g_cfg_textureFilter = 3; g_cfg_anisoLevel = 16; break;
-    default: g_cfg_psxDither = 0; g_cfg_textureFilter = 0; break;
+    /* Dither and filtering are independent settings now, so both are applied
+     * rather than one excluding the other. texture_filter 3..6 is anisotropic,
+     * where the value carries the tap count as well as the mode. */
+    g_cfg_psxDither = g_PcConfig.dithering ? 1 : 0;
+    switch (g_PcConfig.textureFilter) {
+    case 1:  g_cfg_textureFilter = 1; break;
+    case 2:  g_cfg_textureFilter = 2; break;
+    case 3:  g_cfg_textureFilter = 3; g_cfg_anisoLevel = 2;  break;
+    case 4:  g_cfg_textureFilter = 3; g_cfg_anisoLevel = 4;  break;
+    case 5:  g_cfg_textureFilter = 3; g_cfg_anisoLevel = 8;  break;
+    case 6:  g_cfg_textureFilter = 3; g_cfg_anisoLevel = 16; break;
+    default: g_cfg_textureFilter = 0; break;
+    }
+
+    /* Upscale method for a render resolution below the window. */
+    {
+        extern int g_PcPresentScale;
+        static const char* const kScaleNames[] = { "integer", "nearest", "bilinear",
+                                                   "sharp bilinear" };
+        g_PcPresentScale = g_PcConfig.scaling;
+        SH_LOG("Scaling: %s", kScaleNames[(g_PcConfig.scaling >= 0 &&
+                                          g_PcConfig.scaling <= 3) ? g_PcConfig.scaling : 2]);
     }
     g_cfg_bilinearFiltering = (g_cfg_textureFilter > 0);
     /* Menus / 2D-only frames (g_PsxDitherSuppressed) get bilinear if enabled,
      * independent of the 3D psx_dither mode above. */
     g_cfg_menuFilter = g_PcConfig.menuFilter ? 1 : 0;
     g_cfg_disableDpadMovement = 0; /* driven per-frame by gameplay state (game_main.c) so the D-pad still navigates menus */
-    SH_LOG("Filtering: %s%s",
-           g_cfg_psxDither     ? "PSX dither" :
+    SH_LOG("Dithering: %s   Filtering: %s%s",
+           g_cfg_psxDither ? "on" : "off",
            g_cfg_textureFilter == 1 ? "bilinear" :
            g_cfg_textureFilter == 2 ? "trilinear" :
            g_cfg_textureFilter == 3 ? "anisotropic" : "off",
-           g_cfg_textureFilter >= 3 ? " (see aniso taps in the mode)" : "");
+           g_cfg_textureFilter == 3 ? " (taps in texture_filter)" : "");
 
     /* PGXP master gate: PsyCross is compiled with USE_PGXP=1, but the
      * runtime path is opt-in via config.cfg use_pgxp. When 0, prim emit
