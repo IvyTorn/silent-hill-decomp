@@ -21,9 +21,14 @@ int  Pc_CoopMenu_IsOpen(void);
 /* One frame of input, edges already derived by the caller. */
 void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm);
 
-/* Draw the panel on top of whatever is on screen, using the game's text system
- * so it matches the main menu it is launched from. */
-void Pc_CoopMenu_Draw(void);
+/* Accessors for the renderer (sh_net_ui.c's Nu_DrawCoopMenu). The menu is drawn
+ * with the online UI's clean panel so it matches the quick menu / achievements
+ * popup, on the title screen and in game alike. */
+int         Pc_CoopMenu_RowCount(void);
+int         Pc_CoopMenu_Selected(void);
+const char* Pc_CoopMenu_Title(void);
+void        Pc_CoopMenu_RowText(int i, char* out, int cap);
+void        Pc_CoopMenu_StatusText(char* out, int cap);
 
 #ifdef __cplusplus
 }

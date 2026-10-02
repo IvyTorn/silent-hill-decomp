@@ -744,10 +744,10 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
             MainMenu_MainTextDraw();
 #ifdef SH_PC_PORT
             MainMenu_AchievementHintDraw();
-            /* Co-op overlay draws over the menu text; it sets browserOpen while
-             * up, so the cursor below is suppressed the same way the achievement
-             * panel suppresses it. */
-            Pc_CoopMenu_Draw();
+            /* The co-op menu renders from the post-capture hook (sh_net_ui's
+             * Nu_DrawCoopMenu), like the achievement browser, so it is not drawn
+             * here. It sets browserOpen above while open, which suppresses the
+             * cursor below. */
             /* The achievement panel draws its own pointer over the top, so the
              * game's would just be a second cursor tracking the same mouse
              * underneath it. */

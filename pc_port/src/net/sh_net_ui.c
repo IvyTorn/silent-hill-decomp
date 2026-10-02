@@ -47,6 +47,7 @@
 #include "sh_net_memo.h"
 #include "sh_net_chat.h"
 #include "sh_net_session.h"
+#include "pc_coop_menu.h"
 #include "pc_config.h"
 #include "pc_discord.h" /* Pc_MapAreaName */
 #include "sh_log.h"
@@ -1184,6 +1185,71 @@ static void Nu_DrawChat(int px)
     }
 }
 
+/* Filled rect in viewport pixels (the selected-row highlight). */
+static void Nu_FillPx(float x, float y, float w, float h,
+                      float r, float g, float b, float a)
+{
+    const float x0 = (x / s_vpW) * 2.0f - 1.0f;
+    const float x1 = ((x + w) / s_vpW) * 2.0f - 1.0f;
+    const float yT = 1.0f - (y / s_vpH) * 2.0f;
+    const float yB = 1.0f - ((y + h) / s_vpH) * 2.0f;
+    Nu_Fill(x0, yT, x1, yB, r, g, b, a);
+}
+
+/* The co-op front end (pc_coop_menu.c), drawn as a centred modal panel so it
+ * matches the quick menu / achievements popup. Used on the title screen and in
+ * game alike -- both reach here through the same post-capture hook. */
+static void Nu_DrawCoopMenu(int px)
+{
+    const int n   = Pc_CoopMenu_RowCount();
+    const int sel = Pc_CoopMenu_Selected();
+    const float rowH   = (float)px * 1.75f;
+    const float padY   = (float)px * 1.1f;
+    const float titleH = (float)px * 1.9f;
+    char  status[128];
+    float statusH, panelW, panelH, panelX, panelY, cx, y;
+    int   i;
+
+    Pc_CoopMenu_StatusText(status, sizeof(status));
+    statusH = status[0] ? (float)px * 1.7f : 0.0f;
+
+    panelW = s_vpW * 0.48f;
+    if (panelW < 240.0f) panelW = 240.0f;
+    panelH = titleH + rowH * (float)n + statusH + padY;
+    panelX = (s_vpW - panelW) * 0.5f;
+    panelY = (s_vpH - panelH) * 0.5f;
+    cx     = s_vpW * 0.5f;
+
+    Nu_Panel(panelX, panelY, panelW, panelH, 1.0f);
+    Nu_DrawTextCentered(Pc_CoopMenu_Title(), cx, panelY + padY * 0.5f,
+                        (int)((float)px * 1.08f), 0.93f, 0.87f, 0.55f, 1.0f);
+
+    y = panelY + titleH;
+    for (i = 0; i < n; i++)
+    {
+        char      row[96];
+        const int on = (i == sel);
+        Pc_CoopMenu_RowText(i, row, sizeof(row));
+        if (on)
+        {
+            Nu_FillPx(panelX + (float)px * 0.6f, y - (float)px * 0.2f,
+                      panelW - (float)px * 1.2f, rowH * 0.9f,
+                      0.32f, 0.30f, 0.17f, 0.65f);
+        }
+        Nu_DrawTextCentered(row, cx, y, px,
+                            on ? 1.00f : 0.72f,
+                            on ? 0.98f : 0.71f,
+                            on ? 0.82f : 0.62f, 1.0f);
+        y += rowH;
+    }
+
+    if (status[0])
+    {
+        Nu_DrawTextCentered(status, cx, panelY + panelH - statusH + (float)px * 0.3f,
+                            (int)((float)px * 0.82f), 0.80f, 0.76f, 0.64f, 0.95f);
+    }
+}
+
 void ShNetUi_Draw(void)
 {
     GLint     vp[4];
@@ -1193,7 +1259,7 @@ void ShNetUi_Draw(void)
     int       px;
     int       drawList, drawComposer, drawStatus;
 
-    if (!g_PcConfig.onlineEnabled && !g_PcConfig.onlineSteam)
+    if (!g_PcConfig.onlineEnabled && !g_PcConfig.onlineSteam && !g_PcConfig.coopMode)
     {
         return;
     }
@@ -1242,7 +1308,7 @@ void ShNetUi_Draw(void)
 
     if (!drawList && !drawComposer && !drawStatus && s_eventCount == 0 &&
         ShNetMemo_NearestReadable() < 0 && !ShNetMemo_JustPlaced() &&
-        !ShNetChat_DisplayActive())
+        !ShNetChat_DisplayActive() && !Pc_CoopMenu_IsOpen())
     {
         return;
     }
@@ -1336,6 +1402,11 @@ void ShNetUi_Draw(void)
     if (drawComposer)
     {
         Nu_DrawComposer(px);
+    }
+    /* Modal: on top of everything else. */
+    if (Pc_CoopMenu_IsOpen())
+    {
+        Nu_DrawCoopMenu(px);
     }
 
     glBindTexture(GL_TEXTURE_2D, (GLuint)prevTex);

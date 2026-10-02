@@ -1,9 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* See pc_coop_menu.h. Game thread only; drawn from the main-menu draw path. */
+/*
+ * pc_coop_menu.c - the simple co-op front end (state + logic only).
+ *
+ * Rendering lives in sh_net_ui.c (Nu_DrawCoopMenu), so this menu shares the
+ * clean panel look of the rest of the online UI and draws from the same
+ * post-capture hook on the title screen and in game alike. This file only holds
+ * the page/selection state, services input, and exposes accessors the renderer
+ * reads. Host / Join drive the Steam session layer (sh_net_session.h).
+ */
 
 #include "game.h"
 #include "bodyprog/bodyprog.h"
-#include "bodyprog/text/text_draw.h"
 
 #include "pc_coop_menu.h"
 #include "pc_config.h"
@@ -13,13 +20,6 @@
 
 #include <stdio.h>
 #include <string.h>
-
-/* 12x16 glyph rows, centred-ish on the 320px PSX framebuffer. */
-#define COOP_TITLE_Y   112
-#define COOP_ROW0_Y    150
-#define COOP_ROW_DY    20
-#define COOP_STATUS_Y  280
-#define COOP_ROW_X     100
 
 typedef enum
 {
@@ -83,7 +83,7 @@ static void Coop_StartHosting(void)
 }
 
 /* Rows on the current page; the last row is always Back. */
-static int Coop_RowCount(void)
+int Pc_CoopMenu_RowCount(void)
 {
     switch (s_page)
     {
@@ -92,6 +92,88 @@ static int Coop_RowCount(void)
     case COOP_PAGE_HOST:       return 3; /* Invite, Leave, Back */
     case COOP_PAGE_JOIN:       return 1; /* Back */
     default:                   return 1;
+    }
+}
+
+int Pc_CoopMenu_Selected(void)
+{
+    return s_sel;
+}
+
+const char* Pc_CoopMenu_Title(void)
+{
+    switch (s_page)
+    {
+    case COOP_PAGE_HOST_SETUP: return "HOST GAME";
+    case COOP_PAGE_HOST:       return "LOBBY";
+    case COOP_PAGE_JOIN:       return "JOIN GAME";
+    default:                   return "MULTIPLAYER";
+    }
+}
+
+void Pc_CoopMenu_RowText(int i, char* out, int cap)
+{
+    if (!out || cap <= 0)
+    {
+        return;
+    }
+    out[0] = '\0';
+    switch (s_page)
+    {
+    case COOP_PAGE_ROOT:
+        if (i == 0) snprintf(out, cap, "Host Game");
+        else if (i == 1) snprintf(out, cap, "Join Game");
+        else snprintf(out, cap, "Back");
+        break;
+
+    case COOP_PAGE_HOST_SETUP:
+        if (i == 0) snprintf(out, cap, "Max Players:  %d", s_setMaxPlayers);
+        else if (i == 1) snprintf(out, cap, "Visibility:  %s", s_setPublic ? "Public" : "Private");
+        else if (i == 2) snprintf(out, cap, "FPS Lock:  %d", s_setFps);
+        else if (i == 3) snprintf(out, cap, "Start Hosting");
+        else snprintf(out, cap, "Back");
+        break;
+
+    case COOP_PAGE_HOST:
+        if (i == 0) snprintf(out, cap, "Invite Friend");
+        else if (i == 1) snprintf(out, cap, "Close Lobby");
+        else snprintf(out, cap, "Back");
+        break;
+
+    case COOP_PAGE_JOIN:
+    default:
+        snprintf(out, cap, "Back");
+        break;
+    }
+}
+
+void Pc_CoopMenu_StatusText(char* out, int cap)
+{
+    if (!out || cap <= 0)
+    {
+        return;
+    }
+    out[0] = '\0';
+    switch (s_page)
+    {
+    case COOP_PAGE_ROOT:
+        if (!ShSteam_Available())
+        {
+            snprintf(out, cap, "Steam not running - start Steam and relaunch.");
+        }
+        break;
+
+    case COOP_PAGE_HOST:
+        ShSession_StatusLine(out, cap);
+        break;
+
+    case COOP_PAGE_JOIN:
+        snprintf(out, cap, "Accept a Steam invite from a friend to join.");
+        break;
+
+    case COOP_PAGE_HOST_SETUP:
+    default:
+        break;
     }
 }
 
@@ -107,45 +189,17 @@ static void Coop_Confirm(void)
 
     case COOP_PAGE_HOST_SETUP:
         /* The three setting rows cycle on confirm; no left/right needed. */
-        if (s_sel == 0)
-        {
-            s_setMaxPlayers = (s_setMaxPlayers >= 4) ? 2 : s_setMaxPlayers + 1;
-        }
-        else if (s_sel == 1)
-        {
-            s_setPublic = !s_setPublic;
-        }
-        else if (s_sel == 2)
-        {
-            s_setFps = (s_setFps == 60) ? 30 : 60;
-        }
-        else if (s_sel == 3)
-        {
-            Coop_StartHosting();
-        }
-        else
-        {
-            s_page = COOP_PAGE_ROOT;
-            s_sel  = 0;
-        }
+        if (s_sel == 0)      { s_setMaxPlayers = (s_setMaxPlayers >= 4) ? 2 : s_setMaxPlayers + 1; }
+        else if (s_sel == 1) { s_setPublic = !s_setPublic; }
+        else if (s_sel == 2) { s_setFps = (s_setFps == 60) ? 30 : 60; }
+        else if (s_sel == 3) { Coop_StartHosting(); }
+        else                 { s_page = COOP_PAGE_ROOT; s_sel = 0; }
         break;
 
     case COOP_PAGE_HOST:
-        if (s_sel == 0)
-        {
-            ShSession_RequestInvite(); /* Steam overlay friend picker */
-        }
-        else if (s_sel == 1)
-        {
-            ShSession_RequestLeave();
-            s_page = COOP_PAGE_ROOT;
-            s_sel  = 0;
-        }
-        else
-        {
-            s_page = COOP_PAGE_ROOT;
-            s_sel  = 0;
-        }
+        if (s_sel == 0)      { ShSession_RequestInvite(); }
+        else if (s_sel == 1) { ShSession_RequestLeave(); s_page = COOP_PAGE_ROOT; s_sel = 0; }
+        else                 { s_page = COOP_PAGE_ROOT; s_sel = 0; }
         break;
 
     case COOP_PAGE_JOIN:
@@ -163,7 +217,7 @@ void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm)
     {
         return;
     }
-    rows = Coop_RowCount();
+    rows = Pc_CoopMenu_RowCount();
     if (up)
     {
         s_sel = (s_sel + rows - 1) % rows;
@@ -188,84 +242,5 @@ void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm)
             s_page = COOP_PAGE_ROOT;
             s_sel  = 0;
         }
-    }
-}
-
-static void Coop_DrawText(s32 x, s32 y, s16 color, const char* s)
-{
-    char buf[96];
-    snprintf(buf, sizeof(buf), "%s", s);
-    Gfx_StringSetPosition(x, y);
-    Gfx_StringSetColor(color);
-    Gfx_StringDraw(buf, DEFAULT_MAP_MESSAGE_LENGTH);
-}
-
-static void Coop_DrawRow(int idx, const char* label)
-{
-    char buf[96];
-    s32  y = COOP_ROW0_Y + idx * COOP_ROW_DY;
-    if (idx == s_sel)
-    {
-        snprintf(buf, sizeof(buf), "[ %s ]", label);
-        Coop_DrawText(COOP_ROW_X - 12, y, StringColorId_White, buf);
-    }
-    else
-    {
-        Coop_DrawText(COOP_ROW_X, y, StringColorId_LightGrey, label);
-    }
-}
-
-void Pc_CoopMenu_Draw(void)
-{
-    char line[96];
-    char status[96];
-
-    if (!s_open)
-    {
-        return;
-    }
-
-    Coop_DrawText(COOP_ROW_X - 8, COOP_TITLE_Y, StringColorId_Gold, "MULTIPLAYER");
-
-    switch (s_page)
-    {
-    case COOP_PAGE_ROOT:
-        Coop_DrawRow(0, "HOST GAME");
-        Coop_DrawRow(1, "JOIN GAME");
-        Coop_DrawRow(2, "BACK");
-        if (!ShSteam_Available())
-        {
-            Coop_DrawText(COOP_ROW_X - 40, COOP_STATUS_Y, StringColorId_Red,
-                          "Steam not available - is Steam running?");
-        }
-        break;
-
-    case COOP_PAGE_HOST_SETUP:
-        snprintf(line, sizeof(line), "MAX PLAYERS: %d", s_setMaxPlayers);
-        Coop_DrawRow(0, line);
-        snprintf(line, sizeof(line), "VISIBILITY: %s", s_setPublic ? "PUBLIC" : "PRIVATE");
-        Coop_DrawRow(1, line);
-        snprintf(line, sizeof(line), "FPS LOCK: %d", s_setFps);
-        Coop_DrawRow(2, line);
-        Coop_DrawRow(3, "START HOSTING");
-        Coop_DrawRow(4, "BACK");
-        break;
-
-    case COOP_PAGE_HOST:
-        Coop_DrawRow(0, "INVITE FRIEND");
-        Coop_DrawRow(1, "CLOSE LOBBY");
-        Coop_DrawRow(2, "BACK");
-        ShSession_StatusLine(status, sizeof(status));
-        Coop_DrawText(COOP_ROW_X - 40, COOP_STATUS_Y, StringColorId_LightGrey, status);
-        break;
-
-    case COOP_PAGE_JOIN:
-    default:
-        Coop_DrawRow(0, "BACK");
-        Coop_DrawText(COOP_ROW_X - 56, COOP_STATUS_Y - COOP_ROW_DY, StringColorId_LightGrey,
-                      "Accept a Steam invite to join a friend.");
-        ShSession_StatusLine(status, sizeof(status));
-        Coop_DrawText(COOP_ROW_X - 40, COOP_STATUS_Y, StringColorId_LightGrey, status);
-        break;
     }
 }
