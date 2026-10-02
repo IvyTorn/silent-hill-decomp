@@ -2584,7 +2584,17 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
                      * recovery are no longer needed for guns. Melee has no Aim pose, so
                      * still drop its "aim" while running to avoid the arm-swinging-in-
                      * place bug. */
-                    if (g_DebugThirdPersonCam && g_Player_IsRunning &&
+                    /* g_Player_IsRunning means "run MODE is engaged", NOT "Harry is
+                     * moving": it is derived from the run control alone. With the
+                     * Walk/Run Control option set to Reverse the sense inverts, so
+                     * run mode is engaged whenever the run control is NOT held --
+                     * including standing perfectly still. Cancelling on that flag
+                     * alone therefore killed melee aim PERMANENTLY in the alt
+                     * cameras for anyone playing with Reverse, and in Normal it also
+                     * blocked aiming while merely holding the run key still. Require
+                     * actual movement input, which is what the in-place swing bug
+                     * needs anyway. */
+                    if (g_DebugThirdPersonCam && g_Player_IsRunning && g_Player_HasMoveInput &&
                         g_SysWork.playerCombat.weaponAttack < WEAPON_ATTACK(EquippedWeaponId_Handgun, AttackInputType_Tap)) {
                         aimHeld = false;
                         g_Player_IsAiming = false;
