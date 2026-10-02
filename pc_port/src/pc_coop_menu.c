@@ -45,6 +45,17 @@ static int s_setMaxPlayers = 4;
 static int s_setPublic     = 0;
 static int s_setFps        = 60;
 
+/* Host-setup save picker: the co-op saves on disk and which one to start from
+ * (-1 = a fresh New Game). */
+static CoopSaveEntry s_saves[8];
+static int           s_saveCount;
+static int           s_loadIdx = -1;
+
+/* Start-game request handed to title.c (GameState_MainMenu_Update), which does
+ * the actual boot. 0 = none, 1 = new game, 2 = load s_startSave. */
+static int  s_startReq;
+static char s_startSave[COOP_SAVE_NAME_MAX];
+
 void Pc_CoopMenu_Open(void)
 {
     s_open   = 1;
@@ -84,10 +95,39 @@ static void Coop_EnterHostSetup(void)
     s_setMaxPlayers = g_PcConfig.onlineSteamMaxPlayers;
     if (s_setMaxPlayers < 2) s_setMaxPlayers = 2;
     if (s_setMaxPlayers > 4) s_setMaxPlayers = 4;
-    s_setPublic = g_PcConfig.onlineSteamPublic ? 1 : 0;
-    s_setFps    = (g_PcConfig.fpsCap >= 60) ? 60 : 30;
-    s_page      = COOP_PAGE_HOST_SETUP;
-    s_sel       = 0;
+    s_setPublic   = g_PcConfig.onlineSteamPublic ? 1 : 0;
+    s_setFps      = (g_PcConfig.fpsCap >= 60) ? 60 : 30;
+    s_saveCount   = Pc_CoopSave_List(s_saves, (int)(sizeof(s_saves) / sizeof(s_saves[0])));
+    s_loadIdx     = -1; /* default: start a fresh game */
+    s_page        = COOP_PAGE_HOST_SETUP;
+    s_sel         = 0;
+}
+
+/* Queue the game boot for title.c. Reads the host-setup load choice. */
+static void Coop_RequestStart(void)
+{
+    if (s_loadIdx >= 0 && s_loadIdx < s_saveCount)
+    {
+        s_startReq = 2;
+        snprintf(s_startSave, sizeof(s_startSave), "%s", s_saves[s_loadIdx].name);
+    }
+    else
+    {
+        s_startReq      = 1;
+        s_startSave[0]  = '\0';
+    }
+    Pc_CoopMenu_Close();
+}
+
+int Pc_CoopMenu_TakeStartRequest(char* outName, int cap)
+{
+    int req = s_startReq;
+    s_startReq = 0;
+    if (outName && cap > 0)
+    {
+        snprintf(outName, cap, "%s", s_startSave);
+    }
+    return req;
 }
 
 static void Coop_StartHosting(void)
@@ -109,8 +149,8 @@ int Pc_CoopMenu_RowCount(void)
     switch (s_page)
     {
     case COOP_PAGE_ROOT:       return 3; /* Host, Join, Back */
-    case COOP_PAGE_HOST_SETUP: return 5; /* Players, Visibility, FPS, Start, Back */
-    case COOP_PAGE_HOST:       return 3; /* Invite, Leave, Back */
+    case COOP_PAGE_HOST_SETUP: return 6; /* Players, Visibility, FPS, Load, Open Lobby, Back */
+    case COOP_PAGE_HOST:       return 4; /* Invite, Start Game, Leave, Back */
     case COOP_PAGE_JOIN:       return 1; /* Back */
     case COOP_PAGE_INGAME:     return 6; /* Resume, Save, Save&Exit, Nameplates, Players, Leave */
     case COOP_PAGE_PLAYERS:    return ShSession_MemberCount() + 1; /* members + Back */
@@ -155,13 +195,21 @@ void Pc_CoopMenu_RowText(int i, char* out, int cap)
         if (i == 0) snprintf(out, cap, "Max Players:  %d", s_setMaxPlayers);
         else if (i == 1) snprintf(out, cap, "Visibility:  %s", s_setPublic ? "Public" : "Private");
         else if (i == 2) snprintf(out, cap, "FPS Lock:  %d", s_setFps);
-        else if (i == 3) snprintf(out, cap, "Start Hosting");
+        else if (i == 3)
+        {
+            if (s_loadIdx >= 0 && s_loadIdx < s_saveCount)
+                snprintf(out, cap, "Load:  %s", s_saves[s_loadIdx].name);
+            else
+                snprintf(out, cap, "Load:  New Game");
+        }
+        else if (i == 4) snprintf(out, cap, "Open Lobby");
         else snprintf(out, cap, "Back");
         break;
 
     case COOP_PAGE_HOST:
         if (i == 0) snprintf(out, cap, "Invite Friend");
-        else if (i == 1) snprintf(out, cap, "Close Lobby");
+        else if (i == 1) snprintf(out, cap, "Start Game");
+        else if (i == 2) snprintf(out, cap, "Close Lobby");
         else snprintf(out, cap, "Back");
         break;
 
@@ -272,17 +320,19 @@ static void Coop_Confirm(void)
         break;
 
     case COOP_PAGE_HOST_SETUP:
-        /* The three setting rows cycle on confirm; no left/right needed. */
+        /* Setting rows cycle on confirm; no left/right needed. */
         if (s_sel == 0)      { s_setMaxPlayers = (s_setMaxPlayers >= 4) ? 2 : s_setMaxPlayers + 1; }
         else if (s_sel == 1) { s_setPublic = !s_setPublic; }
         else if (s_sel == 2) { s_setFps = (s_setFps == 60) ? 30 : 60; }
-        else if (s_sel == 3) { Coop_StartHosting(); }
+        else if (s_sel == 3) { s_loadIdx = (s_loadIdx + 1 >= s_saveCount) ? -1 : s_loadIdx + 1; }
+        else if (s_sel == 4) { Coop_StartHosting(); } /* Open Lobby */
         else                 { s_page = COOP_PAGE_ROOT; s_sel = 0; }
         break;
 
     case COOP_PAGE_HOST:
         if (s_sel == 0)      { ShSession_RequestInvite(); }
-        else if (s_sel == 1) { ShSession_RequestLeave(); s_page = COOP_PAGE_ROOT; s_sel = 0; }
+        else if (s_sel == 1) { Coop_RequestStart(); }                       /* Start Game */
+        else if (s_sel == 2) { ShSession_RequestLeave(); s_page = COOP_PAGE_ROOT; s_sel = 0; }
         else                 { s_page = COOP_PAGE_ROOT; s_sel = 0; }
         break;
 

@@ -36,6 +36,11 @@ void        Pc_CoopMenu_StatusText(char* out, int cap);
 void        Pc_CoopMenu_SetSelected(int i);
 void        Pc_CoopMenu_Confirm(void);
 
+/* The host's "Start Game" queues the boot here; title.c polls it each main-menu
+ * frame and performs the actual New Game / load boot. Returns 0 none, 1 new
+ * game, 2 load (save name written to outName), and clears the request. */
+int         Pc_CoopMenu_TakeStartRequest(char* outName, int cap);
+
 #ifdef __cplusplus
 }
 #endif

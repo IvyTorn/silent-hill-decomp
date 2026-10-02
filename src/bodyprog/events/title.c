@@ -8,6 +8,7 @@
 #include "map_registry.h"
 #include "lang_text.h" /* menu translations + width for recentred entries */
 #include "pc_coop_menu.h" /* simple co-op front end (Multiplayer row) */
+#include "pc_coop_save.h" /* co-op save load for the host "Start Game" boot */
 #include "main/fileinfo.h" /* g_GameRegion: PAL repositions the achievements hint */
 #endif
 
@@ -245,6 +246,35 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
 #endif
 
             g_MainMenu_VisibleEntryFlags |= g_MainMenu_VisibleEntryFlags << MainMenuEntry_Count;
+
+#ifdef SH_PC_PORT
+            /* Co-op host pressed "Start Game" in the lobby: boot the shared game.
+             * Reuse the proven paths rather than hand-rolling a boot -- a fresh
+             * game goes through the New Game skip, a loaded save through Continue
+             * (the save is read into g_GameWork.savegame, copied to autosave so
+             * Continue's health>0 branch boots that map). */
+            {
+                char coopSave[COOP_SAVE_NAME_MAX];
+                int  coopReq = Pc_CoopMenu_TakeStartRequest(coopSave, sizeof(coopSave));
+                if (coopReq == 1)
+                {
+                    skipToGameStep = 1;
+                }
+                else if (coopReq == 2)
+                {
+                    if (Pc_CoopSave_Load(coopSave))
+                    {
+                        g_GameWork.autosave             = g_GameWork.savegame;
+                        g_MainMenu_SelectedEntry        = MainMenuEntry_Continue;
+                        g_Controller0->clickedBtnFlags |= g_GameWorkPtr->config.controllerConfig.enter;
+                    }
+                    else
+                    {
+                        skipToGameStep = 1; /* load failed -> fresh game */
+                    }
+                }
+            }
+#endif
 
             if (g_Controller0->pulsedBtnFlags & (ControllerFlag_LStickUp | ControllerFlag_LStickDown))
             {
