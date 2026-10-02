@@ -539,6 +539,7 @@ static const char* const HELP_LINES[] = {
     " net coop 0|1  force co-op mode (blocks pausing) for testing",
     " net model 0|1 EXPERIMENTAL: draw ghosts as full character models",
     " status        co-op: session, players, pings, pausing",
+    " bgm <1-41>    play a music track (in-game) to identify it; bgm stop",
     " steam         Steam session status",
     " steam host    open a co-op lobby (friends only)",
     " steam invite  Steam overlay friend invite",
@@ -1491,6 +1492,22 @@ void Pc_ConsoleExec(const char* line)
             else
                 cprintf("  - %-20s  --%s", m->name,
                         m->linked ? "" : "  (no link)");
+        }
+    } else if (strcmp(cmd, "BGM") == 0) {
+        /* Play a sequenced music track by number so a track can be identified by
+         * ear (e.g. finding "Killing Time" for the co-op lobby). In-game only --
+         * the title screen has not loaded the gameplay instrument bank. */
+        if (strcmp(arg, "STOP") == 0 || strcmp(arg, "OFF") == 0) {
+            Bgm_CrossfadeToTrack(0); /* BgmTrackIdx_None */
+            cprintf("bgm: stopped");
+        } else {
+            int n = atoi(arg);
+            if (n >= 1 && n <= 41) {
+                Bgm_PlayNewTrack(n);
+                cprintf("bgm: playing track %d  (in-game only; `bgm stop` to stop)", n);
+            } else {
+                cprintf("bgm <1-41>  play a track to identify it;  bgm stop");
+            }
         }
     } else if (strcmp(cmd, "STEAM") == 0) {
         char line[128];
