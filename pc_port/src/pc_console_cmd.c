@@ -538,6 +538,7 @@ static const char* const HELP_LINES[] = {
     " net who       who is online, and where",
     " net coop 0|1  force co-op mode (blocks pausing) for testing",
     " net model 0|1 EXPERIMENTAL: draw ghosts as full character models",
+    " status        co-op: session, players, pings, pausing",
     " steam         Steam session status",
     " steam host    open a co-op lobby (friends only)",
     " steam invite  Steam overlay friend invite",
@@ -1464,6 +1465,32 @@ void Pc_ConsoleExec(const char* line)
             cprintf("  co-op mode: %s", ShNet_CoopActive()
                     ? "ON - pausing is blocked" : "off");
             cprintf("  net reconnect | net who | net memos | net coop [0|1]");
+        }
+    } else if (strcmp(cmd, "STATUS") == 0) {
+        /* Co-op-oriented one-look: mode, session, who is in it, and whether the
+         * world is shared (pausing blocked). */
+        int i, n = ShSession_MemberCount();
+        cprintf("multiplayer status:");
+        cprintf("  coop_mode: %s", g_PcConfig.coopMode ? "on" : "off");
+        if (ShSession_Active()) {
+            cprintf("  session: %s, lobby %llu, %d player(s)",
+                    ShSession_IsHost() ? "HOSTING" : "guest",
+                    ShSession_LobbyId(), n);
+        } else {
+            cprintf("  session: not in a lobby");
+        }
+        cprintf("  pausing: %s", ShNet_PauseBlocked()
+                ? "blocked (shared world)" : "allowed");
+        cprintf("  fps cap: %d", g_PcConfig.fpsCap);
+        for (i = 0; i < n; i++) {
+            const ShSessionMember* m = ShSession_Member(i);
+            if (!m) continue;
+            if (m->pingMs >= 0)
+                cprintf("  - %-20s %d ms%s", m->name, m->pingMs,
+                        m->linked ? "" : "  (no link)");
+            else
+                cprintf("  - %-20s  --%s", m->name,
+                        m->linked ? "" : "  (no link)");
         }
     } else if (strcmp(cmd, "STEAM") == 0) {
         char line[128];
