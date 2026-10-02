@@ -22,6 +22,7 @@
 #include "sh_net_memo.h"
 #include "sh_net_chat.h"
 #include "sh_net_session.h"
+#include "sh_net_coop.h"     /* ShNet_SetCoopActive: block pausing in a session */
 #include "sh_net_internal.h"
 #include "sh_net_platform.h" /* ShNetPlat_Millis, for the roster re-request throttle */
 #include "pc_discord.h" /* Pc_MapAreaName, for Steam rich presence */
@@ -123,6 +124,19 @@ void ShNet_GameTick(void)
 
     ShNetMemo_Tick();
     ShNetChat_Tick();
+
+    /* Co-op: another player physically in the Steam session means the world is
+     * shared and must not be paused. Drive the coop seam from the live member
+     * count so ShNet_LiveWorld() / ShNet_PauseBlocked() cover a real session,
+     * not just the console override. */
+    if (g_PcConfig.coopMode)
+    {
+        int shared = ShSession_Active() && (ShSession_MemberCount() > 1);
+        if (shared != ShNet_CoopActive())
+        {
+            ShNet_SetCoopActive(shared, shared ? "co-op session" : "session ended");
+        }
+    }
 
     inWorld = (g_GameWork.gameState == GameState_InGame) &&
               (g_SavegamePtr != NULL) &&
