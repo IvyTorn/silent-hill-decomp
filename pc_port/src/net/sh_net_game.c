@@ -125,16 +125,16 @@ void ShNet_GameTick(void)
     ShNetMemo_Tick();
     ShNetChat_Tick();
 
-    /* Co-op: another player physically in the Steam session means the world is
-     * shared and must not be paused. Drive the coop seam from the live member
-     * count so ShNet_LiveWorld() / ShNet_PauseBlocked() cover a real session,
-     * not just the console override. */
-    if (g_PcConfig.coopMode)
+    /* A multiplayer game is never pausable -- pausing a world meant to be shared
+     * is the one thing co-op must not do. Drive the coop seam from g_PcCoopGame
+     * (set when the game was launched via the Multiplayer menu) so
+     * ShNet_LiveWorld() / ShNet_PauseBlocked() report it; a single-player game
+     * leaves it 0 and pauses normally. */
     {
-        int shared = ShSession_Active() && (ShSession_MemberCount() > 1);
-        if (shared != ShNet_CoopActive())
+        extern int g_PcCoopGame;
+        if (g_PcCoopGame != ShNet_CoopActive())
         {
-            ShNet_SetCoopActive(shared, shared ? "co-op session" : "session ended");
+            ShNet_SetCoopActive(g_PcCoopGame, g_PcCoopGame ? "multiplayer game" : "single-player");
         }
     }
 

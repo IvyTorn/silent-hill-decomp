@@ -237,12 +237,13 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
             }
 
 #ifdef SH_PC_PORT
-            /* The Multiplayer row is shown only when coop_mode is set, so a
-             * build with it off has exactly the old menu. */
-            if (g_PcConfig.coopMode)
-            {
-                g_MainMenu_VisibleEntryFlags |= (1 << MainMenuEntry_Multiplayer);
-            }
+            /* The Multiplayer row is ALWAYS shown, in every mode -- the gamemode
+             * is a runtime choice made inside it (host / join now, solo / living
+             * world later), not a config toggle. g_PcCoopGame is cleared here
+             * each menu frame and set only when the co-op boot below runs, so a
+             * normal New Game / Continue is single-player. */
+            g_MainMenu_VisibleEntryFlags |= (1 << MainMenuEntry_Multiplayer);
+            g_PcCoopGame = 0;
 #endif
 
             g_MainMenu_VisibleEntryFlags |= g_MainMenu_VisibleEntryFlags << MainMenuEntry_Count;
@@ -258,18 +259,21 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                 int  coopReq = Pc_CoopMenu_TakeStartRequest(coopSave, sizeof(coopSave));
                 if (coopReq == 1)
                 {
+                    g_PcCoopGame   = 1; /* this game is multiplayer */
                     skipToGameStep = 1;
                 }
                 else if (coopReq == 2)
                 {
                     if (Pc_CoopSave_Load(coopSave))
                     {
+                        g_PcCoopGame                    = 1;
                         g_GameWork.autosave             = g_GameWork.savegame;
                         g_MainMenu_SelectedEntry        = MainMenuEntry_Continue;
                         g_Controller0->clickedBtnFlags |= g_GameWorkPtr->config.controllerConfig.enter;
                     }
                     else
                     {
+                        g_PcCoopGame   = 1;
                         skipToGameStep = 1; /* load failed -> fresh game */
                     }
                 }

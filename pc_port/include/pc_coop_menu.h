@@ -14,6 +14,11 @@
 extern "C" {
 #endif
 
+/* 1 while the current game was launched as multiplayer (set at the co-op boot,
+ * cleared at the title). The runtime gate for the in-game co-op features; a
+ * normal single-player game leaves it 0. */
+extern int g_PcCoopGame;
+
 void Pc_CoopMenu_Open(void);        /* main-menu popup (Host / Join) */
 void Pc_CoopMenu_OpenInGame(void);  /* in-game M menu (Resume / players / leave) */
 void Pc_CoopMenu_Close(void);

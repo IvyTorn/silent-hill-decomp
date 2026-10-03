@@ -1083,17 +1083,12 @@ void ShNet_Init(void)
     s_sh.localMap = -1;
     s_sh.tickMs   = SHNET_STATE_MS;
 
+    /* The master-server (living-world) half still only runs when online_enabled
+     * is set. The worker itself always comes up, though: this build always
+     * offers the Multiplayer menu, and host/join need the Steam session half
+     * ready. ShSession_Init no-ops gracefully when Steam is absent, so a plain
+     * single-player launch just has an idle worker and no visible effect. */
     s_masterOn = g_PcConfig.onlineEnabled;
-    /* Simple co-op runs over Steam, so coop_mode brings the worker (and the
-     * Steam session half) up on its own, without the living-world master. */
-    if (!s_masterOn && !g_PcConfig.onlineSteam && !g_PcConfig.coopMode)
-    {
-        s_enabled = 0;
-        ShNet_SetStatus(SHNET_ST_OFF, "Online disabled");
-        s_gt.status = SHNET_ST_OFF;
-        SDL_strlcpy(s_gt.statusText, "Online disabled", sizeof(s_gt.statusText));
-        return;
-    }
 
     SDL_strlcpy(s_host, g_PcConfig.onlineServer[0] ? g_PcConfig.onlineServer : "127.0.0.1",
                 sizeof(s_host));

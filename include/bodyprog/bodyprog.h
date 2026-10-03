@@ -92,8 +92,8 @@ typedef enum _MainMenuEntry
     /* PC port: a Multiplayer row (simple co-op) sits directly above Option, with
      * the Exit row below it. All three stay inside MainMenuEntry_Count, so the
      * row layout, selection wrap and mouse hit-test keep working. The row is
-     * shown only when coop_mode is set; everything else is indexed by these
-     * values, so the ordering here is the ordering on screen. */
+     * always shown; everything else is indexed by these values, so the ordering
+     * here is the ordering on screen. */
     MainMenuEntry_Multiplayer = 3,
     MainMenuEntry_Option      = 4,
     MainMenuEntry_Exit        = 5,

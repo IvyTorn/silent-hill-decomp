@@ -38,6 +38,13 @@ static CoopPage s_page;
 static int      s_sel;
 static char     s_msg[64];  /* transient feedback shown on the in-game status line */
 
+/* 1 while the CURRENT game was launched as multiplayer (host or join via the
+ * Multiplayer menu). This -- not a config flag -- is what turns on the in-game
+ * co-op features (the M menu, no pausing). A normal New Game / Continue leaves
+ * it 0, so single-player is identical to the stock port. title.c sets it at the
+ * boot and clears it at the menu. */
+int g_PcCoopGame;
+
 /* Pending host settings, seeded from config when the setup page is entered and
  * written back to config just before the lobby is opened (the worker reads them
  * there -- see ShSession_Tick's wantHost handler). */

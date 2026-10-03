@@ -1470,9 +1470,10 @@ void Pc_ConsoleExec(const char* line)
     } else if (strcmp(cmd, "STATUS") == 0) {
         /* Co-op-oriented one-look: mode, session, who is in it, and whether the
          * world is shared (pausing blocked). */
+        extern int g_PcCoopGame;
         int i, n = ShSession_MemberCount();
         cprintf("multiplayer status:");
-        cprintf("  coop_mode: %s", g_PcConfig.coopMode ? "on" : "off");
+        cprintf("  this game: %s", g_PcCoopGame ? "MULTIPLAYER" : "single-player");
         if (ShSession_Active()) {
             cprintf("  session: %s, lobby %llu, %d player(s)",
                     ShSession_IsHost() ? "HOSTING" : "guest",

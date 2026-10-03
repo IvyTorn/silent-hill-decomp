@@ -450,11 +450,6 @@ typedef struct {
     int  onlineSteamMaxPlayers;/* lobby size cap, 2..8 (online_steam_max_players) */
     int  onlineSteamPublic;    /* 1 = public lobby, 0 = friends only (online_steam_public) */
     int  onlineSteamAutoHost;  /* 1 = open a lobby at startup (online_steam_autohost) */
-    int  coopMode;             /* 1 = the simple co-op mode: Multiplayer main-menu
-                                * entry + in-game M menu (host/join Steam lobbies).
-                                * Default OFF so a plain build is identical to
-                                * single-player; set coop_mode = 1 to enable.
-                                * (config key: coop_mode) */
 
     char keyOnlinePlayers[24]; /* who-is-online panel hotkey (key_online_players); default F11 */
     char keyOnlineMemo[24];    /* leave-a-message composer hotkey (key_online_memo); default M */

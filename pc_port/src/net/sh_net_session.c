@@ -83,14 +83,10 @@ void ShSession_Init(void)
     memset(&s_pub, 0, sizeof(s_pub));
     s_req.presenceMap = -1;
 
-    /* coop_mode runs co-op over Steam, so it needs Steam up even when the
-     * standalone online_steam toggle is off. */
-    if (!g_PcConfig.onlineSteam && !g_PcConfig.coopMode)
-    {
-        SDL_strlcpy(s_pub.status, "Steam: disabled", sizeof(s_pub.status));
-        return;
-    }
-
+    /* Steam always comes up: this build always offers the Multiplayer menu, and
+     * host/join need it. ShSteam_Init fails gracefully (returns 0) when there is
+     * no steam_api64.dll or Steam is not running, in which case the Multiplayer
+     * menu simply reports it. */
     s_enabled = ShSteam_Init((unsigned int)g_PcConfig.onlineSteamAppId);
     if (!s_enabled)
     {

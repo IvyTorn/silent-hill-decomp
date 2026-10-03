@@ -1333,7 +1333,7 @@ void ShNetUi_Draw(void)
     int       px;
     int       drawList, drawComposer, drawStatus;
 
-    if (!g_PcConfig.onlineEnabled && !g_PcConfig.onlineSteam && !g_PcConfig.coopMode)
+    if (!ShNet_Enabled() && !Pc_CoopMenu_IsOpen())
     {
         return;
     }

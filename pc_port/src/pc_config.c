@@ -68,9 +68,6 @@ s_PcConfig g_PcConfig = {
     .onlineSteamMaxPlayers = 4,
     .onlineSteamPublic     = 0,   /* friends only: an invite is the point */
     .onlineSteamAutoHost   = 0,
-    .coopMode              = 0, /* OFF by default: a plain build is identical to
-                                 * single-player. Set coop_mode = 1 for the
-                                 * Multiplayer menu + M menu + Steam co-op. */
     .keyOnlinePlayers = "F11",
     .keyOnlineMemo    = "M",
     .keyChatGame      = "Y",
@@ -794,10 +791,6 @@ void PcConfig_Load(const char* path)
         else if (strcmp(key, "online_steam_autohost") == 0)
         {
             g_PcConfig.onlineSteamAutoHost = (atoi(value) != 0);
-        }
-        else if (strcmp(key, "coop_mode") == 0)
-        {
-            g_PcConfig.coopMode = (atoi(value) != 0);
         }
         else if (strcmp(key, "whole_map_exteriors") == 0)
         {
