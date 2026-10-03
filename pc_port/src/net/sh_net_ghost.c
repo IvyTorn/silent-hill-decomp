@@ -727,8 +727,13 @@ void ShNet_DrawWorld(GsOT* ot)
                 ShNetG_GhostColor((unsigned int)m->steamId, &cr, &cg, &cb);
                 {
                     int drewModel = 0;
-                    if (g_PcConfig.onlineGhostModel && modelsDrawn < SHNET_MAX_MODELS &&
-                        !(m->flags & SHNET_PF_CUTSCENE))
+                    /* Co-op shows each player as their REAL character model by
+                     * default (that is the whole point -- you see your friend as
+                     * Harry, or whatever PLAYAS character they picked, which the
+                     * pose carries in charaId). The silhouette is only the
+                     * fallback when the model cannot be drawn (assets not
+                     * resident). */
+                    if (modelsDrawn < SHNET_MAX_MODELS && !(m->flags & SHNET_PF_CUTSCENE))
                     {
                         unsigned char* before = (unsigned char*)poly;
                         GsOUT_PACKET_P = (PACKET*)poly;
