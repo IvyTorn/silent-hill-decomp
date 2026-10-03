@@ -133,6 +133,9 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
      * the hand-off past the opening movie. Consumed at hand-off so a later warm
      * boot back to the title behaves normally. */
     static s32  skipToGameStep = 0;
+    /* A co-op guest boots a fresh game into the host's map; -1 means "not a guest
+     * boot", any other value overrides the New Game start map below. */
+    static s32  coopGuestMap = -1;
 
     if (skipToGameStep == 0 && g_PcConfig.skipIntros >= 2)
     {
@@ -257,6 +260,8 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
             {
                 char coopSave[COOP_SAVE_NAME_MAX];
                 int  coopReq = Pc_CoopMenu_TakeStartRequest(coopSave, sizeof(coopSave));
+                extern int ShSession_TakeWorldRequest(void);
+                int  guestMap = ShSession_TakeWorldRequest();
                 if (coopReq == 1)
                 {
                     g_PcCoopGame   = 1; /* this game is multiplayer */
@@ -276,6 +281,15 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                         g_PcCoopGame   = 1;
                         skipToGameStep = 1; /* load failed -> fresh game */
                     }
+                }
+                else if (guestMap >= 0)
+                {
+                    /* Guest: the host pressed Start -- boot a fresh game into
+                     * their map (coopGuestMap overrides the New Game start map). */
+                    g_PcCoopGame   = 1;
+                    coopGuestMap   = guestMap;
+                    skipToGameStep = 1;
+                    Pc_CoopMenu_Close(); /* the Join page is likely still up */
                 }
             }
 #endif
@@ -625,6 +639,8 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                 {
                     int mapId = MapRegistry_FindByName(g_PcConfig.mapName);
                     if (mapId < 0) mapId = 0;
+                    /* A co-op guest starts in the host's map, not the config map. */
+                    if (coopGuestMap >= 0) { mapId = coopGuestMap; coopGuestMap = -1; }
                     GameBoot_SavegameInitialize(mapId, newGameSelectedDifficultyIdx - 1);
 
                     /* Randomizer: start the run here, after the savegame wipe and

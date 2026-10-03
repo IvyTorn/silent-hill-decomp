@@ -98,6 +98,16 @@ void ShNet_OnMapChanged(int mapIdx)
     /* What friends see on the Steam friends list. The area name is the same
      * one the Discord presence line and the player list use. */
     ShSession_PublishPresence(Pc_MapAreaName(mapIdx), mapIdx);
+
+    /* Co-op host: tell the session members to follow us into this map so a guest
+     * boots (or re-boots) into the same area. Only the host dictates the world. */
+    {
+        extern int g_PcCoopGame;
+        if (g_PcCoopGame && ShSession_IsHost())
+        {
+            ShSession_RequestWorld(mapIdx);
+        }
+    }
 }
 
 void ShNet_GameTick(void)
@@ -146,6 +156,7 @@ void ShNet_GameTick(void)
     {
         ShNet_PublishLocal(0, s_lastMap < 0 ? 0 : s_lastMap, ShNetG_LocalChara(), 0,
                            0, 0, 0, 0, 0, 0, 0);
+        ShSession_PublishLocalPos(-1, 0, 0, 0, 0, 0, 0, 0, 0); /* no pose outside a map */
         ShSession_PublishPresence("In the menus", -1);
         ShNet_PumpToGameThread();
         return;
@@ -180,6 +191,15 @@ void ShNet_GameTick(void)
                        (int)g_SysWork.playerWork.player.position.vz,
                        (short)g_SysWork.playerWork.player.rotation.vy,
                        health,
+                       (unsigned short)g_SysWork.playerWork.player.model.anim.status,
+                       (unsigned short)g_SysWork.playerWork.player.model.anim.keyframeIdx);
+
+    /* Co-op presence: the same pose, to the Steam session members. */
+    ShSession_PublishLocalPos(mapIdx, ShNetG_LocalChara(), flags,
+                       (int)g_SysWork.playerWork.player.position.vx,
+                       (int)g_SysWork.playerWork.player.position.vy,
+                       (int)g_SysWork.playerWork.player.position.vz,
+                       (short)g_SysWork.playerWork.player.rotation.vy,
                        (unsigned short)g_SysWork.playerWork.player.model.anim.status,
                        (unsigned short)g_SysWork.playerWork.player.model.anim.keyframeIdx);
 

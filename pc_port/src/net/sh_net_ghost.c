@@ -46,6 +46,8 @@
 #include "sh_net.h"
 #include "sh_net_art.h"
 #include "sh_net_ui.h"
+#include "sh_net_session.h" /* co-op peers drawn alongside living-world ghosts */
+#include "sh_net_steam.h"   /* ShSteam_SelfId */
 #include "sh_log.h"
 #include "stb_image.h"
 
@@ -554,9 +556,16 @@ void ShNet_DrawWorld(GsOT* ot)
     s32          range;
     const VECTOR3* self = &g_SysWork.playerWork.player.position;
 
-    if (!g_PcConfig.onlineEnabled || ShNet_Status() != SHNET_ST_CONNECTED)
+    /* Two sources of other players: the living world (master server ghosts) and
+     * a co-op Steam session (peers). Draw if either is live. */
     {
-        return;
+        extern int g_PcCoopGame;
+        int livingWorld = g_PcConfig.onlineEnabled && ShNet_Status() == SHNET_ST_CONNECTED;
+        int coop        = g_PcCoopGame && ShSession_Active();
+        if (!livingWorld && !coop)
+        {
+            return;
+        }
     }
     if (g_GameWork.gameState != GameState_InGame)
     {
@@ -672,6 +681,80 @@ void ShNet_DrawWorld(GsOT* ot)
             {
                 poly = ShNetG_DrawNameplate(ot, poly, g->name, gx, gy, gz);
                 namesDrawn++;
+            }
+        }
+    }
+
+    /* ---- co-op session peers (Steam P2P) ---- */
+    {
+        extern int g_PcCoopGame;
+        if (g_PcCoopGame && ShSession_Active() && s_ghostTexOk)
+        {
+            int myMap = (g_SavegamePtr) ? (int)g_SavegamePtr->mapIdx : -1;
+            int mc    = ShSession_MemberCount();
+            for (i = 0; i < mc; i++)
+            {
+                const ShSessionMember* m = ShSession_Member(i);
+                VECTOR3 centre, axisU, axisV;
+                int     gx, gy, gz;
+                short   grot;
+                u8      cr, cg, cb;
+
+                if (poly - primBase >= SHNET_MAX_PRIMS)
+                {
+                    break;
+                }
+                if (!m || m->poseMs == 0 || m->mapIdx != myMap) /* self/no pose/other map */
+                {
+                    continue;
+                }
+                gx = m->x; gy = m->y; gz = m->z; grot = m->rotY;
+                if (ABS(gx - self->vx) > range || ABS(gz - self->vz) > range)
+                {
+                    continue;
+                }
+
+                centre.vx = gx;
+                centre.vy = gy - GHOST_HALF_H;
+                centre.vz = gz;
+                axisU.vx  = (GHOST_HALF_W * GsWSMATRIX.m[0][0]) >> 12;
+                axisU.vy  = (GHOST_HALF_W * GsWSMATRIX.m[0][1]) >> 12;
+                axisU.vz  = (GHOST_HALF_W * GsWSMATRIX.m[0][2]) >> 12;
+                axisV.vx  = 0;
+                axisV.vy  = -GHOST_HALF_H;
+                axisV.vz  = 0;
+
+                ShNetG_GhostColor((unsigned int)m->steamId, &cr, &cg, &cb);
+                {
+                    int drewModel = 0;
+                    if (g_PcConfig.onlineGhostModel && modelsDrawn < SHNET_MAX_MODELS &&
+                        !(m->flags & SHNET_PF_CUTSCENE))
+                    {
+                        unsigned char* before = (unsigned char*)poly;
+                        GsOUT_PACKET_P = (PACKET*)poly;
+                        drewModel = ShNetG_TryDrawModel(m->charaId, gx, gy, gz, grot, (int)m->frame);
+                        {
+                            unsigned char* after = (unsigned char*)GsOUT_PACKET_P;
+                            poly     = (POLY_FT4*)after;
+                            primBase = (POLY_FT4*)((unsigned char*)primBase + (after - before));
+                        }
+                        if (drewModel) modelsDrawn++;
+                    }
+                    if (!drewModel)
+                    {
+                        int alpha = (m->flags & SHNET_PF_FLASHLIGHT) ? 255 : 230;
+                        poly = ShNetG_EmitQuad(ot, poly, &centre, &axisU, &axisV,
+                                               SHNET_CLUT(GHOST_SLOT),
+                                               GHOST_TEX_W - 1, GHOST_TEX_H - 1,
+                                               cr, cg, cb, alpha);
+                    }
+                }
+                if (g_PcConfig.onlineNameplates && namesDrawn < NAMEPLATE_SLOTS &&
+                    m->name[0] && m->name[0] != '?')
+                {
+                    poly = ShNetG_DrawNameplate(ot, poly, m->name, gx, gy, gz);
+                    namesDrawn++;
+                }
             }
         }
     }

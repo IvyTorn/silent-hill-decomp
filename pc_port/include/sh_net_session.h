@@ -47,6 +47,16 @@ typedef struct
     int                pingMs;     /* -1 until a pong comes back */
     int                linked;     /* 1 once they have answered us */
     int                mapIdx;     /* -1 unknown */
+
+    /* Co-op presence: this member's last reported pose (SHNET_MSG_S_POS). Valid
+     * only while poseMs is recent and the member is on our map. */
+    int                charaId;
+    int                flags;      /* SHNET_PF_* */
+    int                x, y, z;    /* Q19.12 world position */
+    short              rotY;       /* Q3.12 */
+    unsigned short     anim;
+    unsigned short     frame;
+    unsigned int       poseMs;     /* wall clock of the last pose, 0 = none */
 } ShSessionMember;
 
 /* ------------------------------------------------------------------ */
@@ -85,6 +95,22 @@ void               ShSession_StatusLine(char* out, int cap);
  * "Alchemilla Hospital" rather than "In Game". Called from the game thread with
  * whatever the player is looking at; the worker forwards it to Steam. */
 void ShSession_PublishPresence(const char* area, int mapIdx);
+
+/* Co-op presence. The game thread publishes the local player's pose once a
+ * frame; the worker broadcasts it to the other members as SHNET_MSG_S_POS, and
+ * each member's incoming pose lands in its ShSessionMember for the renderer to
+ * read. map < 0 means "not in a map" (menus) -- no pose is sent. */
+void ShSession_PublishLocalPos(int mapIdx, int charaId, int flags,
+                               int x, int y, int z, short rotY,
+                               unsigned short anim, unsigned short frame);
+
+/* Host -> guests: everyone boot into this map for a co-op game. Sent when the
+ * host presses Start Game. */
+void ShSession_RequestWorld(int mapIdx);
+
+/* Guest poll: a map the host told us to boot into since the last call, or -1.
+ * Clears the request. The game thread consumes this to launch the co-op game. */
+int  ShSession_TakeWorldRequest(void);
 
 #ifdef __cplusplus
 }

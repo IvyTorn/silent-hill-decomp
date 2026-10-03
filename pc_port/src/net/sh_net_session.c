@@ -28,6 +28,7 @@
 #define SESSION_PING_MS   2000
 #define SESSION_LINK_MS   8000
 #define SESSION_HELLO_MS  5000
+#define SESSION_POS_MS    100  /* co-op presence broadcast rate (~10 Hz) */
 
 /* Requests, and the published copy. Both under s_lock. */
 static SDL_mutex* s_lock;
@@ -42,6 +43,16 @@ static struct
     char               presenceArea[64];
     int                presenceMap;
     int                presenceDirty;
+
+    /* Local player pose for the co-op presence broadcast. poseValid is cleared
+     * when not in a map so no pose goes out from the menus. */
+    int                poseValid;
+    int                poseMap, poseChara, poseFlags;
+    int                poseX, poseY, poseZ;
+    short              poseRotY;
+    unsigned short     poseAnim, poseFrame;
+
+    int                wantWorldMap; /* host: send S_WORLD(map) to guests; -1 none */
 } s_req;
 
 static struct
@@ -52,6 +63,7 @@ static struct
     int                memberCount;
     ShSessionMember    members[SHSESSION_MAX_MEMBERS];
     char               status[128];
+    int                worldReq;    /* guest: a map the host said to boot into, -1 none */
 } s_pub;
 
 /* Worker-private. */
@@ -61,6 +73,8 @@ static unsigned int    s_lastPingMs;
 static unsigned int    s_lastHelloMs;
 static unsigned int    s_lastSeenMs[SHSESSION_MAX_MEMBERS];
 static unsigned int    s_pingSentMs[SHSESSION_MAX_MEMBERS];
+static unsigned int    s_lastPosMs;   /* last co-op pose broadcast */
+static int             s_worldReqIn = -1; /* a map the host told us to boot into */
 static int             s_enabled;
 
 /* ------------------------------------------------------------------ */
@@ -81,7 +95,9 @@ void ShSession_Init(void)
     }
     memset(&s_req, 0, sizeof(s_req));
     memset(&s_pub, 0, sizeof(s_pub));
-    s_req.presenceMap = -1;
+    s_req.presenceMap  = -1;
+    s_req.wantWorldMap = -1;
+    s_pub.worldReq     = -1;
 
     /* Steam always comes up: this build always offers the Multiplayer menu, and
      * host/join need it. ShSteam_Init fails gracefully (returns 0) when there is
@@ -177,6 +193,51 @@ void ShSession_PublishPresence(const char* area, int mapIdx)
         s_req.presenceDirty = 1;
     }
     SDL_UnlockMutex(s_lock);
+}
+
+void ShSession_PublishLocalPos(int mapIdx, int charaId, int flags,
+                               int x, int y, int z, short rotY,
+                               unsigned short anim, unsigned short frame)
+{
+    if (!s_lock) return;
+    SDL_LockMutex(s_lock);
+    if (mapIdx < 0)
+    {
+        s_req.poseValid = 0;
+    }
+    else
+    {
+        s_req.poseValid = 1;
+        s_req.poseMap   = mapIdx;
+        s_req.poseChara = charaId;
+        s_req.poseFlags = flags;
+        s_req.poseX     = x;
+        s_req.poseY     = y;
+        s_req.poseZ     = z;
+        s_req.poseRotY  = rotY;
+        s_req.poseAnim  = anim;
+        s_req.poseFrame = frame;
+    }
+    SDL_UnlockMutex(s_lock);
+}
+
+void ShSession_RequestWorld(int mapIdx)
+{
+    if (!s_lock) return;
+    SDL_LockMutex(s_lock);
+    s_req.wantWorldMap = mapIdx;
+    SDL_UnlockMutex(s_lock);
+}
+
+int ShSession_TakeWorldRequest(void)
+{
+    int map = -1;
+    if (!s_lock) return -1;
+    SDL_LockMutex(s_lock);
+    map            = s_pub.worldReq;
+    s_pub.worldReq = -1;
+    SDL_UnlockMutex(s_lock);
+    return map;
 }
 
 /* ------------------------------------------------------------------ */
@@ -406,6 +467,43 @@ static void ShSession_Receive(unsigned int now)
             SH_DBG("[SESSION] %s left the session", s_members[idx].name);
             s_members[idx].linked = 0;
             break;
+        case SHNET_MSG_S_POS:
+        {
+            const shn_u8* p = buf + SHNET_HDR_SIZE;
+            int           o = 0;
+            int           m;
+            if (payLen < 22)
+            {
+                break;
+            }
+            m                      = (int)ShnGetU8(p, &o);
+            s_members[idx].mapIdx  = (m == 0xFF) ? -1 : m;
+            s_members[idx].charaId = (int)ShnGetU8(p, &o);
+            s_members[idx].flags   = (int)ShnGetU8(p, &o);
+            (void)ShnGetU8(p, &o); /* pad */
+            s_members[idx].x       = (int)ShnGetS32(p, &o);
+            s_members[idx].y       = (int)ShnGetS32(p, &o);
+            s_members[idx].z       = (int)ShnGetS32(p, &o);
+            s_members[idx].rotY    = (short)ShnGetS16(p, &o);
+            s_members[idx].anim    = (unsigned short)ShnGetU16(p, &o);
+            s_members[idx].frame   = (unsigned short)ShnGetU16(p, &o);
+            s_members[idx].poseMs  = now;
+            break;
+        }
+        case SHNET_MSG_S_WORLD:
+        {
+            const shn_u8* p = buf + SHNET_HDR_SIZE;
+            int           o = 0;
+            int           m;
+            if (payLen < 1)
+            {
+                break;
+            }
+            m = (int)ShnGetU8(p, &o);
+            s_worldReqIn = (m == 0xFF) ? -1 : m;
+            SH_DBG("[SESSION] host says: boot into map %d", s_worldReqIn);
+            break;
+        }
         default:
             break;
         }
@@ -426,6 +524,13 @@ static void ShSession_Publish(void)
         s_pub.members[i] = s_members[i];
     }
     ShSteam_StatusLine(s_pub.status, (int)sizeof(s_pub.status));
+    /* Hand a received world-boot request to the game thread. Only overwrite when
+     * there is a new one, so a request already waiting to be taken is not lost. */
+    if (s_worldReqIn >= 0)
+    {
+        s_pub.worldReq = s_worldReqIn;
+        s_worldReqIn   = -1;
+    }
     SDL_UnlockMutex(s_lock);
 }
 
@@ -435,6 +540,11 @@ void ShSession_Tick(unsigned int nowMs)
     unsigned long long wantJoin;
     char               area[64];
     int                i;
+
+    int                poseValid, poseMap, poseChara, poseFlags;
+    int                poseX, poseY, poseZ, wantWorldMap;
+    short              poseRotY;
+    unsigned short     poseAnim, poseFrame;
 
     if (!s_lock || !s_enabled)
     {
@@ -450,11 +560,17 @@ void ShSession_Tick(unsigned int nowMs)
     wantJoin      = s_req.wantJoin;
     presenceDirty = s_req.presenceDirty;
     SDL_strlcpy(area, s_req.presenceArea, sizeof(area));
+    poseValid = s_req.poseValid;
+    poseMap   = s_req.poseMap;  poseChara = s_req.poseChara; poseFlags = s_req.poseFlags;
+    poseX     = s_req.poseX;    poseY     = s_req.poseY;     poseZ     = s_req.poseZ;
+    poseRotY  = s_req.poseRotY; poseAnim  = s_req.poseAnim;  poseFrame = s_req.poseFrame;
+    wantWorldMap        = s_req.wantWorldMap;
     s_req.wantHost      = 0;
     s_req.wantLeave     = 0;
     s_req.wantInvite    = 0;
     s_req.wantJoin      = 0;
     s_req.presenceDirty = 0;
+    s_req.wantWorldMap  = -1;
     SDL_UnlockMutex(s_lock);
 
     /* An invite accepted in the overlay, or +connect_lobby, outranks anything
@@ -545,6 +661,53 @@ void ShSession_Tick(unsigned int nowMs)
             ShnPutHeader(buf, SHNET_MSG_S_PING, (shn_u16)(off - SHNET_HDR_SIZE), 0);
             ShSteam_Send(s_members[i].steamId, buf, off, 0);
             s_pingSentMs[i] = nowMs;
+        }
+    }
+
+    /* Host -> guests: boot into the co-op map (reliable). */
+    if (wantWorldMap >= 0)
+    {
+        for (i = 0; i < s_memberCount; i++)
+        {
+            shn_u8 buf[SHNET_HDR_SIZE + 4];
+            int    off = SHNET_HDR_SIZE;
+            if (s_members[i].steamId == ShSteam_SelfId())
+            {
+                continue;
+            }
+            ShnPutU8(buf, &off, (shn_u8)((wantWorldMap > 255) ? 0xFF : wantWorldMap));
+            ShnPutU8(buf, &off, 0);
+            ShnPutU16(buf, &off, 0);
+            ShnPutHeader(buf, SHNET_MSG_S_WORLD, (shn_u16)(off - SHNET_HDR_SIZE), 0);
+            ShSteam_Send(s_members[i].steamId, buf, off, 1);
+        }
+        SH_DBG("[SESSION] sent world boot (map %d) to %d member(s)", wantWorldMap, s_memberCount);
+    }
+
+    /* Co-op presence: broadcast our pose, unreliable, throttled. */
+    if (poseValid && nowMs - s_lastPosMs >= SESSION_POS_MS)
+    {
+        s_lastPosMs = nowMs;
+        for (i = 0; i < s_memberCount; i++)
+        {
+            shn_u8 buf[SHNET_HDR_SIZE + 24];
+            int    off = SHNET_HDR_SIZE;
+            if (s_members[i].steamId == ShSteam_SelfId())
+            {
+                continue;
+            }
+            ShnPutU8(buf, &off, (shn_u8)((poseMap > 255) ? 0xFF : poseMap));
+            ShnPutU8(buf, &off, (shn_u8)poseChara);
+            ShnPutU8(buf, &off, (shn_u8)poseFlags);
+            ShnPutU8(buf, &off, 0);
+            ShnPutS32(buf, &off, poseX);
+            ShnPutS32(buf, &off, poseY);
+            ShnPutS32(buf, &off, poseZ);
+            ShnPutS16(buf, &off, poseRotY);
+            ShnPutU16(buf, &off, poseAnim);
+            ShnPutU16(buf, &off, poseFrame);
+            ShnPutHeader(buf, SHNET_MSG_S_POS, (shn_u16)(off - SHNET_HDR_SIZE), 0);
+            ShSteam_Send(s_members[i].steamId, buf, off, 0);
         }
     }
 
