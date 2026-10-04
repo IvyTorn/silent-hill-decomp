@@ -98,24 +98,24 @@ namespace SilentHillPC_Launcher
             {
                 Location = new Point(12, 10),
                 Size = new Size(536, 44),
-                Text = "Other people, in your Silent Hill. You still play alone — nothing " +
-                       "anyone else does can touch your game. What you get is their " +
-                       "outlines moving through the fog, the messages they leave, and " +
-                       "the places they died."
+                Text = "Co-op over Steam is the multiplayer that works now: host a game, " +
+                       "invite a friend, and play together. You host and join from the " +
+                       "in-game Multiplayer menu; the settings here are its defaults. The " +
+                       "living world (strangers' ghosts over a master server) is coming."
             };
 
             _chkEnable = new CheckBox
             {
                 Location = new Point(15, 60),
-                Size = new Size(240, 20),
-                Text = "Play online"
+                Size = new Size(320, 20),
+                Text = "Play the living world (master server)"
             };
 
             var grpServer = new GroupBox
             {
                 Location = new Point(12, 86),
                 Size = new Size(536, 116),
-                Text = "Master server"
+                Text = "Living world — master server (coming)"
             };
 
             _txtServer = new TextBox { Location = new Point(96, 24), Size = new Size(250, 22) };
@@ -161,7 +161,7 @@ namespace SilentHillPC_Launcher
             {
                 Location = new Point(12, 210),
                 Size = new Size(536, 150),
-                Text = "What you see"
+                Text = "Living world — what you see (coming)"
             };
 
             _chkGhosts = new CheckBox { Location = new Point(14, 24), Size = new Size(240, 20), Text = "Other players, as outlines" };
@@ -200,23 +200,23 @@ namespace SilentHillPC_Launcher
             {
                 Location = new Point(12, 368),
                 Size = new Size(536, 140),
-                Text = "Steam co-op sessions"
+                Text = "Co-op over Steam — the current multiplayer"
             };
 
             var steamIntro = new Label
             {
                 Location = new Point(14, 20),
                 Size = new Size(508, 32),
-                Text = "Separate from the master server above, and usable on its own. " +
-                       "Gives you Steam friend invites, the overlay, and a direct " +
-                       "connection that needs no port forwarding."
+                Text = "Always on: host and join from the in-game Multiplayer menu, with " +
+                       "friend invites, the overlay, and a direct connection that needs no " +
+                       "port forwarding. These are defaults for the host options and names."
             };
 
             _chkSteam = new CheckBox
             {
                 Location = new Point(14, 56),
                 Size = new Size(200, 20),
-                Text = "Enable Steam sessions"
+                Text = "Show player nameplates"
             };
 
             _chkSteamPublic = new CheckBox
@@ -278,7 +278,7 @@ namespace SilentHillPC_Launcher
             {
                 Location = new Point(14, 516),
                 Size = new Size(420, 18),
-                Text = "In game:  F11 who is online     M leave a message     console: steam host"
+                Text = "In co-op:  M  multiplayer menu (save / players / leave)      console:  status"
             };
 
             _btnClose = new Button
@@ -310,8 +310,11 @@ namespace SilentHillPC_Launcher
                 "so a fan port can use lobbies and invites without an AppID of its own. " +
                 "Change this only if the project ever gets a real one.");
             tip.SetToolTip(_chkSteam,
-                "Needs steam_api64.dll beside the game exe (Steamworks SDK, " +
-                "redistributable_bin/win64) and Steam running.");
+                "Each player's name floats over their head in co-op. You can also " +
+                "toggle this from the in-game M menu.");
+            tip.SetToolTip(_txtName,
+                "Your name. In co-op it floats over your head to the other players; " +
+                "on the master server it is your ghost's name.");
             tip.SetToolTip(_btnSteamCheck,
                 "Runs the probe in online_server: loads the DLL, resolves every Steam " +
                 "function the port needs, and creates a throwaway lobby. Names whatever " +
@@ -350,7 +353,7 @@ namespace SilentHillPC_Launcher
                                        Math.Max(_trkRange.Minimum, GetInt(_config, "online_ghost_range", 40)));
             UpdateRangeLabel();
 
-            _chkSteam.Checked         = GetInt(_config, "online_steam", 0) != 0;
+            _chkSteam.Checked         = GetInt(_config, "online_nameplates", 1) != 0;
             _numSteamAppId.Value      = Math.Max(1, GetInt(_config, "online_steam_appid", 480));
             _numSteamMax.Value        = Math.Min(8, Math.Max(2, GetInt(_config, "online_steam_max_players", 4)));
             _chkSteamPublic.Checked   = GetInt(_config, "online_steam_public", 0) != 0;
@@ -384,7 +387,7 @@ namespace SilentHillPC_Launcher
             _config.Set("online_events", _chkEvents.Checked ? "1" : "0");
             _config.Set("online_ghost_style", _cboStyle.SelectedIndex.ToString());
             _config.Set("online_ghost_range", _trkRange.Value.ToString());
-            _config.Set("online_steam", _chkSteam.Checked ? "1" : "0");
+            _config.Set("online_nameplates", _chkSteam.Checked ? "1" : "0");
             _config.Set("online_steam_appid", ((int)_numSteamAppId.Value).ToString());
             _config.Set("online_steam_max_players", ((int)_numSteamMax.Value).ToString());
             _config.Set("online_steam_public", _chkSteamPublic.Checked ? "1" : "0");
