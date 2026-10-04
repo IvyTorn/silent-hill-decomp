@@ -1197,34 +1197,79 @@ static void Nu_FillPx(float x, float y, float w, float h,
     Nu_Fill(x0, yT, x1, yB, r, g, b, a);
 }
 
-/* The arrow sprite, drawn in the overlay so it sits above the modal panel. The
- * post-capture overlay composites over the PSX frame, so the game's own cursor
- * (drawn into that frame) would be hidden behind the panel -- same reason the
- * achievement browser draws its own. Re-uploaded each frame; Nu_Upload recycles
- * the slot, so it does not leak. */
+/* A plain white arrow with a black outline, generated once and drawn in the
+ * overlay above the modal panel -- the game's own cursor is painted into the PSX
+ * frame underneath and so is hidden by the panel. Generated rather than read
+ * from VRAM (the earlier sprite path drew nothing on the title screen). The
+ * hotspot is the tip at the top-left, placed at the pointer. */
+#define NU_CUR_W 20
+#define NU_CUR_H 28
 static void Nu_DrawCursor(void)
 {
-    unsigned char rgba[32 * 32 * 4];
-    float  nx, ny, cw, ch, x, y;
+    static unsigned char s_cur[NU_CUR_W * NU_CUR_H * 4];
+    static int           s_curBuilt = 0;
+    float  nx, ny, x, y, cw, ch;
     GLuint slot;
 
     if (!Pc_MouseCursor_ViewportPos(&nx, &ny))
     {
         return;
     }
-    if (!Pc_MouseCursor_SpriteRgba(rgba))
+
+    if (!s_curBuilt)
     {
-        return;
+        unsigned char inside[NU_CUR_W * NU_CUR_H];
+        /* Arrowhead triangle: tip A(0,0), straight down the left edge to
+         * B(0,H-1), across to the point C(0.62W, 0.62H). */
+        const float ax = 0, ay = 0, bx = 0, by = NU_CUR_H - 1;
+        const float ccx = NU_CUR_W * 0.62f, ccy = NU_CUR_H * 0.62f;
+        int px, py, i, dx, dy;
+
+        for (py = 0; py < NU_CUR_H; py++)
+            for (px = 0; px < NU_CUR_W; px++)
+            {
+                float p = (float)px, q = (float)py;
+                float d1 = (p - bx)  * (ay - by)  - (ax - bx)  * (q - by);
+                float d2 = (p - ccx) * (by - ccy) - (bx - ccx) * (q - ccy);
+                float d3 = (p - ax)  * (ccy - ay) - (ccx - ax) * (q - ay);
+                int neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                int pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                inside[py * NU_CUR_W + px] = (unsigned char)(!(neg && pos));
+            }
+        for (i = 0; i < NU_CUR_W * NU_CUR_H * 4; i++) s_cur[i] = 0;
+        for (py = 0; py < NU_CUR_H; py++)
+            for (px = 0; px < NU_CUR_W; px++)
+            {
+                int o = (py * NU_CUR_W + px) * 4;
+                if (inside[py * NU_CUR_W + px])
+                {
+                    s_cur[o] = s_cur[o + 1] = s_cur[o + 2] = 255; s_cur[o + 3] = 255;
+                }
+                else
+                {
+                    int edge = 0;
+                    for (dy = -1; dy <= 1 && !edge; dy++)
+                        for (dx = -1; dx <= 1; dx++)
+                        {
+                            int qx = px + dx, qy = py + dy;
+                            if (qx >= 0 && qx < NU_CUR_W && qy >= 0 && qy < NU_CUR_H &&
+                                inside[qy * NU_CUR_W + qx]) { edge = 1; break; }
+                        }
+                    if (edge) { s_cur[o] = s_cur[o + 1] = s_cur[o + 2] = 0; s_cur[o + 3] = 255; }
+                }
+            }
+        s_curBuilt = 1;
     }
-    slot = Nu_Upload(rgba, 32, 32);
+
+    slot = Nu_Upload(s_cur, NU_CUR_W, NU_CUR_H);
     if (!slot)
     {
         return;
     }
-    ch = s_vpH * 0.05f;
-    if (ch < 16.0f) ch = 16.0f;
-    cw = ch; /* 32x32 */
-    x  = nx * s_vpW;
+    ch = s_vpH * 0.055f;
+    if (ch < 18.0f) ch = 18.0f;
+    cw = ch * ((float)NU_CUR_W / (float)NU_CUR_H);
+    x  = nx * s_vpW; /* tip (hotspot) at the pointer */
     y  = ny * s_vpH;
     Nu_Quad(slot,
             (x / s_vpW) * 2.0f - 1.0f, 1.0f - (y / s_vpH) * 2.0f,
@@ -1276,7 +1321,10 @@ static void Nu_DrawCoopMenu(int px)
                 }
             }
         }
-        if (hovered >= 0 && Pc_MouseCursor_Moved())
+        /* The highlighted row always follows the pointer, so what you click is
+         * what is lit -- a stale selection under the cursor was why clicks seemed
+         * to hit the wrong row. */
+        if (hovered >= 0)
         {
             Pc_CoopMenu_SetSelected(hovered);
         }
@@ -1313,12 +1361,21 @@ static void Nu_DrawCoopMenu(int px)
                             (int)((float)px * 0.82f), 0.80f, 0.76f, 0.64f, 0.95f);
     }
 
-    /* Click confirms the hovered row. Done after the draw so a page change does
-     * not desync this frame's geometry; the new page draws next frame. */
-    if (hovered >= 0 && Pc_MouseCursor_LeftClicked())
+    /* Click confirms the hovered row, once per press. The latch is tracked here
+     * (not via the per-frame click edge) so a single press fires exactly one
+     * confirm regardless of how the draw hook lines up with the input poll --
+     * multiple confirms from one click were cycling options and jumping pages.
+     * Done after the draw so a page change does not desync this frame's
+     * geometry; the new page draws next frame. */
     {
-        Pc_CoopMenu_SetSelected(hovered);
-        Pc_CoopMenu_Confirm();
+        static int s_wasDown = 0;
+        int        down = Pc_MouseCursor_LeftHeld();
+        if (hovered >= 0 && down && !s_wasDown)
+        {
+            Pc_CoopMenu_SetSelected(hovered);
+            Pc_CoopMenu_Confirm();
+        }
+        s_wasDown = down;
     }
 
     Nu_DrawCursor();
