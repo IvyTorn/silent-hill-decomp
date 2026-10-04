@@ -69,7 +69,8 @@ enum { QO_X_SHADOW = 0, QO_X_SPEAKERS, QO_X_BGM, QO_X_SFX,
        QO_X_TPSRESTX, QO_X_TPSRESTY, QO_X_TPSAIMX, QO_X_TPSAIMY,
        QO_X_OTSRESTX, QO_X_OTSRESTY, QO_X_OTSAIMX, QO_X_OTSAIMY,
        QO_X_SPU,
-       QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE };
+       QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE,
+       QO_X_CAMSTYLE, QO_X_OTSSIDE };
 extern const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz);
 extern void        PcOpt_QuickExtraAdjust(int which, int dir);
 extern void        PcOpt_QuickViewReset(int mode);
@@ -130,8 +131,8 @@ static const QoRowDef s_page0[] = {
     { ROW_OPT,   "flashlight_intensity", 0, NULL },
     { ROW_OPT,   "flashlight_size",      0, NULL },
     { ROW_EXTRA, NULL, QO_X_SHADOW,         "Shadow Resolution" },
-    /* The dream soft-focus (Alessa / Lisa) and how strong it is. Here only:
-     * the PC Options graphics page is at its row limit. */
+    /* The Alessa/Lisa soft focus. Quick menu only: the PC Options graphics
+     * page is at its row limit, and this is a look you judge by watching it. */
     { ROW_EXTRA, NULL, QO_X_DREAMBLUR,      "Dream Blur" },
     { ROW_EXTRA, NULL, QO_X_DREAMSTR,       "Dream Blur Strength" },
     { ROW_OPT,   "bullet_decals",        0, NULL },
@@ -380,6 +381,12 @@ static const QoRowDef s_pageControls[] = {
     /* The controls panel, controller columns only on a phone. With no
      * controller connected it shows a toast instead of opening. */
     { ROW_ACTION, NULL, QO_A_KEYBINDS,         "Controller Config" },
+    /* The eye button's cycle, both ways, for anyone who would rather pick. */
+    { ROW_EXTRA, NULL, QO_X_CAMSTYLE,         "Camera Mode" },
+    { ROW_EXTRA, NULL, QO_X_OTSSIDE,          "OTS Shoulder" },
+    /* Which pad drives the game when a TV remote or a second pad is also
+     * connected. Saved, so it is the default next launch too. */
+    { ROW_OPT,   "preferred_controller",   0, "Controller" },
     { ROW_OPT,   "touch_style",            0, NULL },  /* Context or Gamepad */
     { ROW_OPT,   "control_2d",             0, NULL },  /* screen-relative movement */
     { ROW_OPT,   "touch_controls",         0, NULL },  /* Automatic / On / Off */
@@ -392,7 +399,7 @@ static const QoRowDef s_pageControls[] = {
     /* Frees the pad's D-pad to be bound to actions instead. Gameplay only, and
      * the touch overlay's own D-pad bits are merged after the controller read,
      * so the Gamepad style still navigates menus with it. */
-    { ROW_EXTRA, NULL, QO_X_DPADMOVE,        "Disable D-pad for Movement" },
+    { ROW_EXTRA, NULL, QO_X_DPADMOVE,         "Disable D-pad for Movement" },
     { ROW_OPT,   "touch_quicksave_buttons", 0, "Quick Save/Load Buttons" },
     { ROW_PAGE,  NULL, 0,                     "Next page  (Graphics)" },
     { ROW_CLOSE, NULL, 0,                     "Close" },
@@ -1628,12 +1635,20 @@ void Pc_QuickOptions_Close(void)
     s_ddRow = -1;
     if (s_phase == QO_CLOSED || s_phase == QO_CLOSING)
         return;
+    /* The keybind panel opened from the Controls page is fed by this menu's
+     * Update, so closing the menu under it left it drawn with nothing able to
+     * close it. Whatever closes the menu closes it too. */
+    Pc_BindPanel_Close();
     s_phase      = QO_CLOSING;
     s_phaseStart = SDL_GetTicks();
 }
 
 void Pc_QuickOptions_Toggle(void)
 {
+    /* The panel owns input while it is up -- the bind being captured may be
+     * the very button that opens this menu -- so the toggle waits for it. */
+    if (Pc_BindPanel_IsOpen())
+        return;
     if (s_phase == QO_CLOSED || s_phase == QO_CLOSING)
         qo_open();
     else
@@ -2545,9 +2560,9 @@ void Pc_QuickOptions_Draw(void)
         }
         else if (s_texLabel[i])
         {
-            /* An action row is a setting like any other, so it starts where the
-             * option labels do. Only the navigation rows -- Previous / Next
-             * page and Close -- are centred. */
+            /* An action row reads as a setting you pick, so it starts where
+             * every option label starts; Previous/Next and Close are the
+             * panel's own furniture and stay centred. */
             float lx = (r->kind == ROW_ACTION)
                      ? panelL + pad
                      : panelL + (panelW - (float)s_labelW[i]) * 0.5f;

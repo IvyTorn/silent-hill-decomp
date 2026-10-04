@@ -2985,10 +2985,11 @@ bool Ipd_CellPositionMatchCheck(s_Chunk* chunk, s_MapTerrain* map)
          * self-contained cell (mapRoomIdxGet differs across the gap); loaded
          * state is already gated by the caller. */
         /* Not in the two boss arenas. Each is one open room in one cell, with
-         * nothing but black past its edge on PSX, and the same-room test above
-         * cannot tell them apart from their neighbours: it samples cell CENTRES,
-         * and Map_RoomIdxGet maps any point outside its room bands to the same
-         * table entry, so most of map1_s05's column-0 cells "match" and the
+         * nothing but black past its edge on PSX, and the same-room test below
+         * cannot tell them apart from their neighbours: Map_RoomIdxGet maps any
+         * point outside its room bands to the same table entry, so most of
+         * map1_s05's column-0 cells "match" -- more so here than on pc-port,
+         * since this test asks at five points per cell, not one -- and the
          * school rooms around the Split Head arena drew across the void. This is
          * the exact-cell rule bdf8daa69 gave these arenas, which the July
          * widening reopened. */

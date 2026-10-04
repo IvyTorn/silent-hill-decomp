@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include "pc_config.h"
 #include "pc_audio_config.h" /* the software-SPU row */
+#include "control_style.h"   /* the Camera Mode / OTS Shoulder rows */
 #endif
 
 #define LINE_CURSOR_TIMER_MAX 8
@@ -112,6 +113,15 @@ extern int g_PsyX_UseFlashlightShadows;
 extern void PsyX_ApplyWindowState(int width, int height, int fullscreen);
 extern void PsyX_ApplyVsync(int vsync);
 
+#if defined(SH_IOS) || defined(__ANDROID__)
+/* Preferred controller picker (PsyX_pad.cpp). */
+extern char        g_cfg_preferredController[128];
+extern int         PsyX_Pad_DeviceCount(void);
+extern const char* PsyX_Pad_DeviceName(int n);
+extern int         PsyX_Pad_PreferredControllerConnected(void);
+extern void        PsyX_Pad_ApplyPreferredController(void);
+#endif
+
 /* Per-pixel flashlight beam live floats (PsyCross); mirrored by the sliders. */
 extern float g_PsyX_FlashlightIntensity;
 extern float g_PsyX_FogStrength;
@@ -167,7 +177,7 @@ int Pc_ExitToMenuRowActive(void)
 }
 
 
-enum { PCK_INT, PCK_RES, PCK_FILTER, PCK_WINMODE, PCK_VSYNC, PCK_SLIDER, PCK_MAP, PCK_FLMODE, PCK_NEXT, PCK_PREV, PCK_BACK, PCK_RESET, PCK_STORAGE, PCK_RALOGIN };
+enum { PCK_INT, PCK_RES, PCK_FILTER, PCK_WINMODE, PCK_VSYNC, PCK_SLIDER, PCK_MAP, PCK_FLMODE, PCK_PAD, PCK_NEXT, PCK_PREV, PCK_BACK, PCK_RESET, PCK_STORAGE, PCK_RALOGIN };
 
 /* PC-options row origin. The heading sits at y=20 and the rows used to start at 56,
  * leaving a full empty row beneath it while the pages ran off the BOTTOM of the
@@ -231,8 +241,6 @@ static const char* const LBL_FLMODE[] = { "Classic", "C_+_Shadows", "Modern", "M
 static const char* const LBL_MMCNR[]  = { "Top_L", "Top_R", "Bottom_L", "Bottom_R" };
 static const char* const LBL_MMMODE[] = { "Off", "Square", "Circle" };
 static const char* const LBL_TOUCH[]  = { "Automatic", "Always_On", "Always_Off" };
-static const int VAL_ORIENT[]  = { 0, 1, 2 };
-static const char* const LBL_ORIENT[] = { "Landscape", "Auto", "Portrait" };
 static const int VAL_TSTYLE[] = { 0, 1 };
 static const char* const LBL_TSTYLE[] = { "Context", "Gamepad" };
 static const char* const LBL_WHZ[]    = { "30_Hz", "60_Hz" };
@@ -434,18 +442,17 @@ static const s_PcOpt PCOPT_H[] = {
 #if defined(SH_IOS) || defined(__ANDROID__)
 /* Page 6, phones only: the overflow. Each of these was parked on a page with
  * a spare row until the rows ran out -- Bullet_Decals on Controls, the
- * RetroAchievements login on HUD, Android's Screen_Rotation on Camera, which
- * had made that page twelve tall there. The pages are unlabelled in game, so
+ * RetroAchievements login on HUD. The pages are unlabelled in game, so
  * grouping is secondary to every page fitting. */
 static const s_PcOpt PCOPT_M[] = {
+    /* Which controller drives the game when more than one is connected. An
+     * Android TV remote enumerates as a controller, and with first-come
+     * assignment it could take the slots ahead of a Bluetooth pad. */
+    { "Controller",        NULL,                          "preferred_controller", NULL,      0, NULL,       NULL, 1, PCK_PAD },
     { "Bullet_Decals",     &g_PcConfig.bulletDecals,      "bullet_decals",       VAL_ONOFF,  2, LBL_ONOFF,  NULL, 1, PCK_INT },
     /* Mobile only, because a phone has no launcher: everywhere else the
      * launcher owns the account and the game just consumes its token. */
     { "Achievements",      NULL,                          NULL,                  NULL,       0, NULL,       NULL, 0, PCK_RALOGIN },
-#if defined(__ANDROID__)
-    /* Applied at startup, so it needs a relaunch. */
-    { "Screen_Rotation",   &g_PcConfig.screenOrientation, "screen_orientation", VAL_ORIENT, 3, LBL_ORIENT, NULL, 0, PCK_INT },
-#endif
     { "Prev_Page",         NULL,                          NULL,                  NULL,       0, NULL,       NULL, 0, PCK_PREV },
     { "Back",              NULL,                          NULL,                  NULL,       0, NULL,       NULL, 0, PCK_BACK },
 };
@@ -539,6 +546,72 @@ static int PcOpt_ValueColumnX(const s_PcOpt* tbl, int count)
     return x;
 }
 
+#if defined(SH_IOS) || defined(__ANDROID__)
+/* The Controller row cycles Automatic, each connected controller, and the saved
+ * one while it is disconnected -- otherwise opening the menu with the pad
+ * switched off would show Automatic and the first press would lose the choice. */
+static const char* PcOpt_PadChoice(int idx, int* count)
+{
+    const char* saved = g_PcConfig.preferredController;
+    int         n     = PsyX_Pad_DeviceCount();
+    int         i, extra = (saved[0] != '\0');
+
+    for (i = 0; i < n && extra; i++)
+    {
+        const char* nm = PsyX_Pad_DeviceName(i);
+
+        if (nm != NULL && strcmp(nm, saved) == 0)
+            extra = 0;
+    }
+
+    *count = 1 + n + extra;
+    if (idx <= 0)
+        return "";
+    if (idx <= n)
+        return PsyX_Pad_DeviceName(idx - 1);
+    return saved;
+}
+
+static int PcOpt_PadChoiceIndex(void)
+{
+    int count, i;
+
+    (void)PcOpt_PadChoice(0, &count);
+    for (i = 1; i < count; i++)
+    {
+        const char* nm = PcOpt_PadChoice(i, &count);
+
+        if (nm != NULL && strcmp(nm, g_PcConfig.preferredController) == 0)
+            return i;
+    }
+    return 0;
+}
+
+/* The game font lacks most punctuation and draws '_' as its space. */
+static const char* PcOpt_PadLabel(char* buf, int bufsz, int maxChars)
+{
+    const char* nm = g_PcConfig.preferredController;
+    int         i, k = 0;
+
+    if (nm[0] == '\0')
+        return "Automatic";
+
+    for (i = 0; nm[i] && k < bufsz - 1 && k < maxChars; i++)
+    {
+        const char c = nm[i];
+
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+            buf[k++] = c;
+        else if (k > 0 && buf[k - 1] != '_')
+            buf[k++] = '_';
+    }
+    while (k > 0 && buf[k - 1] == '_')
+        k--;
+    buf[k] = '\0';
+    return buf;
+}
+#endif
+
 static const char* PcOpt_ValueLabel(const s_PcOpt* e, char* buf, int bufsz)
 {
     if (e->kind == PCK_RES) {
@@ -561,6 +634,9 @@ static const char* PcOpt_ValueLabel(const s_PcOpt* e, char* buf, int bufsz)
     }
 #endif
 #if defined(SH_IOS) || defined(__ANDROID__)
+    /* Same 12-glyph budget as the account name below. */
+    if (e->kind == PCK_PAD)
+        return PcOpt_PadLabel(buf, bufsz, 12);
     if (e->kind == PCK_RALOGIN) {
         if (Pc_Ra_LoginPending())
             return "Signing_in";
@@ -670,6 +746,26 @@ static void PcOpt_Adjust(const s_PcOpt* e, int dir)
         }
         return;
     }
+#if defined(SH_IOS) || defined(__ANDROID__)
+    if (e->kind == PCK_PAD) {
+        int         count, idx = PcOpt_PadChoiceIndex();
+        const char* nm;
+        char        pick[sizeof(g_PcConfig.preferredController)];
+
+        (void)PcOpt_PadChoice(0, &count);
+        idx = (idx + dir + count) % count;
+        nm  = PcOpt_PadChoice(idx, &count);
+        snprintf(pick, sizeof(pick), "%s", nm != NULL ? nm : "");
+        memcpy(g_PcConfig.preferredController, pick, sizeof(pick));
+        PcConfig_SaveKeyValue(e->key, g_PcConfig.preferredController);
+        snprintf(g_cfg_preferredController, sizeof(g_cfg_preferredController), "%s",
+                 g_PcConfig.preferredController);
+        PsyX_Pad_ApplyPreferredController();
+        SH_DBG_ECHO("Controller: %s", g_PcConfig.preferredController[0]
+                                          ? g_PcConfig.preferredController : "Automatic");
+        return;
+    }
+#endif
     if (e->field == NULL)
         return;
 
@@ -739,6 +835,17 @@ int         PcOpt_QuickRealtime(const void* h) { return ((const s_PcOpt*)h)->rea
 
 const char* PcOpt_QuickLabel(const void* h, char* buf, int bufsz)
 {
+#if defined(SH_IOS) || defined(__ANDROID__)
+    /* The panel has room for the whole name, and its own font has the glyphs. */
+    if (((const s_PcOpt*)h)->kind == PCK_PAD) {
+        if (g_PcConfig.preferredController[0] == '\0')
+            return "Automatic";
+        /* Cut so the suffix survives the panel's 48-byte value buffer. */
+        snprintf(buf, bufsz, PsyX_Pad_PreferredControllerConnected() ? "%s" : "%.28s (not connected)",
+                 g_PcConfig.preferredController);
+        return buf;
+    }
+#endif
     return PcOpt_ValueLabel((const s_PcOpt*)h, buf, bufsz);
 }
 
@@ -763,7 +870,9 @@ enum { QO_X_SHADOW = 0, QO_X_SPEAKERS, QO_X_BGM, QO_X_SFX,
        QO_X_TPSRESTX, QO_X_TPSRESTY, QO_X_TPSAIMX, QO_X_TPSAIMY,
        QO_X_OTSRESTX, QO_X_OTSRESTY, QO_X_OTSAIMX, QO_X_OTSAIMY,
        QO_X_SPU,
-       QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE };
+       /* Quick menu only: the PC Options graphics page is at its row limit. */
+       QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE,
+       QO_X_CAMSTYLE, QO_X_OTSSIDE };
 
 /* display_aspect = crt puts the picture on (4:3 x trim), so one framebuffer
  * pixel lands on screen this many times wider than tall at trim 1.0. It is the
@@ -806,6 +915,12 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
         return Pc_LangQuickMenu(g_PcConfig.dreamBlur ? "On" : "Off");
     case QO_X_DPADMOVE:
         return Pc_LangQuickMenu(g_PcConfig.disableDpadMovement ? "On" : "Off");
+    case QO_X_CAMSTYLE: {
+        static const char* const lbl[] = { "Classic", "Thirdperson", "Over the Shoulder", "Firstperson" };
+        return Pc_LangQuickMenu((g_ControlStyle >= 0 && g_ControlStyle < 4) ? lbl[g_ControlStyle] : "Classic");
+    }
+    case QO_X_OTSSIDE:
+        return Pc_LangQuickMenu((g_OtsSide > 0) ? "Right" : "Left");
     case QO_X_DREAMSTR:
         if (!g_PcConfig.dreamBlur) { snprintf(buf, bufsz, "%d%%  %s", (int)(g_PcConfig.dreamBlurStrength * 100.0f + 0.5f), Pc_LangQuick("(off)")); return buf; }
         snprintf(buf, bufsz, "%d%%", (int)(g_PcConfig.dreamBlurStrength * 100.0f + 0.5f));
@@ -1239,6 +1354,19 @@ void PcOpt_QuickExtraAdjust(int which, int dir)
         Sd_PlaySfx(Sfx_MenuMove, 0, 64);
         break;
     /* Read every frame by the gameplay gate in game_main.c, so it applies live. */
+    /* The Change-Camera cycle, both ways. Persisted by Pc_ControlStyleSet. */
+    case QO_X_CAMSTYLE: {
+        const int n = Pc_ControlStyleCount();
+        Pc_ControlStyleSet((g_ControlStyle + dir + n) % n);
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
+    }
+    /* Live only, like the Swap Shoulder bind it mirrors. Thirdperson reads it
+     * too while tps_ots_aim is on. */
+    case QO_X_OTSSIDE:
+        g_OtsSide = -g_OtsSide;
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
     case QO_X_DPADMOVE:
         g_PcConfig.disableDpadMovement = !g_PcConfig.disableDpadMovement;
         PcConfig_SaveKeyValue("disable_dpad_movement", g_PcConfig.disableDpadMovement ? "1" : "0");

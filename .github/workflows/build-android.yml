@@ -1,0 +1,113 @@
+name: Build Android Port (arm64 + arm32)
+
+# Produces the sideloadable debug APK by running android_port/build_android.sh,
+# the same script a maintainer runs. CI calling the project's own script rather
+# than gradle directly is deliberate: a change that breaks the script breaks the
+# build everyone actually uses.
+#
+# Signed only by the debug keystore Gradle generates, which is all a sideload
+# needs. Release signing stays with the maintainer, who has the keystore.
+#
+# The 32-bit library is what earns this its keep. Every maintainer device is
+# arm64, so armeabi-v7a is built and never run; a compile break there, or an ABI
+# silently dropped from the APK, is otherwise invisible until a user on an older
+# tablet reports it.
+
+on:
+  push:
+    branches: [android-port]
+    paths-ignore:
+      - '**.md'
+      - 'pc_port/launcher/**'
+  pull_request:
+    branches: [android-port]
+  workflow_dispatch:
+
+# One build per branch: pushes land in bursts and a superseded run is wasted
+# runner time.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.repository == 'SlickAmogus/silent-hill-decomp'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (with SDL + PsyCross submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # AGP 8.5 refuses to run on a newer JDK, the same reason
+      # build_android.sh pins a JDK 17 locally.
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Exactly the versions app/build.gradle pins. The runner image ships an
+      # SDK and some NDK, but not necessarily these, and a mismatch fails late
+      # with a message that does not name the cause.
+      - name: Android SDK components
+        run: |
+          set -eu
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "SDK at $SDK"
+          SDKMGR="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
+          "$SDKMGR" "platforms;android-34" "build-tools;34.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+
+      # Not tracked in git (it names a local path), so CI writes its own.
+      - name: Point the build at this runner's SDK
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" > android_port/local.properties
+
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Toolchain versions
+        run: |
+          java -version
+          gradle --version | head -8
+          ls "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk"
+
+      - name: Build
+        # The script takes its JDK and gradle from these, which is how it runs
+        # unchanged off a Windows machine.
+        env:
+          JAVA_HOME_ANDROID: ${{ env.JAVA_HOME }}
+          GRADLE_BIN: gradle
+        run: |
+          chmod +x android_port/build_android.sh
+          ./android_port/build_android.sh
+
+      - name: Report what was built
+        run: |
+          set -eu
+          APK=android_port/app/build/outputs/apk/debug/app-debug.apk
+          ls -la "$APK"
+          echo "=== native libraries in the APK ==="
+          unzip -l "$APK" | grep "lib/"
+          # Both ABIs, or the build is not what it claims: Gradle will happily
+          # produce a single-ABI APK when one CMake configure fails, and that
+          # APK still installs -- on the half of devices that match.
+          for abi in arm64-v8a armeabi-v7a; do
+            for so in libmain.so libSDL2.so; do
+              unzip -l "$APK" | grep -q "lib/$abi/$so" || { echo "MISSING lib/$abi/$so"; exit 1; }
+            done
+          done
+          echo "both ABIs present"
+          echo "=== unstripped library sizes per ABI ==="
+          find android_port/app/build/intermediates/cxx -name libmain.so -exec ls -la {} +
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilentHill-android-debug
+          path: android_port/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 90
