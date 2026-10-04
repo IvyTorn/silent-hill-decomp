@@ -255,6 +255,13 @@ static inline s32 AttenuationCalc(s32 volume, VECTOR3* pos, q19_12 falloff)
 }
 
 #ifdef SH_PC_PORT
+/* Defined below, and declared in no header -- the decomp calls it from map
+ * code and lets the implicit declaration stand. gcc accepts that and infers a
+ * compatible type; clang treats the implicit int-returning form as a
+ * conflicting declaration and fails the file outright, which is every Apple
+ * and NDK build. So the one caller inside this file states the type. */
+void func_8005DE0C(e_SfxId sfxId, VECTOR3* pos, s32 vol, q19_12 falloff, s8 pitch);
+
 /* Looping positional SFX keep their own attenuation alive.
  *
  * Every caller of func_8005DE0C sits inside a proximity or state test, and
