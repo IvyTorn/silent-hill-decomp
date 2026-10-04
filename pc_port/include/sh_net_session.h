@@ -112,6 +112,14 @@ void ShSession_RequestWorld(int mapIdx);
  * Clears the request. The game thread consumes this to launch the co-op game. */
 int  ShSession_TakeWorldRequest(void);
 
+/* Co-op shared items. The game thread notices a local pickup and queues it here;
+ * the worker broadcasts it (reliable) to every other member. On the other end the
+ * worker queues what it receives, and the game thread drains it with TakeItem and
+ * grants it to the local inventory -- so each player keeps their own pool and
+ * everyone ends up with what anyone picked up. */
+void ShSession_QueueItem(int itemId, int count);
+int  ShSession_TakeItem(int* itemId, int* count);
+
 #ifdef __cplusplus
 }
 #endif

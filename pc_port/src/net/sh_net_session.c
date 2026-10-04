@@ -77,6 +77,16 @@ static unsigned int    s_lastPosMs;   /* last co-op pose broadcast */
 static int             s_worldReqIn = -1; /* a map the host told us to boot into */
 static int             s_enabled;
 
+/* Co-op shared-item queues, both under s_lock. Out: local pickups waiting for the
+ * worker to broadcast. In: pickups received from members, waiting for the game
+ * thread to grant. A handful of pickups a room, so a small ring is plenty. */
+#define SESSION_ITEM_Q 32
+typedef struct { shn_u8 id; shn_u16 n; } ShSessionItem;
+static ShSessionItem s_itemOut[SESSION_ITEM_Q];
+static int           s_itemOutCount;
+static ShSessionItem s_itemIn[SESSION_ITEM_Q];
+static int           s_itemInCount;
+
 /* ------------------------------------------------------------------ */
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */
@@ -238,6 +248,36 @@ int ShSession_TakeWorldRequest(void)
     s_pub.worldReq = -1;
     SDL_UnlockMutex(s_lock);
     return map;
+}
+
+void ShSession_QueueItem(int itemId, int count)
+{
+    if (!s_lock || itemId < 0 || itemId > 255 || count <= 0) return;
+    SDL_LockMutex(s_lock);
+    if (s_itemOutCount < SESSION_ITEM_Q)
+    {
+        s_itemOut[s_itemOutCount].id = (shn_u8)itemId;
+        s_itemOut[s_itemOutCount].n  = (shn_u16)(count > 65535 ? 65535 : count);
+        s_itemOutCount++;
+    }
+    SDL_UnlockMutex(s_lock);
+}
+
+int ShSession_TakeItem(int* itemId, int* count)
+{
+    int got = 0;
+    if (!s_lock) return 0;
+    SDL_LockMutex(s_lock);
+    if (s_itemInCount > 0)
+    {
+        if (itemId) *itemId = s_itemIn[0].id;
+        if (count)  *count  = s_itemIn[0].n;
+        s_itemInCount--;
+        memmove(s_itemIn, s_itemIn + 1, (size_t)s_itemInCount * sizeof(s_itemIn[0]));
+        got = 1;
+    }
+    SDL_UnlockMutex(s_lock);
+    return got;
 }
 
 /* ------------------------------------------------------------------ */
@@ -504,6 +544,29 @@ static void ShSession_Receive(unsigned int now)
             SH_DBG("[SESSION] host says: boot into map %d", s_worldReqIn);
             break;
         }
+        case SHNET_MSG_S_ITEM:
+        {
+            const shn_u8* p = buf + SHNET_HDR_SIZE;
+            int           o = 0;
+            int           id, n;
+            if (payLen < 4)
+            {
+                break;
+            }
+            id = (int)ShnGetU8(p, &o);
+            (void)ShnGetU8(p, &o); /* pad */
+            n  = (int)ShnGetU16(p, &o);
+            SDL_LockMutex(s_lock);
+            if (s_itemInCount < SESSION_ITEM_Q && n > 0)
+            {
+                s_itemIn[s_itemInCount].id = (shn_u8)id;
+                s_itemIn[s_itemInCount].n  = (shn_u16)n;
+                s_itemInCount++;
+            }
+            SDL_UnlockMutex(s_lock);
+            SH_DBG("[SESSION] %s picked up item %d x%d", s_members[idx].name, id, n);
+            break;
+        }
         default:
             break;
         }
@@ -546,6 +609,10 @@ void ShSession_Tick(unsigned int nowMs)
     short              poseRotY;
     unsigned short     poseAnim, poseFrame;
 
+    ShSessionItem      itemOut[SESSION_ITEM_Q];
+    int                itemOutN = 0;
+    int                q;
+
     if (!s_lock || !s_enabled)
     {
         return;
@@ -565,6 +632,12 @@ void ShSession_Tick(unsigned int nowMs)
     poseX     = s_req.poseX;    poseY     = s_req.poseY;     poseZ     = s_req.poseZ;
     poseRotY  = s_req.poseRotY; poseAnim  = s_req.poseAnim;  poseFrame = s_req.poseFrame;
     wantWorldMap        = s_req.wantWorldMap;
+    itemOutN            = s_itemOutCount;
+    if (itemOutN > 0)
+    {
+        memcpy(itemOut, s_itemOut, (size_t)itemOutN * sizeof(itemOut[0]));
+        s_itemOutCount = 0;
+    }
     s_req.wantHost      = 0;
     s_req.wantLeave     = 0;
     s_req.wantInvite    = 0;
@@ -709,6 +782,27 @@ void ShSession_Tick(unsigned int nowMs)
             ShnPutHeader(buf, SHNET_MSG_S_POS, (shn_u16)(off - SHNET_HDR_SIZE), 0);
             ShSteam_Send(s_members[i].steamId, buf, off, 0);
         }
+    }
+
+    /* Co-op shared items: a local pickup goes to everyone, reliable (a dropped
+     * grant means a missing key). */
+    for (q = 0; q < itemOutN; q++)
+    {
+        for (i = 0; i < s_memberCount; i++)
+        {
+            shn_u8 buf[SHNET_HDR_SIZE + 4];
+            int    off = SHNET_HDR_SIZE;
+            if (s_members[i].steamId == ShSteam_SelfId())
+            {
+                continue;
+            }
+            ShnPutU8(buf, &off, itemOut[q].id);
+            ShnPutU8(buf, &off, 0);
+            ShnPutU16(buf, &off, itemOut[q].n);
+            ShnPutHeader(buf, SHNET_MSG_S_ITEM, (shn_u16)(off - SHNET_HDR_SIZE), 0);
+            ShSteam_Send(s_members[i].steamId, buf, off, 1);
+        }
+        SH_DBG("[SESSION] shared pickup item %d x%d to session", itemOut[q].id, itemOut[q].n);
     }
 
     ShSession_Receive(nowMs);

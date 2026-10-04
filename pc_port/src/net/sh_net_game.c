@@ -17,6 +17,8 @@
 #include "game.h"
 #include "bodyprog/bodyprog.h"
 #include "bodyprog/map/map.h"
+#include "bodyprog/items.h"        /* INV_ITEM_COUNT_MAX, s_InventoryItem */
+#include "bodyprog/item_screens.h" /* Inventory_AddSpecialItem: grant a shared pickup */
 
 #include "sh_net.h"
 #include "sh_net_memo.h"
@@ -83,6 +85,71 @@ static int ShNetG_BuildFlags(void)
         flags |= SHNET_PF_MENU;
     }
     return flags;
+}
+
+/* Co-op shared items. Each frame in a session we diff the inventory against last
+ * frame's per-id totals: a count that went UP is a pickup, which we hand to the
+ * other players; what they hand us we add to our own inventory. Receives are
+ * folded into the snapshot before the diff, so a granted item is never bounced
+ * back. Keyed by item id and summed across slots, so a merged stack and a new
+ * slot both read as the same +N. Inert outside a co-op game: the snapshot resets,
+ * so single-player never queues a thing. Known gap: the WORLD pickup is not yet
+ * removed on the other clients, so two players walking over the same box both
+ * collect it; flag-based specials (plates, stone) already de-dup themselves. */
+static void ShNetG_SyncItems(void)
+{
+    extern int            g_PcCoopGame;
+    static unsigned short s_snap[256];
+    static int            s_snapInit;
+    unsigned short        cur[256];
+    int                   i, id, cnt;
+
+    if (!g_PcCoopGame || !ShSession_Active())
+    {
+        s_snapInit = 0;
+        return;
+    }
+
+    while (ShSession_TakeItem(&id, &cnt))
+    {
+        if (id > 0 && id < 256 && id != 0xFF && cnt > 0)
+        {
+            int t;
+            Inventory_AddSpecialItem((u8)id, (u8)(cnt > 255 ? 255 : cnt));
+            t          = (int)s_snap[id] + cnt;
+            s_snap[id] = (unsigned short)(t > 65535 ? 65535 : t);
+            SH_DBG("[COOP] got shared item %d x%d", id, cnt);
+        }
+    }
+
+    memset(cur, 0, sizeof(cur));
+    for (i = 0; i < INV_ITEM_COUNT_MAX; i++)
+    {
+        int sid = g_SavegamePtr->items[i].id_0;
+        int sc  = g_SavegamePtr->items[i].count_1;
+        if (sid <= 0 || sid >= 0xFF)
+        {
+            continue;
+        }
+        {
+            int t    = (int)cur[sid] + sc;
+            cur[sid] = (unsigned short)(t > 65535 ? 65535 : t);
+        }
+    }
+
+    if (s_snapInit)
+    {
+        for (i = 1; i < 0xFF; i++)
+        {
+            if (cur[i] > s_snap[i])
+            {
+                ShSession_QueueItem(i, (int)cur[i] - (int)s_snap[i]);
+                SH_DBG("[COOP] shared our pickup item %d x%d", i, (int)cur[i] - (int)s_snap[i]);
+            }
+        }
+    }
+    memcpy(s_snap, cur, sizeof(s_snap));
+    s_snapInit = 1;
 }
 
 void ShNet_OnMapChanged(int mapIdx)
@@ -202,6 +269,9 @@ void ShNet_GameTick(void)
                        (short)g_SysWork.playerWork.player.rotation.vy,
                        (unsigned short)g_SysWork.playerWork.player.model.anim.status,
                        (unsigned short)g_SysWork.playerWork.player.model.anim.keyframeIdx);
+
+    /* Co-op shared items: hand out what we picked up, take in what others did. */
+    ShNetG_SyncItems();
 
     /* Death marker, once per death. Latched rather than edge-detected on the
      * health value alone: health sits at zero for the whole death animation

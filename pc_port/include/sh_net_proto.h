@@ -122,7 +122,8 @@ enum
     SHNET_MSG_S_PONG     = 0x52,
     SHNET_MSG_S_BYE      = 0x53,
     SHNET_MSG_S_POS      = 0x54, /* P2P  my position/anim this tick (co-op presence) */
-    SHNET_MSG_S_WORLD    = 0x55  /* P2P  host -> guests: boot into this map */
+    SHNET_MSG_S_WORLD    = 0x55, /* P2P  host -> guests: boot into this map */
+    SHNET_MSG_S_ITEM     = 0x56  /* P2P  I picked this up; everyone gets it too */
 };
 
 /* Marker kinds. */
