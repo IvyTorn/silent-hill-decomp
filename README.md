@@ -1,6 +1,6 @@
-# Silent Hill - Native Android Port
+# Silent Hill - Native iOS Port
 
-  **A native Android port built on the Silent Hill PSX decompilation.** It shares the whole engine with the [PC port](https://github.com/SlickAmogus/silent-hill-decomp/tree/pc-port): the same decompiled C source, compiled for ARM and running on [PsyCross](https://github.com/SlickAmogus/PsyCross) (our fork of the PsyQ compatibility layer) through SDL2 and OpenGL ES 3.0. It is **not an emulator** and **not a static recompilation**. Game logic and feel match the PSX original, and every enhancement is optional.
+  **A native iOS port built on the Silent Hill PSX decompilation.** It shares the whole engine with the [PC port](https://github.com/SlickAmogus/silent-hill-decomp/tree/pc-port) and the [Android port](https://github.com/SlickAmogus/silent-hill-decomp/tree/android-port): the same decompiled C source, compiled for arm64 and running on [PsyCross](https://github.com/SlickAmogus/PsyCross) (our fork of the PsyQ compatibility layer) through SDL2 and OpenGL ES 3.0. It is **not an emulator** and **not a static recompilation**. Game logic and feel match the PSX original, and every enhancement is optional.
 
   **Development is heavily AI-assisted** (Claude Opus 4.6, 4.7 and the newer Fable model), and we're open about that. Every change is a reviewed, hand-directed edit to real source, tested against the original behaviour.
 
@@ -9,41 +9,41 @@
 
 ## Licensing at a glance
 
-**The port is GPL-3.0.** That covers `pc_port/`, `android_port/` and every `SH_PC_PORT` addition to the decompiled sources.
+**The port is GPL-3.0.** That covers `pc_port/`, `ios_port/` and every `SH_PC_PORT` addition to the decompiled sources.
 
 **The decompilation is not licensed by this project.** `src/`, `include/`, `configs/`, `asm/`, `lib/` and `rom/` remain the work of the [silent-hill-decomp](https://github.com/shdecompilations/silent-hill-decomp) contributors.
 
-**No game data is included.** Silent Hill is © Konami. You need your own legally obtained disc image; nothing from it ships in the APK.
+**No game data is included.** Silent Hill is © Konami. You need your own legally obtained disc image; nothing from it ships in the app.
 
 Full breakdown: [COPYRIGHT.md](COPYRIGHT.md).
 
 ## Features
 
 - **The full game.** Every map, boss, cutscene and ending. All 43 map overlays are linked into the app.
-- **Touch controls.** A floating movement stick, drag-to-look, tap to act, and on-screen Aim / Item / Map / Start buttons. Menus work by tapping. The buttons send whatever your controller config has bound, so rebinds carry over.
-- **Controllers.** Bluetooth and USB pads work, and the touch overlay steps aside when one is in use. Remap them under **Options > Controller Config**. With more than one connected (an Android TV remote counts as one), **Options > Controller** or the quick menu's Controls page picks the one that drives the game; it is saved, and while it is disconnected every controller works as before.
-- **Graphics.** Renders at the device's native resolution in widescreen (Hor+) by default, at 60 fps. Landscape only. PGXP perspective correction and the rest of the PC port's graphics options are available too.
+- **Touch controls.** A floating movement stick, drag-to-look, tap to act, and on-screen Aim / Item / Map / Start buttons, with a separate Fire button while aiming (**One Button Combat** merges them). Menus work by tapping. The third-person, over-the-shoulder and first-person cameras also work on touch, and an on-screen eye button cycles between them. The buttons send whatever your controller config has bound, so rebinds carry over.
+- **Controllers.** Paired Bluetooth pads work, and the touch overlay steps aside when one is in use. Remap them under **Options > Controller Config**. With more than one connected, **Options > Controller** or the quick menu's Controls page picks the one that drives the game; it is saved, and while it is disconnected every controller works as before.
+- **Graphics.** Renders at the device's native resolution in widescreen (Hor+) by default, at 60 fps. PGXP perspective correction and the rest of the PC port's graphics options are available too.
 - **Quick options overlay.** Graphics, HUD, audio and cheats, opened from an on-screen button.
-- **RetroAchievements.** Sign in from **Options > System > Achievements** (softcore only).
+- **RetroAchievements.** Sign in from **Options > System > Achievements** with a native sign-in sheet (softcore only). Your password is exchanged once for a token and is never stored.
 - **Mods.** Loose-file replacements and DuckStation-style texture packs. See [Modding](#modding).
 - **All regions.** USA, PAL and NTSC-J discs are auto-detected.
 
 ## Known Issues / Bugs
 
-- **No FMV overrides.** There is no libjpeg or ffmpeg on Android, so HD AVI/MP4 movie replacements are ignored. The disc's own cutscenes still play.
-- **No surround audio.** Audio is stereo, rendered in software through SDL, because Android has no OpenAL.
-- **Memory on low-end devices.** Every map's working buffers are reserved up front (about 195 MB of `.bss`). It is paid only as maps are visited, but it is never released, so a long session on a 1 GB device can get killed by Android's low-memory killer.
-- **Unsigned debug builds only**, no Play Store release.
+- **No FMV overrides.** The iOS build has no libjpeg or ffmpeg, so HD AVI/MP4 movie replacements are ignored. The disc's own cutscenes still play.
+- **No surround audio.** Audio is stereo, rendered in software through SDL, because Apple removed OpenAL.
+- **No Randomizer.** Its Lua scripting layer needs `system()`, which the iOS SDK forbids.
+- **Sideload only.** The app is unsigned. With a free Apple ID it has to be re-signed every 7 days.
 
 Everything else that's known is on the [issues page](https://github.com/SlickAmogus/silent-hill-decomp/issues).
 
 ## Short Instructions
 
-1. Install the APK (Android 5.0+, OpenGL ES 3.0, arm64-v8a or armeabi-v7a).
-2. Open the app. On first run it asks where to keep game data: **phone storage** or an **SD card** (the card is the default when one is present).
-3. Give it your disc image. The setup screen looks in Downloads and other common folders and offers to move the `.bin` into place, or you can pick the file yourself. Any filename works and no `.cue` is needed.
+1. Download `SilentHill-unsigned.ipa` from the latest [Build iOS Port](https://github.com/SlickAmogus/silent-hill-decomp/actions/workflows/build-ios.yml) run (iOS 13+).
+2. Sideload it with **Sideloadly** or **AltStore**. On Windows, install iTunes and iCloud **from apple.com, not the Microsoft Store**; the Store versions break both tools. Leave auto-refresh running, since a free Apple ID certificate lasts only 7 days.
+3. Launch the app once. Then use the **Files** app to put your disc image in `On My iPhone > Silent Hill > gamedata`. The top-level `Silent Hill` folder works too. Any filename works and no `.cue` is needed.
 
-Game data lives in `Android/media/com.silenthill.port/` on the volume you chose. That folder needs no permissions and any file manager can open it, so you can reach your saves, `config.cfg`, mods and `SilentHill_<timestamp>.log` there.
+Saves, `config.cfg`, mods and the `SilentHill_<timestamp>.log` files are all in that same **Files** folder. The bundle ID (`com.silenthill.port`) never changes, so re-signing keeps your disc image and saves.
 
 ## Controls
 
@@ -52,51 +52,42 @@ Game data lives in `Android/media/com.silenthill.port/` on the volume you chose.
 | Drag, left side | Move (push to the edge to run) |
 | Drag, right side | Look |
 | Tap | Action: attack with a weapon ready, interact otherwise |
-| On-screen buttons | Aim (hold), Item, Map, Start, and the quick options overlay |
+| On-screen buttons | Aim (hold), Fire, Item, Map, Start, Change Camera, and the quick options overlay |
 
-A physical controller uses the standard PSX layout.
+In the alternate cameras, dragging on the right turns the camera directly, a double tap on the left toggles aim, and a tap on the right fires. A physical controller uses the standard PSX layout.
 
 ## Building
 
-### How the Android build works
+### How the iOS build works
 
-`android_port/` holds only the APK shell: the Gradle project, manifest, Java activities and a CMake shim. The game itself is `pc_port/`, built as `libmain.so`. Android-specific code stays behind `if(ANDROID)` / `#ifdef __ANDROID__`, so the port keeps up with PC development instead of turning into a fork.
+`ios_port/` holds only the app shell: a CMake project that builds SDL2 and `pc_port/` into an app bundle, plus `Info.plist`, a launch storyboard and a few small Objective-C files. The game itself is `pc_port/`. iOS-specific code stays behind `SH_IOS` / `TARGET_OS_IPHONE`, and much of it is shared with Android, so the port keeps up with PC development instead of turning into a fork.
 
-- **Renderer:** PsyCross's GLES 3.0 path (`RENDERER_OGLES`) through SDL2.
-- **Audio:** OpenAL is compiled out (`SH_NO_OPENAL`). The SPU and XA audio are rendered in software and played through SDL's AAudio/OpenSL output.
-- **Maps:** Android can't `dlopen` map DLLs from a data folder, so `SH_STATIC_MAPS` is turned on automatically. Each overlay's symbols get a per-map prefix via `llvm-objcopy --redefine-syms` so all 43 can be linked together, and a generated registry replaces `dlsym`.
-- **Disabled:** ffmpeg, the libjpeg MJPEG decoder and the launcher (it's C#/.NET). RetroAchievements stays on and uses `HttpURLConnection` through JNI in place of libcurl.
-- **Startup:** `SetupActivity` handles choosing where data goes and installing the disc. `SilentHillActivity` (a subclass of `SDLActivity`) unpacks the port's own assets from the APK (fonts, `decal.png`, language packs, UI sounds) without overwriting existing files. `main()` then `chdir()`s into the data folder so every relative path resolves there.
-- **ABIs:** `arm64-v8a` and `armeabi-v7a`. The 32-bit build exists for devices like the Arcade1Up MT8163 board, which run a 32-bit userspace. `RelWithDebInfo` is pinned in `app/build.gradle` because unoptimized builds crawl on weak hardware.
+- **Renderer:** PsyCross's GLES 3.0 path (`RENDERER_OGLES`), using Apple's `OpenGLES/ES3` headers and an EAGL context through SDL. On iOS, framebuffer 0 is not the screen, so PsyCross records SDL's real framebuffer (`PSYX_DEFAULT_FBO`) at init.
+- **Audio:** OpenAL is compiled out (`SH_NO_OPENAL`). The SPU and XA audio are rendered in software and played through SDL's CoreAudio output.
+- **Maps:** iOS won't load a dylib from outside the signed bundle, so `SH_STATIC_MAPS` is forced on. Each overlay's symbols get a per-map prefix via `llvm-objcopy --redefine-syms` so all 43 can be linked together, and a generated registry replaces `dlsym`.
+- **Disabled:** ffmpeg, the libjpeg MJPEG decoder, Lua and the launcher (it's C#/.NET). RetroAchievements stays on: `ios_ra_http.m` implements it over NSURLSession, and `-Wl,-export_dynamic` keeps the game's globals visible for the achievement address map.
+- **Startup:** SDL owns the entry point (`UIApplicationMain`). `main()` `chdir()`s into `Documents`, and `ios_bootstrap.m` copies the port's own assets out of the read-only bundle without overwriting existing files: fonts, `decal.png`, language packs, UI sounds and a default `config.cfg`. `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` make `Documents` visible in Files.
 
 ### Prerequisites
 
-| Component | Version |
-|-----------|---------|
-| JDK | 17 (AGP 8.x will not run on newer) |
-| Gradle | 8.9 |
-| Android SDK | platform 34, build-tools 34.0.0 |
-| NDK | 27.3.13750724 |
-| CMake | 3.22.1 (SDK-bundled) |
-
-Fetch the submodules (SDL2 and PsyCross):
-```
-git submodule update --init --recursive android_port/app/jni/SDL pc_port/PsyCross pc_port/third_party/rcheevos
-```
+- **macOS with Xcode.** Xcode is used only as a toolchain; there is no Xcode project. Only Apple's clang can target `arm64-apple-ios`, so this can't be built on Windows or Linux.
+- **cmake**, **ninja** and **llvm** (for `llvm-nm` / `llvm-objcopy`), e.g. from Homebrew.
+- The SDL2, PsyCross and rcheevos submodules:
+  ```
+  git submodule update --init --recursive ios_port/SDL pc_port/PsyCross pc_port/third_party/rcheevos
+  ```
 
 ### Build
 
 ```sh
-./android_port/build_android.sh                  # assembleDebug
-./android_port/build_android.sh assembleRelease
-adb install -r android_port/app/build/outputs/apk/debug/app-debug.apk
+./ios_port/build_ios.sh
 ```
 
-The script defaults to the toolchain under `C:/Android/`. Set `JAVA_HOME_ANDROID` and `GRADLE_BIN` to use your own. See [`android_port/README.md`](android_port/README.md) for more technical notes.
+This configures, builds and packages an unsigned `.ipa`. You don't need a Mac for this: [`.github/workflows/build-ios.yml`](.github/workflows/build-ios.yml) runs the same build on a GitHub macOS runner for every push to `ios-port` and uploads the `.ipa` as an artifact. See [`ios_port/README.md`](ios_port/README.md) for more technical notes.
 
 ## Modding
 
-Mods are **on by default** on Android, because there is no launcher to turn them on. On first launch the game creates the mod folders and writes a quick-reference `gamedata/load/README.txt` inside the data folder. Restart the game after adding or removing files. **Options > Graphics > Load Mods** turns loose-file mods off.
+Mods are **on by default** on iOS, because there is no launcher to turn them on. On first launch the game creates the mod folders and writes a quick-reference `gamedata/load/README.txt` in the app's Files folder. Restart the game after adding or removing files. **Options > Graphics > Load Mods** turns loose-file mods off.
 
 - **Loose-file replacements:** `gamedata/load/<FOLDER>/<NAME>`, using the disc's own folder and file names (e.g. `gamedata/load/CHARA/HERO.TIM`). Case doesn't matter.
   - **Textures:** `.png` or `.dds` next to the name (`HERO.TIM.png` or `HERO.png`), or a replacement `.TIM`
@@ -107,7 +98,7 @@ Mods are **on by default** on Android, because there is no launcher to turn them
 - **Texture packs:** DuckStation-format packs in `gamedata/texturemods/`, either as a folder or a `.zip`. Always on. Memory budgets for packs scale down to the device's RAM.
 - **Not available:** FMV overrides (see Known Issues).
 
-The mod *tools* (disc extraction, TIM ↔ PNG, character texture reference sheets, ILM ↔ OBJ model export) are in the PC launcher's Mod Manager. Build mods on a PC, then copy the resulting `gamedata/` files to the phone. Full file formats and workflows: [`Modding_And_Extraction_Guide.md`](pc_port/docs/Modding_And_Extraction_Guide.md), [`Model_Modding_Guide.md`](pc_port/docs/Model_Modding_Guide.md), [`Modern_Item_GLTF_Modding_Guide.md`](pc_port/docs/Modern_Item_GLTF_Modding_Guide.md).
+The mod *tools* (disc extraction, TIM ↔ PNG, character texture reference sheets, ILM ↔ OBJ model export) are in the PC launcher's Mod Manager. Build mods on a PC, then copy the resulting `gamedata/` files to the device with Files (or Finder file sharing). Full file formats and workflows: [`Modding_And_Extraction_Guide.md`](pc_port/docs/Modding_And_Extraction_Guide.md), [`Model_Modding_Guide.md`](pc_port/docs/Model_Modding_Guide.md), [`Modern_Item_GLTF_Modding_Guide.md`](pc_port/docs/Modern_Item_GLTF_Modding_Guide.md).
 
 ## Support
 
