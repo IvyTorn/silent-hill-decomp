@@ -47,6 +47,7 @@
 #include "sh_net_memo.h"
 #include "sh_net_chat.h"
 #include "sh_net_session.h"
+#include "sh_net_coop.h" /* ShNet_CoopStray: the "stay together" nudge */
 #include "pc_coop_menu.h"
 #include "pc_mouse_cursor.h"
 #include "pc_config.h"
@@ -1390,7 +1391,7 @@ void ShNetUi_Draw(void)
     int       px;
     int       drawList, drawComposer, drawStatus;
 
-    if (!ShNet_Enabled() && !Pc_CoopMenu_IsOpen())
+    if (!ShNet_Enabled() && !Pc_CoopMenu_IsOpen() && !ShNet_CoopStray())
     {
         return;
     }
@@ -1439,7 +1440,7 @@ void ShNetUi_Draw(void)
 
     if (!drawList && !drawComposer && !drawStatus && s_eventCount == 0 &&
         ShNetMemo_NearestReadable() < 0 && !ShNetMemo_JustPlaced() &&
-        !ShNetChat_DisplayActive() && !Pc_CoopMenu_IsOpen())
+        !ShNetChat_DisplayActive() && !Pc_CoopMenu_IsOpen() && !ShNet_CoopStray())
     {
         return;
     }
@@ -1510,6 +1511,17 @@ void ShNetUi_Draw(void)
     }
 
     Nu_DrawEvents((int)((float)px * 0.9f));
+
+    if (ShNet_CoopStray())
+    {
+        const int   big = (int)((float)px * 1.25f);
+        const char* msg = "Please stay with your companions";
+        const float y   = s_vpH * 0.16f;
+        const float tw  = Nu_TextWidth(msg, big);
+        Nu_Panel((s_vpW - tw) * 0.5f - (float)px, y - (float)px * 0.5f,
+                 tw + (float)px * 2.0f, (float)big * 2.0f, 0.72f);
+        Nu_DrawTextCentered(msg, s_vpW * 0.5f, y, big, 0.88f, 0.82f, 0.56f, 1.0f);
+    }
 
     if (ShNetMemo_JustPlaced())
     {

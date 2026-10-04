@@ -152,6 +152,67 @@ static void ShNetG_SyncItems(void)
     s_snapInit = 1;
 }
 
+/* Co-op "stay together" nudge. We are a stray when every companion we can see is
+ * on another map and has stayed there past a short grace period -- long enough
+ * not to fire on a doorway crossing. Map granularity, because in Silent Hill a
+ * room is a map load; a tighter "two rooms" rule needs a room graph we do not
+ * have yet. Purely advisory: it shows a line, it never moves the player. */
+#define SHNET_STRAY_GRACE_MS 9000u
+static int          s_coopStray;
+static unsigned int s_strayAloneSinceMs;
+
+static void ShNetG_UpdateStray(int mapIdx)
+{
+    extern int g_PcCoopGame;
+    int        i, n, companions = 0, together = 0;
+
+    if (!g_PcCoopGame || !ShSession_Active())
+    {
+        s_coopStray         = 0;
+        s_strayAloneSinceMs = 0;
+        return;
+    }
+
+    n = ShSession_MemberCount();
+    for (i = 0; i < n; i++)
+    {
+        const ShSessionMember* m = ShSession_Member(i);
+        /* poseMs == 0 is either us or someone we have never had a pose from. */
+        if (!m || !m->linked || m->poseMs == 0)
+        {
+            continue;
+        }
+        companions++;
+        if (m->mapIdx == mapIdx)
+        {
+            together++;
+        }
+    }
+
+    if (companions == 0 || together > 0)
+    {
+        s_coopStray         = 0;
+        s_strayAloneSinceMs = 0;
+    }
+    else
+    {
+        unsigned int now = ShNetPlat_Millis();
+        if (s_strayAloneSinceMs == 0)
+        {
+            s_strayAloneSinceMs = now;
+        }
+        if (now - s_strayAloneSinceMs >= SHNET_STRAY_GRACE_MS)
+        {
+            s_coopStray = 1;
+        }
+    }
+}
+
+int ShNet_CoopStray(void)
+{
+    return s_coopStray;
+}
+
 void ShNet_OnMapChanged(int mapIdx)
 {
     if (mapIdx == s_lastMap)
@@ -225,6 +286,8 @@ void ShNet_GameTick(void)
                            0, 0, 0, 0, 0, 0, 0);
         ShSession_PublishLocalPos(-1, 0, 0, 0, 0, 0, 0, 0, 0); /* no pose outside a map */
         ShSession_PublishPresence("In the menus", -1);
+        s_coopStray         = 0; /* no "stay together" nudge in the menus */
+        s_strayAloneSinceMs = 0;
         ShNet_PumpToGameThread();
         return;
     }
@@ -272,6 +335,9 @@ void ShNet_GameTick(void)
 
     /* Co-op shared items: hand out what we picked up, take in what others did. */
     ShNetG_SyncItems();
+
+    /* Co-op "stay together" nudge. */
+    ShNetG_UpdateStray(mapIdx);
 
     /* Death marker, once per death. Latched rather than edge-detected on the
      * health value alone: health sits at zero for the whole death animation
