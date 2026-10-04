@@ -668,6 +668,21 @@ static int qo_row_is_list(const QoRowDef* r)
     return r->kind == ROW_CHEAT && Pc_Cheats_ListCount(r->cpage, r->extra) > 0;
 }
 
+#if defined(QO_MOBILE)
+/* Touch splits a list row by what its LABEL does. Spawn's label fires, so that
+ * row is a button: its halves are fire and cycle, and - / + would describe the
+ * wrong gesture. Starting map only browses, so on a phone it is an ordinary
+ * stepper like every other value row -- two directions from taps, slidable,
+ * and marked - and +. A dropdown is still the wrong control for either on
+ * glass, so neither opens one. */
+static int qo_row_is_pill(const QoRowDef* r)
+{
+    return qo_row_is_list(r) && Pc_Cheats_ListIsButton(r->cpage, r->extra);
+}
+#else
+#define qo_row_is_pill qo_row_is_list
+#endif
+
 /* ------------------------------------------------------------------ */
 /* GL primitives (mirrors pc_rando_settings.c)                         */
 /* ------------------------------------------------------------------ */
@@ -1929,7 +1944,7 @@ void Pc_QuickOptions_Update(int up, int down, int left, int right,
                  * so sliding off the row does not start adjusting its
                  * neighbour. */
                 if (r_ >= 0 && r_ < nRows && px_ >= s_geoStepL &&
-                    QO_IS_VALUE_ROW(rows[r_].kind) && !qo_row_is_list(&rows[r_]))
+                    QO_IS_VALUE_ROW(rows[r_].kind) && !qo_row_is_pill(&rows[r_]))
                 {
                     s_slideRow   = r_;
                     s_slideX     = px_;
@@ -2022,7 +2037,7 @@ void Pc_QuickOptions_Update(int up, int down, int left, int right,
             {
                 s_sel = row;
 #if defined(QO_MOBILE)
-                if (qo_row_is_list(&rows[row]))
+                if (qo_row_is_pill(&rows[row]))
                 {
                     /* No dropdown on touch. It is a scrolling sub-list inside
                      * one row, which is the smallest thing on the panel and the
@@ -2040,7 +2055,7 @@ void Pc_QuickOptions_Update(int up, int down, int left, int right,
                 }
                 else
 #endif
-                if (qo_row_is_list(&rows[row]) && mpx > (s_geoPanelL + s_geoPanelR) * 0.5f)
+                if (qo_row_is_pill(&rows[row]) && mpx > (s_geoPanelL + s_geoPanelR) * 0.5f)
                 {
                     /* Right half of a list row: open the dropdown on the value. */
                     s_ddRow    = row;
@@ -2504,7 +2519,7 @@ void Pc_QuickOptions_Draw(void)
             if (s_texLabel[i])
             {
                 tH = (float)s_labelH[i]; tY = rowMid + tH * 0.5f;
-                if (qo_row_is_list(r))
+                if (qo_row_is_pill(r))
                 {
                     float bl = panelL + pad - 6.0f, br = panelL + pad + (float)s_labelW[i] + 6.0f;
                     float bt = rowTop - rowH * 0.08f, bb = rowTop - rowH * 0.92f;
@@ -2525,7 +2540,7 @@ void Pc_QuickOptions_Draw(void)
 #if defined(QO_MOBILE)
                 /* Right-aligned against the + rather than the panel edge, so
                  * the mark sits beside the number instead of on top of it. */
-                if (!qo_row_is_list(r))
+                if (!qo_row_is_pill(r))
                     vr = panelR - pad * 0.12f - (float)s_incW - pad * 0.45f
                        - (float)s_valueW[i];
 #endif
@@ -2543,7 +2558,7 @@ void Pc_QuickOptions_Draw(void)
              * unselected rows so a page does not read as a wall of symbols. */
             /* Not on a list row: that one is not a stepper -- its halves fire
              * and cycle -- so - and + would describe the wrong gesture. */
-            if (!qo_row_is_list(r))
+            if (!qo_row_is_pill(r))
             {
                 const float mg = (i == s_sel) ? 0.95f : 0.45f;
 

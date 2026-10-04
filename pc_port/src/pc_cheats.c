@@ -414,8 +414,15 @@ const char* Pc_Cheats_Label(int page, int idx, char* buf, int bufsz)
         case CH_MAP:
         {
             int id = MapRow_Current();
+#if defined(PC_CHEATS_MOBILE)
+            /* Name only. The description runs to forty characters, which on a
+             * phone panel reaches back under the row's own label, and the
+             * chevrons are redundant where the stepper draws - and +. */
+            snprintf(buf, bufsz, "%s", MapRegistry_GetName(id));
+#else
             snprintf(buf, bufsz, "< %s >  %s", MapRegistry_GetName(id),
                      MapRegistry_GetDescription(id));
+#endif
             return buf;
         }
         default:           return "";
@@ -497,6 +504,16 @@ void Pc_Cheats_Confirm(int page, int idx)
 
 /* List rows (Spawn): the overlay draws these as a button on the left and a
  * browsable value on the right, and can open the list as a dropdown. */
+/* 1 if the row's LABEL does something besides browsing: Spawn places the
+ * character it names, so its label is a button. Starting map only records a
+ * choice, so it is an ordinary value. Touch splits the two row kinds
+ * differently and has no right-click to tell them apart with. */
+int Pc_Cheats_ListIsButton(int page, int idx)
+{
+    const CheatRow* r = row_at(page, idx, NULL);
+    return (r != NULL && r->kind == CH_SPAWN);
+}
+
 int Pc_Cheats_ListCount(int page, int idx)
 {
     const CheatRow* r = row_at(page, idx, NULL);

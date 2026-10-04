@@ -17,6 +17,7 @@ void        Pc_Cheats_Confirm(int page, int idx);
 /* List rows (Spawn): >0 entries means "button on the left, browsable value on
  * the right, dropdown on click". */
 int         Pc_Cheats_ListCount(int page, int idx);
+int         Pc_Cheats_ListIsButton(int page, int idx);
 const char* Pc_Cheats_ListName(int page, int idx, int i);
 int         Pc_Cheats_ListGet(int page, int idx);
 void        Pc_Cheats_ListSet(int page, int idx, int i);
