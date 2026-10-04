@@ -221,6 +221,26 @@ VECTOR3    g_Player_PrevPosition;
  * movement shim REPLACES Player_LowerBodyUpdate, so under the alternate cameras
  * and 2D control the results-screen walk/run totals never accrued. */
 int        g_PcNativeDistAccrued;
+
+/* The shim's strafe and jump-back write Harry's position directly rather than
+ * through D_800C4590.offset, so the func_8007C0D8 fallback never sees them.
+ * Walk vs run follows the native classification: sidesteps are walking, and
+ * run-strafe and the jump back land in its default (running) branch. */
+static void Pc_ShimDistCredit(s32 dx, s32 dz, int running)
+{
+    s32 step = SquareRoot0(SQUARE(dx) + SQUARE(dz));
+
+    if (running)
+    {
+        g_SavegamePtr->runDistance += step;
+        g_SavegamePtr->runDistance  = CLAMP(g_SavegamePtr->runDistance, 1, Q12(1000000.0f));
+    }
+    else
+    {
+        g_SavegamePtr->walkDistance += step;
+        g_SavegamePtr->walkDistance  = CLAMP(g_SavegamePtr->walkDistance, 1, Q12(1000000.0f));
+    }
+}
 #endif
 u16        g_Player_IsRunning;
 s16        __pad_bss_800C4606;
@@ -1648,8 +1668,15 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
                     {
                         int _lb = g_SysWork.playerWork.extra.lowerBodyState;
                         g_PcQuickTurnRequest = 0;
-                        if (_lb <= PlayerLowerBodyState_RunLeft ||
-                            (_lb >= PlayerLowerBodyState_Aim && _lb <= PlayerLowerBodyState_AimRunLeft))
+                        /* Same guard as the native Player_CharaTurn_0 call sites: during a
+                         * walk<->run transition Player_AnimUpdate forces the legs onto the
+                         * Still blend every frame, which overwrites the QuickTurn anim this
+                         * state sets once on stateStep 0. The blend then links to the walk/
+                         * run loop and the state waits forever for a QuickTurn keyframe:
+                         * legs walking in place, upper body frozen, no input. */
+                        if (!g_Player_IsInWalkToRunTransition &&
+                            (_lb <= PlayerLowerBodyState_RunLeft ||
+                             (_lb >= PlayerLowerBodyState_Aim && _lb <= PlayerLowerBodyState_AimRunLeft)))
                         {
                             int _aim = (_lb < PlayerLowerBodyState_Aim) ? 0 : 20;
                             g_SysWork.playerWork.extra.lowerBodyState =
@@ -2240,8 +2267,13 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
                             s_prevJumpBackTime = curTime;
                             if (dTime > 0) {
                                 q19_12 step = Q12_MULT_PRECISE(Q12(0.22f), dTime);
-                                player->position.vx -= Q12_MULT(step, Math_Sin(player->rotation.vy));
-                                player->position.vz -= Q12_MULT(step, Math_Cos(player->rotation.vy));
+                                s32    jbX  = Q12_MULT(step, Math_Sin(player->rotation.vy));
+                                s32    jbZ  = Q12_MULT(step, Math_Cos(player->rotation.vy));
+                                player->position.vx -= jbX;
+                                player->position.vz -= jbZ;
+#ifdef SH_PC_PORT
+                                Pc_ShimDistCredit(jbX, jbZ, 1);
+#endif
                             }
                         } else {
                             /* Brace/blend phase: no positional advance; reset time tracking. */
@@ -2567,11 +2599,15 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
 
                                 player->position.vx += strafeColl.offset.vx;
                                 player->position.vz += strafeColl.offset.vz;
+                                Pc_ShimDistCredit(strafeColl.offset.vx, strafeColl.offset.vz, runStrafe);
                             } else
 #endif
                             {
                                 player->position.vx += strafeWish.vx;
                                 player->position.vz += strafeWish.vz;
+#ifdef SH_PC_PORT
+                                Pc_ShimDistCredit(strafeWish.vx, strafeWish.vz, runStrafe);
+#endif
                             }
                         }
                     }
@@ -2654,7 +2690,17 @@ void Player_LogicUpdate(s_SubCharacter* player, s_PlayerExtra* extra, GsCOORDINA
                      * recovery are no longer needed for guns. Melee has no Aim pose, so
                      * still drop its "aim" while running to avoid the arm-swinging-in-
                      * place bug. */
-                    if (g_DebugThirdPersonCam && g_Player_IsRunning &&
+                    /* g_Player_IsRunning means "run MODE is engaged", NOT "Harry is
+                     * moving": it is derived from the run control alone. With the
+                     * Walk/Run Control option set to Reverse the sense inverts, so
+                     * run mode is engaged whenever the run control is NOT held --
+                     * including standing perfectly still. Cancelling on that flag
+                     * alone therefore killed melee aim PERMANENTLY in the alt
+                     * cameras for anyone playing with Reverse, and in Normal it also
+                     * blocked aiming while merely holding the run key still. Require
+                     * actual movement input, which is what the in-place swing bug
+                     * needs anyway. */
+                    if (g_DebugThirdPersonCam && g_Player_IsRunning && g_Player_HasMoveInput &&
                         g_SysWork.playerCombat.weaponAttack < WEAPON_ATTACK(EquippedWeaponId_Handgun, AttackInputType_Tap)) {
                         aimHeld = false;
                         g_Player_IsAiming = false;
@@ -4423,6 +4469,7 @@ static void Pc_FreeAimGunUpperBody(s_SubCharacter* player, s_PlayerExtra* extra,
     bool fireEdge;
     bool reloadReq = PC_PlayerManualReloadRequested();
     s32  ammo      = g_SysWork.playerCombat.currentWeaponAmmo;
+    extern int g_PcInfiniteAmmo;
     s32  reserve   = g_SysWork.playerCombat.totalWeaponAmmo;
     /* The HyperBlaster is the PSX full-auto exception: it consumes no ammo (the
      * fire block below already skips the decrement) and has no reload, and on
@@ -4496,7 +4543,12 @@ static void Pc_FreeAimGunUpperBody(s_SubCharacter* player, s_PlayerExtra* extra,
             extra->model.anim.time        = Q12(holdKf);
             playerProps.flags &= ~PlayerFlag_Shooting;
 
-            if (!isHyperBlaster && reserve > 0 && (reloadReq || (fireEdge && ammo == 0)))
+            /* With infinite ammo an empty clip still fires, so the automatic
+             * "fired dry" reload must not run -- that is the one path that would
+             * move rounds out of the inventory while the cheat is on. A reload
+             * the player asks for by hand still works. */
+            if (!isHyperBlaster && reserve > 0 &&
+                (reloadReq || (fireEdge && ammo == 0 && !g_PcInfiniteAmmo)))
             {
                 /* Begin reload: play the reload anim (blend->active track) from the
                  * proven per-weapon keyframes, firing locked out. */
@@ -4527,15 +4579,19 @@ static void Pc_FreeAimGunUpperBody(s_SubCharacter* player, s_PlayerExtra* extra,
              * before the recoil ends) would loose an un-aimed shot from inside
              * the FSM. Raw input OR'd in so an isAiming blip can't drop a shot. */
             if ((g_SysWork.playerCombat.isAiming || g_Player_IsAiming) &&
-                (isHyperBlaster ? (fireHeld && s_refireT <= 0) : (fireEdge && ammo > 0)))
+                (isHyperBlaster ? (fireHeld && s_refireT <= 0)
+                                : (fireEdge && (ammo > 0 || g_PcInfiniteAmmo))))
             {
                 /* Fire: the existing (working) damage trigger + ammo + SFX. */
                 s_refireT = PC_GUN_REFIRE_SEC;
                 player->field_44.field_0 = 1;
                 if (g_SysWork.playerCombat.weaponAttack != WEAPON_ATTACK(EquippedWeaponId_HyperBlaster, AttackInputType_Tap))
                 {
-                    g_SysWork.playerCombat.currentWeaponAmmo--;
-                    g_SavegamePtr->items[g_SysWork.playerCombat.weaponInventoryIdx].count_1--;
+                    if (!g_PcInfiniteAmmo)
+                    {
+                        g_SysWork.playerCombat.currentWeaponAmmo--;
+                        g_SavegamePtr->items[g_SysWork.playerCombat.weaponInventoryIdx].count_1--;
+                    }
                     func_8005DC1C(g_Player_EquippedWeaponInfo.attackSfx, &player->position, Q8(0.5f), 0);
                 }
                 else
@@ -4555,7 +4611,7 @@ static void Pc_FreeAimGunUpperBody(s_SubCharacter* player, s_PlayerExtra* extra,
                 s_state    = PcGun_Fire;
                 s_stuckTmr = 0;
             }
-            else if (fireEdge && ammo == 0)
+            else if (fireEdge && ammo == 0 && !g_PcInfiniteAmmo)
             {
                 /* Dry fire. Reaching here means the reload branch above declined
                  * it — no reserve left — so this is the genuinely empty click,
@@ -4765,6 +4821,7 @@ static int s_pcMtClickQueue = 0;
  * which it both reads and writes, so that one travels by pointer. */
 static bool Player_CombatAnimUpdate(s_SubCharacter* player, s_PlayerExtra* extra, s32* enemyAttackedIdx) // 0x80074350 (un-nested from Player_UpperBodyMainUpdate)
 {
+    extern int g_PcInfiniteAmmo;
     s16 ssp20;
     s16 temp_a1;
     s32 keyframeIdx0;
@@ -5230,14 +5287,17 @@ static bool Player_CombatAnimUpdate(s_SubCharacter* player, s_PlayerExtra* extra
         {
             playerProps.flags |= PlayerFlag_Shooting;
 
-            if (g_SysWork.playerCombat.currentWeaponAmmo != 0)
+            if (g_SysWork.playerCombat.currentWeaponAmmo != 0 || g_PcInfiniteAmmo)
             {
                 player->field_44.field_0 = 1;
 
                 if (g_SysWork.playerCombat.weaponAttack != WEAPON_ATTACK(EquippedWeaponId_HyperBlaster, AttackInputType_Tap))
                 {
-                    g_SysWork.playerCombat.currentWeaponAmmo--;
-                    g_SavegamePtr->items[g_SysWork.playerCombat.weaponInventoryIdx].count_1--;
+                    if (!g_PcInfiniteAmmo)
+                    {
+                        g_SysWork.playerCombat.currentWeaponAmmo--;
+                        g_SavegamePtr->items[g_SysWork.playerCombat.weaponInventoryIdx].count_1--;
+                    }
 
                     func_8005DC1C(g_Player_EquippedWeaponInfo.attackSfx, &player->position, Q8(0.5f), 0);
                 }

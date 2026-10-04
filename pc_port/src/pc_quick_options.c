@@ -29,11 +29,14 @@
 #include "stb_truetype.h"
 
 #include "pc_quick_options.h"
+#include "pc_mouse_click_icons.h"
+#include "pc_dpad_icons.h"
 #include "pc_bind_panel.h"
 #include "pc_mouse_cursor.h"
 #include "pc_config.h"
 #include "pc_cheats.h"
 #include "control_style.h"
+#include "lang_quick.h"
 #include "sh_log.h"
 #include "game.h"
 #include "bodyprog/sound/sfx_id_enum.h"
@@ -150,6 +153,7 @@ static const QoRowDef s_page1[] = {
     { ROW_OPT,   "minimap_require_map",  0, NULL },
     { ROW_OPT,   "crosshair",            0, NULL },
     { ROW_OPT,   "crosshair_size",       0, NULL },
+    { ROW_OPT,   "text_size",            0, NULL },
     { ROW_OPT,   "low_health_glow",      0, NULL },
 /* Not on mobile: it would not do anything. PsyX_SPUAL_SetOutputMode is an
  * empty stub on the software backend and GetOutputMode always answers
@@ -416,6 +420,15 @@ static const char* const s_pageTitles[QO_PAGES] = {
     "QUICK OPTIONS  -  CHEATS",   "QUICK OPTIONS  -  DEBUG",
     "QUICK OPTIONS  -  CONTROLS" };
 
+/* The same sections by short name, which is what pc-port's navigation row and
+ * its title line take. Kept beside the full titles because the mobile pages are
+ * chunks of a section and carry "(2/3)" with the long form. */
+static const char* const s_pageNames[QO_PAGES] = {
+    "GRAPHICS", "HUD & AUDIO", "VIEW & ASPECT", "CHEATS", "DEBUG", "CONTROLS" };
+
+/* The View section's index here; pc-port names its own page enum. */
+#define QO_PG_VIEW 2
+
 /* ------------------------------------------------------------------ */
 /* Mobile pagination                                                   */
 /* ------------------------------------------------------------------ */
@@ -585,8 +598,17 @@ static int            s_fontsTried;
 
 /* Baked text, re-baked when the pixel size or the page changes; values are
  * re-baked whenever their text changes. */
-static GLuint s_texTitle, s_texHint;
-static int    s_titleW, s_titleH, s_hintW, s_hintH;
+static GLuint s_texTitle, s_texHint, s_texHint2;
+static int    s_titleW, s_titleH, s_hintW, s_hintH, s_hint2W, s_hint2H;
+/* The Previous / Next row, in pieces so the mouse glyphs sit inline. */
+enum { QO_NAV_PREV = 0, QO_NAV_SLASH, QO_NAV_NEXT, QO_NAV_DEST, QO_NAV_ICON_R, QO_NAV_ICON_L,
+       QO_NAV_PAD_L, QO_NAV_PAD_R, QO_NAV_N };
+static GLuint s_texNav[QO_NAV_N];
+static int    s_navW[QO_NAV_N], s_navH[QO_NAV_N];
+static int    s_navPx;
+/* The page row names the buttons of the device used last: the D-pad after
+ * controller input, the mouse after mouse or keyboard input. */
+static int    s_navPadIcons;
 #if defined(QO_MOBILE)
 /* Stepper marks for the tap halves. Baked ONCE and reused by every row --
  * two atlas slots for the whole panel, not two per row. */
@@ -1154,7 +1176,7 @@ static GLuint qo_bake_once(const char* text, float px, int* outW, int* outH, int
     p     = text;
     while (*p)
     {
-        int cp = (unsigned char)*p++;
+        int cp = (int)Pc_LangUtf8Next(&p);
         int gx0, gy0, gx1, gy1, gw, gh, adv, lsb, sx, sy;
         float shiftX;
         if (prev)
@@ -1265,6 +1287,105 @@ static void qo_build_white(void)
     if (qo_atlas_ensure())
         s_texWhite = 1; /* slot 0 handle */
 
+}
+
+/* A mouse glyph at `size` px, area-averaged down from the embedded 48 px
+ * coverage mask so it stays clean at text size (the atlas has no mips, and a
+ * LINEAR minify of the full mask would alias the thin outline). White with
+ * alpha = coverage, like the baked text, so it tints the same way. */
+static GLuint qo_bake_icon(const unsigned char* mask, int srcSize, int size, int* outW, int* outH)
+{
+    const float    scale = (float)srcSize / (float)size;
+    unsigned char* rgba;
+    GLuint         tex;
+    int            x, y;
+
+    if (size < 4 || size > 256)
+        return 0;
+    rgba = (unsigned char*)malloc((size_t)size * size * 4);
+    if (!rgba)
+        return 0;
+
+    for (y = 0; y < size; y++)
+    {
+        const float sy0 = y * scale, sy1 = (y + 1) * scale;
+        for (x = 0; x < size; x++)
+        {
+            const float sx0 = x * scale, sx1 = (x + 1) * scale;
+            float       acc = 0.0f;
+            int         iy, ix;
+
+            for (iy = (int)sy0; iy < srcSize && (float)iy < sy1; iy++)
+            {
+                const float wy = fminf(sy1, (float)(iy + 1)) - fmaxf(sy0, (float)iy);
+                for (ix = (int)sx0; ix < srcSize && (float)ix < sx1; ix++)
+                {
+                    const float wx = fminf(sx1, (float)(ix + 1)) - fmaxf(sx0, (float)ix);
+                    acc += (float)mask[iy * srcSize + ix] * wx * wy;
+                }
+            }
+            acc /= scale * scale;
+            rgba[(y * size + x) * 4 + 0] = 255;
+            rgba[(y * size + x) * 4 + 1] = 255;
+            rgba[(y * size + x) * 4 + 2] = 255;
+            rgba[(y * size + x) * 4 + 3] = (unsigned char)(acc > 255.0f ? 255.0f : acc + 0.5f);
+        }
+    }
+
+    tex = qo_upload_rgba(rgba, size, size, 0);
+    free(rgba);
+    if (outW) *outW = size;
+    if (outH) *outH = size;
+    return tex;
+}
+
+/* Previous / Next row pieces for `page`, baked so the whole row fits `avail`:
+ * at `px` if it does, otherwise once more scaled down to fit. Right click goes
+ * back and left click forward (the row adjusts like a value row), so each word
+ * carries the button that does it; on a controller that is D-pad left / right.
+ * Both icon pairs are square at one size, so the fit holds for either. */
+static void qo_bake_nav(int page, int px, float avail)
+{
+    char dest[192];
+    int  pass, i;
+
+    snprintf(dest, sizeof(dest), "(%s  /  %s)",
+             Pc_LangQuick(s_pageNames[(page + QO_PAGES - 1) % QO_PAGES]),
+             Pc_LangQuick(s_pageNames[(page + 1) % QO_PAGES]));
+
+    for (pass = 0; pass < 2; pass++)
+    {
+        const int destPx = (int)((float)px * 0.82f);
+        const int icon   = (int)((float)px * 1.15f + 0.5f);
+        float     total;
+
+        s_texNav[QO_NAV_PREV]   = qo_bake(Pc_LangQuick("Previous"), (float)px, &s_navW[QO_NAV_PREV], &s_navH[QO_NAV_PREV]);
+        s_texNav[QO_NAV_SLASH]  = qo_bake("/", (float)px, &s_navW[QO_NAV_SLASH], &s_navH[QO_NAV_SLASH]);
+        s_texNav[QO_NAV_NEXT]   = qo_bake(Pc_LangQuick("Next"), (float)px, &s_navW[QO_NAV_NEXT], &s_navH[QO_NAV_NEXT]);
+        s_texNav[QO_NAV_DEST]   = qo_bake(dest, (float)destPx, &s_navW[QO_NAV_DEST], &s_navH[QO_NAV_DEST]);
+        s_texNav[QO_NAV_ICON_R] = qo_bake_icon(g_PcMouseIconRight, PC_MOUSE_ICON_SIZE, icon, &s_navW[QO_NAV_ICON_R], &s_navH[QO_NAV_ICON_R]);
+        s_texNav[QO_NAV_ICON_L] = qo_bake_icon(g_PcMouseIconLeft,  PC_MOUSE_ICON_SIZE, icon, &s_navW[QO_NAV_ICON_L], &s_navH[QO_NAV_ICON_L]);
+        s_texNav[QO_NAV_PAD_L]  = qo_bake_icon(g_PcDpadIconLeft,   PC_DPAD_ICON_SIZE,  icon, &s_navW[QO_NAV_PAD_L],  &s_navH[QO_NAV_PAD_L]);
+        s_texNav[QO_NAV_PAD_R]  = qo_bake_icon(g_PcDpadIconRight,  PC_DPAD_ICON_SIZE,  icon, &s_navW[QO_NAV_PAD_R],  &s_navH[QO_NAV_PAD_R]);
+
+        total = (float)(s_navW[QO_NAV_ICON_R] + s_navW[QO_NAV_PREV] + s_navW[QO_NAV_SLASH] +
+                        s_navW[QO_NAV_NEXT] + s_navW[QO_NAV_ICON_L] + s_navW[QO_NAV_DEST]) +
+                (float)px * (0.3f * 2.0f + 0.45f * 2.0f + 0.9f);
+        if (pass == 1 || total <= avail || total <= 0.0f)
+        {
+            s_navPx = px;
+            return;
+        }
+
+        for (i = 0; i < QO_NAV_N; i++)
+        {
+            qo_retire(s_texNav[i]);
+            s_texNav[i] = 0;
+        }
+        px = (int)((float)px * avail / total);
+        if (px < 6)
+            px = 6;
+    }
 }
 
 static void qo_free_text(void)
@@ -1422,12 +1543,13 @@ static void qo_row_name(const QoRowDef* r, char* out, int n)
         const void* h = PcOpt_QuickFind(r->key);
         /* A table row may carry its own wording: the options screen's names
          * are cut to fit a 320px value column, and this panel has the room. */
-        src = (r->label != NULL) ? r->label : (h ? PcOpt_QuickName(h) : r->key);
+        src = (r->label != NULL) ? Pc_LangQuickMenu(r->label)
+                                 : (h ? Pc_LangQuickMenu(PcOpt_QuickName(h)) : r->key);
     }
     else if (r->kind == ROW_CHEAT)
-        src = Pc_Cheats_Name(r->cpage, r->extra);
+        src = Pc_LangQuick(Pc_Cheats_Name(r->cpage, r->extra));
     else
-        src = r->label;
+        src = Pc_LangQuick(r->label);
 
     for (i = 0; i < n - 1 && src[i]; i++)
         out[i] = (src[i] == '_') ? ' ' : src[i];
@@ -1441,7 +1563,7 @@ static void qo_row_value(const QoRowDef* r, char* out, int n)
     if (r->kind == ROW_OPT)
     {
         const void* h = PcOpt_QuickFind(r->key);
-        const char* v = h ? PcOpt_QuickLabel(h, buf, (int)sizeof(buf)) : "?";
+        const char* v = h ? Pc_LangQuickMenu(PcOpt_QuickLabel(h, buf, (int)sizeof(buf))) : "?";
         int i;
         for (i = 0; i < n - 1 && v[i]; i++)
             out[i] = (v[i] == '_') ? ' ' : v[i];
@@ -2208,18 +2330,21 @@ void Pc_QuickOptions_Draw(void)
         s_texTitle = qo_bake(qo_page_title(s_page), (float)(int)(titleH * 0.46f),
                              &s_titleW, &s_titleH);
 #else
-        const char* title = s_pageTitles[s_page];
-        char titleBuf[64];
-        if (s_page == 2)
+        char titleBuf[192];
+        char name[96];
+
+        Pc_LangUtf8Upper(Pc_LangQuick(s_pageNames[s_page]), name, (int)sizeof(name));
+        if (s_page == QO_PG_VIEW)
         {
             int m = qo_view_cam_mode();
-            snprintf(titleBuf, sizeof(titleBuf), "QUICK OPTIONS  -  VIEW  (%s)",
-                     (m == QO_CAM_FPS) ? "Firstperson" :
-                     (m == QO_CAM_OTS) ? "Over-the-Shoulder" :
-                     (m == QO_CAM_TPS) ? "Thirdperson" : "Classic");
-            title = titleBuf;
+            snprintf(titleBuf, sizeof(titleBuf), "%s  -  %s  (%s)", Pc_LangQuick("QUICK OPTIONS"), name,
+                     Pc_LangQuick((m == QO_CAM_FPS) ? "Firstperson" :
+                                  (m == QO_CAM_OTS) ? "Over-the-Shoulder" :
+                                  (m == QO_CAM_TPS) ? "Thirdperson" : "Classic"));
         }
-        s_texTitle = qo_bake(title, (float)(int)(titleH * 0.46f), &s_titleW, &s_titleH);
+        else
+            snprintf(titleBuf, sizeof(titleBuf), "%s  -  %s", Pc_LangQuick("QUICK OPTIONS"), name);
+        s_texTitle = qo_bake(titleBuf, (float)(int)(titleH * 0.46f), &s_titleW, &s_titleH);
 #endif
     }
 #if defined(QO_MOBILE)
@@ -2232,21 +2357,30 @@ void Pc_QuickOptions_Draw(void)
 #if !defined(QO_MOBILE)
     if (!s_texHint)
     {
-        char  hint[192];
+        char  hint[384], hint2[384];
         float avail = panelW - 2.0f * pad;
-        int   hpx   = (int)(hintH * 0.42f);
+        int   hpx   = (int)(hintH * 0.30f);
+        int   widest;
 
         if (hpx < 7) hpx = 7;
-        snprintf(hint, sizeof(hint),
-                 "Up/Down select   Left/Right adjust   PgUp/PgDn page   drag title to move   %s or Esc close   * req restart",
-                 g_PcConfig.keyQuickOptions[0] ? g_PcConfig.keyQuickOptions : "F10");
-        s_texHint = qo_bake(hint, (float)hpx, &s_hintW, &s_hintH);
-        if (s_texHint && s_hintW > avail && s_hintW > 0 && avail > 0.0f)
+        snprintf(hint, sizeof(hint), "%s    %s    %s", Pc_LangQuick("Up/Down select"),
+                 Pc_LangQuick("Left/Right adjust"), Pc_LangQuick("Q/E or PgUp/PgDn page"));
+        snprintf(hint2, sizeof(hint2), "%s    %s    %s", Pc_LangQuick("Drag the title to move"),
+                 Pc_LangQuickFill("{key} or Esc close", "{key}",
+                                  g_PcConfig.keyQuickOptions[0] ? g_PcConfig.keyQuickOptions : "F10"),
+                 Pc_LangQuick("* needs restart"));
+        s_texHint  = qo_bake(hint,  (float)hpx, &s_hintW,  &s_hintH);
+        s_texHint2 = qo_bake(hint2, (float)hpx, &s_hint2W, &s_hint2H);
+        widest = (s_hintW > s_hint2W) ? s_hintW : s_hint2W;
+        if (widest > avail && widest > 0 && avail > 0.0f)
         {
-            int fit = (int)((float)hpx * avail / (float)s_hintW);
+            int fit = (int)((float)hpx * avail / (float)widest);
             if (fit < 6)   fit = 6;
             if (fit > hpx) fit = hpx;
-            s_texHint = qo_bake(hint, (float)fit, &s_hintW, &s_hintH);
+            qo_retire(s_texHint);
+            qo_retire(s_texHint2);
+            s_texHint  = qo_bake(hint,  (float)fit, &s_hintW,  &s_hintH);
+            s_texHint2 = qo_bake(hint2, (float)fit, &s_hint2W, &s_hint2H);
         }
     }
 #endif
