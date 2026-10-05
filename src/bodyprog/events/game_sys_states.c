@@ -113,10 +113,10 @@ static s_MapPoint2d s_PC_D_800BCDB0_Backup;
 static int s_PC_D_800BCDB0_Saved = 0;
 #endif
 
+void InGame_SimAndDraw(void);
+
 void GameState_InGame_Update(void) // 0x80038BD4
 {
-    s_SubCharacter* player;
-
     Demo_DemoRandSeedBackup();
 
     switch (g_GameWork.gameStateSteps[0])
@@ -271,6 +271,17 @@ void GameState_InGame_Update(void) // 0x80038BD4
         }
     }
     Demo_DemoRandSeedRestore();
+
+    InGame_SimAndDraw();
+}
+
+/* The gameplay sim + world draw, split out of GameState_InGame_Update so the
+ * co-op inventory can run it behind the menu (enemies act, Harry frozen) without
+ * re-entering that function's one-shot step-0 init. Single-player reaches it in
+ * exactly the same place and order, so its behaviour is unchanged. */
+void InGame_SimAndDraw(void)
+{
+    s_SubCharacter* player;
 
     D_800A9A0C = ScreenFade_IsFinished() && Fs_QueueChunksLoad();
 

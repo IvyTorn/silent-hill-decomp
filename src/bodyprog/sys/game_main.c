@@ -3379,7 +3379,15 @@ void MainLoop(void) // 0x80032EE0
              * flag; before that the ending's write never left the DLL.) */
             const int cutsceneLive = ((g_SysWork.sysFlags & SysFlag_CutsceneActive) ||
                                       g_SysWork.cutsceneBorderState != CutsceneBorderState_None) ? 1 : 0;
-            int wantHorPlus = (g_GameWork.gameState == GameState_InGame &&
+            extern int g_PcCoopGame;
+            /* Co-op draws the live world behind the inventory (see the no-pause
+             * sim call in GameState_ItemScreens_Update), so that world frame
+             * must be framed Hor+ like gameplay even though gameState is the
+             * inventory. The inventory's own UI is kept 4:3 by the OT2 pass. */
+            int wantHorPlus = ((g_GameWork.gameState == GameState_InGame ||
+                                (g_PcCoopGame &&
+                                 g_GameWork.gameState == GameState_InventoryScreen &&
+                                 g_PcWorldDrawnThisFrame)) &&
                                !(g_PsxSkipFramebufferStore && !cutsceneLive) &&
                                !g_PcMapScreenActive &&
                                !bg2dHeld) ? 1 : 0;
@@ -4156,6 +4164,12 @@ void MainLoop(void) // 0x80032EE0
              * Once the world is gone the menu owns the screen and 4:3 is right,
              * which is also what stops the items and the portrait from being
              * drawn squished toward the centre over the black. */
+            extern int g_PcCoopGame;
+            /* Co-op draws the live world behind the inventory, so uiWorldOnScreen
+             * is now set during it; but the inventory UI is still 320-authored
+             * and must stay 4:3, so force the menu framing for it. */
+            const int uiCoopInv = (g_PcCoopGame &&
+                                   g_GameWork.gameState == GameState_InventoryScreen);
             const int uiWorldOnScreen = g_PcWorldDrawnThisFrame || g_PsxPresentLastFrame;
             const int uiMenuState = (g_SysWork.sysFlags & SysFlag_MenuActive)     ||
                                   g_GameWork.gameState == GameState_InventoryScreen  ||
@@ -4169,7 +4183,7 @@ void MainLoop(void) // 0x80032EE0
                                   g_SysWork.sysState == SysState_MapScreen   ||
                                   g_SysWork.sysState == SysState_SaveMenu0   ||
                                   g_SysWork.sysState == SysState_SaveMenu1;
-            const int uiIsMenu = uiMenuState && !uiWorldOnScreen;
+            const int uiIsMenu = uiCoopInv ? 1 : (uiMenuState && !uiWorldOnScreen);
 
             g_PcHorPlusEnabled = uiIsMenu ? 0 : g_PcHorPlusGate;
             g_PsxUIOrthoPass   = 1;

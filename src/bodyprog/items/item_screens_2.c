@@ -107,6 +107,29 @@ void GameState_ItemScreens_Update(void) // 0x8004C9B0
     Gfx_StringSetColor(StringColorId_White);
     func_800363D0();
 
+#ifdef SH_PC_PORT
+    /* Co-op: the inventory does not pause the world. While the inventory is
+     * actually up (steps 1..16, not the load/exit/save steps), step the gameplay
+     * sim and draw the world behind the menu, so enemies keep acting and can
+     * reach Harry while he is in his pack. His own control is frozen only across
+     * the sim call and restored right after, so he is never left frozen when the
+     * menu closes. Single-player leaves g_PcCoopGame 0 and keeps the classic
+     * frozen inventory. The world draws first; the inventory UI draws over it. */
+    {
+        extern int  g_PcCoopGame;
+        extern u8   g_Player_DisableControl;
+        extern void InGame_SimAndDraw(void);
+        if (g_PcCoopGame &&
+            g_GameWork.gameStateSteps[1] >= 1 && g_GameWork.gameStateSteps[1] <= 16)
+        {
+            u8 savedDisable = g_Player_DisableControl;
+            g_Player_DisableControl = true;
+            InGame_SimAndDraw();
+            g_Player_DisableControl = savedDisable;
+        }
+    }
+#endif
+
     // Update timer if current screen is inventory.
     if (g_GameWork.gameStateSteps[1] < 21)
     {
