@@ -276,7 +276,24 @@ void Pc_CoopMenu_StatusText(char* out, int cap)
         break;
 
     case COOP_PAGE_JOIN:
-        snprintf(out, cap, "Accept a Steam invite from a friend to join.");
+        if (ShSteam_LobbyState() == SHSTEAM_LOBBY_IN)
+        {
+            /* Already in a friend's lobby: tell them whether it is still
+             * gathering or already a game in progress (you drop straight in). */
+            const char* st = ShSteam_GetLobbyData("state");
+            if (st && strcmp(st, "ingame") == 0)
+            {
+                snprintf(out, cap, "Game in progress - dropping you in...");
+            }
+            else
+            {
+                snprintf(out, cap, "In the lobby - waiting for the host to start.");
+            }
+        }
+        else
+        {
+            snprintf(out, cap, "Accept a Steam invite from a friend to join.");
+        }
         break;
 
     case COOP_PAGE_INGAME:
