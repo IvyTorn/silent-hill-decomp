@@ -37,7 +37,13 @@ const char* Pc_CoopMenu_Title(void);
 void        Pc_CoopMenu_RowText(int i, char* out, int cap);
 void        Pc_CoopMenu_StatusText(char* out, int cap);
 
-/* Mouse: the renderer maps the pointer to a row and drives selection/confirm. */
+/* Mouse: the renderer hands over the row geometry each frame (panel left/right,
+ * the y of the first row, and the row pitch, all in top-down overlay pixels,
+ * plus the viewport size), and Pc_CoopMenu_Update does the hover/click hit-test
+ * once per game frame -- the same split the randomizer and achievements windows
+ * use. Doing the click in the render pass was why it landed on the wrong row. */
+void        Pc_CoopMenu_SetGeometry(float panelL, float panelR, float listTop,
+                                    float rowPitch, float vpW, float vpH);
 void        Pc_CoopMenu_SetSelected(int i);
 void        Pc_CoopMenu_Confirm(void);
 

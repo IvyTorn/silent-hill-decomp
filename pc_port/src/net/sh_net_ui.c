@@ -1290,8 +1290,7 @@ static void Nu_DrawCoopMenu(int px)
     const float titleH = (float)px * 1.9f;
     char  status[128];
     float statusH, panelW, panelH, panelX, panelY, cx, y;
-    int   i, sel, hovered = -1;
-    float mnx, mny;
+    int   i, sel;
 
     Pc_CoopMenu_StatusText(status, sizeof(status));
     statusH = status[0] ? (float)px * 1.7f : 0.0f;
@@ -1303,32 +1302,12 @@ static void Nu_DrawCoopMenu(int px)
     panelY = (s_vpH - panelH) * 0.5f;
     cx     = s_vpW * 0.5f;
 
-    /* Mouse: which row is under the pointer? Hover sets the selection (only on
-     * actual movement, so the pad/keyboard are not fought by an idle pointer). */
-    if (Pc_MouseCursor_ViewportPos(&mnx, &mny))
-    {
-        float mx = mnx * s_vpW;
-        float my = mny * s_vpH;
-        if (mx >= panelX && mx <= panelX + panelW)
-        {
-            for (i = 0; i < n; i++)
-            {
-                float top = panelY + titleH + (float)i * rowH - (float)px * 0.2f;
-                if (my >= top && my <= top + rowH)
-                {
-                    hovered = i;
-                    break;
-                }
-            }
-        }
-        /* The highlighted row always follows the pointer, so what you click is
-         * what is lit -- a stale selection under the cursor was why clicks seemed
-         * to hit the wrong row. */
-        if (hovered >= 0)
-        {
-            Pc_CoopMenu_SetSelected(hovered);
-        }
-    }
+    /* Hand this frame's row geometry to the menu; hover and click are hit-tested
+     * in Pc_CoopMenu_Update (once per game frame), not here in the render pass --
+     * which is what made clicks land on the wrong row. First row y = panelY +
+     * titleH, pitch = rowH. */
+    Pc_CoopMenu_SetGeometry(panelX, panelX + panelW, panelY + titleH, rowH,
+                            s_vpW, s_vpH);
 
     sel = Pc_CoopMenu_Selected();
 
@@ -1359,23 +1338,6 @@ static void Nu_DrawCoopMenu(int px)
     {
         Nu_DrawTextCentered(status, cx, panelY + panelH - statusH + (float)px * 0.3f,
                             (int)((float)px * 0.82f), 0.80f, 0.76f, 0.64f, 0.95f);
-    }
-
-    /* Click confirms the hovered row, once per press. The latch is tracked here
-     * (not via the per-frame click edge) so a single press fires exactly one
-     * confirm regardless of how the draw hook lines up with the input poll --
-     * multiple confirms from one click were cycling options and jumping pages.
-     * Done after the draw so a page change does not desync this frame's
-     * geometry; the new page draws next frame. */
-    {
-        static int s_wasDown = 0;
-        int        down = Pc_MouseCursor_LeftHeld();
-        if (hovered >= 0 && down && !s_wasDown)
-        {
-            Pc_CoopMenu_SetSelected(hovered);
-            Pc_CoopMenu_Confirm();
-        }
-        s_wasDown = down;
     }
 
     Nu_DrawCursor();

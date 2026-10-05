@@ -15,6 +15,7 @@
 #include "pc_coop_menu.h"
 #include "pc_coop_save.h"
 #include "pc_config.h"
+#include "pc_mouse_cursor.h" /* hover/click hit-test in Update, like the other windows */
 #include "sh_net_session.h"
 #include "sh_net_steam.h"
 #include "sh_log.h"
@@ -37,6 +38,12 @@ static int      s_inGame;   /* 1 = opened in-game (M menu), 0 = main-menu popup 
 static CoopPage s_page;
 static int      s_sel;
 static char     s_msg[64];  /* transient feedback shown on the in-game status line */
+
+/* Row geometry handed over by the renderer each frame (top-down overlay pixels).
+ * s_geoRowPitch stays 0 until the first draw, which disables the hit-test so a
+ * click before the menu has been laid out does nothing. */
+static float    s_geoPanelL, s_geoPanelR, s_geoListTop, s_geoRowPitch;
+static float    s_geoVpW, s_geoVpH;
 
 /* 1 while the CURRENT game was launched as multiplayer (host or join via the
  * Multiplayer menu). This -- not a config flag -- is what turns on the in-game
@@ -390,6 +397,17 @@ static void Coop_Confirm(void)
     }
 }
 
+void Pc_CoopMenu_SetGeometry(float panelL, float panelR, float listTop,
+                             float rowPitch, float vpW, float vpH)
+{
+    s_geoPanelL   = panelL;
+    s_geoPanelR   = panelR;
+    s_geoListTop  = listTop;
+    s_geoRowPitch = rowPitch;
+    s_geoVpW      = vpW;
+    s_geoVpH      = vpH;
+}
+
 /* Mouse hover drives the selection; a click selects then confirms. The renderer
  * (sh_net_ui.c) owns the row geometry, so it maps the pointer to a row and calls
  * these. */
@@ -417,6 +435,35 @@ void Pc_CoopMenu_Update(int cancel, int up, int down, int confirm)
         return;
     }
     rows = Pc_CoopMenu_RowCount();
+
+    /* Mouse, handled here once per game frame (not in the render pass): movement
+     * selects the hovered row, a left-click confirms it. Same shape as the
+     * randomizer window. The Nu overlay is top-down, so the pointer maps straight
+     * to row = (y - listTop) / pitch with no Y flip. */
+    if (s_geoRowPitch > 0.0f)
+    {
+        float mx, my;
+        if (Pc_MouseCursor_ViewportPos(&mx, &my))
+        {
+            float py  = my * s_geoVpH;
+            float mpx = mx * s_geoVpW;
+            int   row = (int)((py - s_geoListTop) / s_geoRowPitch);
+            if (mpx >= s_geoPanelL && mpx <= s_geoPanelR && row >= 0 && row < rows)
+            {
+                if (Pc_MouseCursor_Moved())
+                {
+                    s_sel = row;
+                }
+                if (Pc_MouseCursor_LeftClicked())
+                {
+                    s_sel = row;
+                    Coop_Confirm();
+                    return;
+                }
+            }
+        }
+    }
+
     if (up)
     {
         s_sel = (s_sel + rows - 1) % rows;
