@@ -35,7 +35,6 @@ Co-op is being built in slices.
 - See each other in the same world as your own character, posed to how you are actually moving.
 - Guests boot into the host's map automatically when the host starts, and follow the host's map changes.
 - **Shared item pickups.** When anyone picks something up, everyone gets it, each into their own inventory. Key items are shared, and ammo gives every player that many rounds without pooling.
-- **"Please stay with your companions"** nudge when you wander into another area alone, and it clears when you regroup.
 
 **In progress**
 - Host-authoritative enemy sync (today each player has their own monsters).

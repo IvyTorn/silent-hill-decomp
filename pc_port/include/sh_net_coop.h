@@ -52,13 +52,6 @@ void ShNet_SetCoopActive(int active, const char* why);
  * may not" rule there is one place to put it. */
 int  ShNet_PauseBlocked(void);
 
-/* 1 when the local player has been alone on their map -- every companion in
- * another area -- past a short grace period, so the overlay can show the
- * "stay with your companions" nudge. Computed on the game thread in
- * ShNet_GameTick; a plain read from the render thread is fine (same thread as
- * the game loop). Always 0 outside a co-op session. */
-int  ShNet_CoopStray(void);
-
 #ifdef __cplusplus
 }
 #endif
