@@ -87,6 +87,14 @@ static int           s_itemOutCount;
 static ShSessionItem s_itemIn[SESSION_ITEM_Q];
 static int           s_itemInCount;
 
+/* Host: the map guests should be booted into, kept persistent (not one-shot) so a
+ * player who joins AFTER the host started still gets sent in -- join-in-progress.
+ * s_worldSent[i] is "member i has been sent the current world"; a map change
+ * clears it so everyone is re-sent, and a fresh joiner's stays 0 so only they
+ * are sent. -1 = host is not in a game yet (lobby only). */
+static int           s_worldMapCur = -1;
+static int           s_worldSent[SHSESSION_MAX_MEMBERS];
+
 /* ------------------------------------------------------------------ */
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */
@@ -340,6 +348,7 @@ static void ShSession_SyncMembers(void)
     ShSessionMember fresh[SHSESSION_MAX_MEMBERS];
     unsigned int    freshSeen[SHSESSION_MAX_MEMBERS];
     unsigned int    freshSent[SHSESSION_MAX_MEMBERS];
+    int             freshWorld[SHSESSION_MAX_MEMBERS];
     int             n = ShSteam_MemberCount();
     int             count = 0;
     int             i;
@@ -351,6 +360,7 @@ static void ShSession_SyncMembers(void)
     memset(fresh, 0, sizeof(fresh));
     memset(freshSeen, 0, sizeof(freshSeen));
     memset(freshSent, 0, sizeof(freshSent));
+    memset(freshWorld, 0, sizeof(freshWorld)); /* a new member has not been sent the world */
 
     for (i = 0; i < n; i++)
     {
@@ -364,9 +374,10 @@ static void ShSession_SyncMembers(void)
         }
         if (old >= 0)
         {
-            fresh[count]     = s_members[old];
-            freshSeen[count] = s_lastSeenMs[old];
-            freshSent[count] = s_pingSentMs[old];
+            fresh[count]      = s_members[old];
+            freshSeen[count]  = s_lastSeenMs[old];
+            freshSent[count]  = s_pingSentMs[old];
+            freshWorld[count] = s_worldSent[old];
         }
         else
         {
@@ -391,6 +402,7 @@ static void ShSession_SyncMembers(void)
     memcpy(s_members, fresh, sizeof(s_members));
     memcpy(s_lastSeenMs, freshSeen, sizeof(s_lastSeenMs));
     memcpy(s_pingSentMs, freshSent, sizeof(s_pingSentMs));
+    memcpy(s_worldSent, freshWorld, sizeof(s_worldSent));
     s_memberCount = count;
 }
 
@@ -693,6 +705,8 @@ void ShSession_Tick(unsigned int nowMs)
         {
             s_memberCount = 0;
         }
+        s_worldMapCur = -1;
+        memset(s_worldSent, 0, sizeof(s_worldSent));
         ShSession_Publish();
         return;
     }
@@ -705,6 +719,9 @@ void ShSession_Tick(unsigned int nowMs)
     {
         ShSteam_SetLobbyData("game", "silenthill-online");
         ShSteam_SetLobbyData("proto", "1");
+        /* So a joiner (and a lobby browser) can tell a session that has already
+         * started from one still gathering in the lobby. */
+        ShSteam_SetLobbyData("state", s_worldMapCur >= 0 ? "ingame" : "lobby");
     }
 
     if (nowMs - s_lastHelloMs >= SESSION_HELLO_MS)
@@ -737,24 +754,34 @@ void ShSession_Tick(unsigned int nowMs)
         }
     }
 
-    /* Host -> guests: boot into the co-op map (reliable). */
-    if (wantWorldMap >= 0)
+    /* Host -> guests: boot into the co-op map (reliable). The map is remembered
+     * (s_worldMapCur) and a fresh map change clears every member's sent-flag, so
+     * this one loop handles both the start broadcast AND a player who joins
+     * mid-game: anyone who has not yet been sent the current world gets it now. */
+    if (wantWorldMap >= 0 && wantWorldMap != s_worldMapCur)
+    {
+        s_worldMapCur = wantWorldMap;
+        memset(s_worldSent, 0, sizeof(s_worldSent));
+        SH_DBG("[SESSION] co-op world is now map %d", s_worldMapCur);
+    }
+    if (ShSteam_IsLobbyOwner() && s_worldMapCur >= 0)
     {
         for (i = 0; i < s_memberCount; i++)
         {
             shn_u8 buf[SHNET_HDR_SIZE + 4];
             int    off = SHNET_HDR_SIZE;
-            if (s_members[i].steamId == ShSteam_SelfId())
+            if (s_members[i].steamId == ShSteam_SelfId() || s_worldSent[i])
             {
                 continue;
             }
-            ShnPutU8(buf, &off, (shn_u8)((wantWorldMap > 255) ? 0xFF : wantWorldMap));
+            ShnPutU8(buf, &off, (shn_u8)((s_worldMapCur > 255) ? 0xFF : s_worldMapCur));
             ShnPutU8(buf, &off, 0);
             ShnPutU16(buf, &off, 0);
             ShnPutHeader(buf, SHNET_MSG_S_WORLD, (shn_u16)(off - SHNET_HDR_SIZE), 0);
             ShSteam_Send(s_members[i].steamId, buf, off, 1);
+            s_worldSent[i] = 1;
+            SH_DBG("[SESSION] sent world (map %d) to %s", s_worldMapCur, s_members[i].name);
         }
-        SH_DBG("[SESSION] sent world boot (map %d) to %d member(s)", wantWorldMap, s_memberCount);
     }
 
     /* Co-op presence: broadcast our pose, unreliable, throttled. */

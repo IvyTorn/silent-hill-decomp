@@ -19,6 +19,8 @@
 #include "bodyprog/map/map.h"
 #include "bodyprog/items.h"        /* INV_ITEM_COUNT_MAX, s_InventoryItem */
 #include "bodyprog/item_screens.h" /* Inventory_AddSpecialItem: grant a shared pickup */
+#include "bodyprog/collision/collision.h" /* Collision_SurfaceGet: ground-snap a joining guest */
+#include "sh_net_steam.h"          /* ShSteam_LobbyOwner: identify the host member */
 
 #include "sh_net.h"
 #include "sh_net_memo.h"
@@ -152,6 +154,69 @@ static void ShNetG_SyncItems(void)
     s_snapInit = 1;
 }
 
+/* Set by title.c when a guest boots into the host's map (join or join-in-
+ * progress); cleared once we have placed him next to the host. */
+int g_PcCoopGuestSpawn = 0;
+
+/* Guest join placement. A guest who boots into the host's map should appear next
+ * to the host, not at the map's New Game spawn (which, for a mid-game joiner,
+ * could be a whole map away). We wait until we have actually received the host's
+ * pose on this map, then drop the player there with a ground snap so he lands on
+ * the floor rather than in the air or under it. The host is standing in a valid
+ * spot, so placing the guest at his position cannot be inside a wall. Runs once.
+ */
+static void ShNetG_CoopGuestSpawn(int mapIdx)
+{
+    unsigned long long     hostId;
+    const ShSessionMember* host = NULL;
+    int                    i, n;
+
+    if (!g_PcCoopGuestSpawn || !ShSession_Active() || ShSession_IsHost())
+    {
+        return;
+    }
+
+    hostId = ShSteam_LobbyOwner();
+    n      = ShSession_MemberCount();
+    for (i = 0; i < n; i++)
+    {
+        const ShSessionMember* m = ShSession_Member(i);
+        if (m && m->steamId == hostId)
+        {
+            host = m;
+            break;
+        }
+    }
+
+    /* Need the host's live pose, and he must be on our map. Until then wait: the
+     * player sits at the New Game spawn for the few frames it takes to hear him. */
+    if (!host || host->poseMs == 0 || host->mapIdx != mapIdx)
+    {
+        return;
+    }
+
+    {
+        s_SubCharacter*    hp = &g_SysWork.playerWork.player;
+        s_CollisionSurface coll;
+        Collision_SurfaceGet(&coll, host->x, host->z);
+        hp->position.vx = host->x;
+        hp->position.vz = host->z;
+        if (coll.groundHeight != Q12(8.0f)) /* Q12(8.0f) is the "no floor here" sentinel */
+        {
+            hp->position.vy                    = coll.groundHeight;
+            hp->properties.player.groundHeight = coll.groundHeight;
+        }
+        else
+        {
+            hp->position.vy = host->y;
+        }
+        hp->rotation.vy = (s16)host->rotY;
+    }
+
+    g_PcCoopGuestSpawn = 0;
+    SH_DBG("[COOP] guest placed next to host on map %d", mapIdx);
+}
+
 void ShNet_OnMapChanged(int mapIdx)
 {
     if (mapIdx == s_lastMap)
@@ -272,6 +337,9 @@ void ShNet_GameTick(void)
 
     /* Co-op shared items: hand out what we picked up, take in what others did. */
     ShNetG_SyncItems();
+
+    /* Co-op: place a joining guest next to the host once his pose is known. */
+    ShNetG_CoopGuestSpawn(mapIdx);
 
     /* Death marker, once per death. Latched rather than edge-detected on the
      * health value alone: health sits at zero for the whole death animation

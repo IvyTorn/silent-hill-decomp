@@ -284,11 +284,16 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                 }
                 else if (guestMap >= 0)
                 {
-                    /* Guest: the host pressed Start -- boot a fresh game into
-                     * their map (coopGuestMap overrides the New Game start map). */
-                    g_PcCoopGame   = 1;
-                    coopGuestMap   = guestMap;
-                    skipToGameStep = 1;
+                    /* Guest: the host is in this map -- boot a fresh game into it
+                     * (coopGuestMap overrides the New Game start map). Flag that
+                     * we should be placed next to the host once his position is
+                     * known, so a mid-game joiner does not land at the New Game
+                     * spawn across the map from everyone. */
+                    extern int g_PcCoopGuestSpawn;
+                    g_PcCoopGame     = 1;
+                    coopGuestMap     = guestMap;
+                    skipToGameStep   = 1;
+                    g_PcCoopGuestSpawn = 1;
                     Pc_CoopMenu_Close(); /* the Join page is likely still up */
                 }
             }
