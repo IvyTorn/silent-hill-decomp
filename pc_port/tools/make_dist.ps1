@@ -55,14 +55,17 @@ $args += "/XD"; $args += $xd
 & robocopy @args | Out-Null
 $code = $LASTEXITCODE  # robocopy: 0-7 are success (8+ is failure)
 
-# /MIR does not descend into an /XD-excluded directory, so one that was copied
-# by an earlier run (before it was excluded) would linger. Remove the excluded
-# disc-derived / personal dirs from dist explicitly, so the script is idempotent
-# whatever state dist was left in.
+# /MIR does not descend into an /XD-excluded directory, nor delete /XF-excluded
+# files, so anything created IN dist by running the game there (logs) or copied
+# before an exclusion was added (FMV) would linger. Strip them explicitly so the
+# distributable stays clean no matter how dist was left. The disc .bin a tester
+# drops into dist/gamedata to play is deliberately left alone.
 foreach ($d in @("gamedata\FMV", "gamedata\temp")) {
     $p = Join-Path $Dist $d
     if (Test-Path $p) { Remove-Item -Recurse -Force $p }
 }
+Get-ChildItem -Path $Dist -Filter *.log -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
 
 # Folders the game writes into at runtime; ship them empty so a fresh install
 # has somewhere to put saves without the disc data or anyone's progress.
