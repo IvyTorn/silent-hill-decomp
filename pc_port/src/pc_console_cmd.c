@@ -1494,6 +1494,23 @@ void Pc_ConsoleExec(const char* line)
                 cprintf("  - %-20s  --%s", m->name,
                         m->linked ? "" : "  (no link)");
         }
+    } else if (strcmp(cmd, "COOPDEBUG") == 0) {
+        /* Host-only: allow JOINED players to use debug controls (console, cheat
+         * keys). Off by default, so a guest cannot cheat/console unless the host
+         * turns this on. Rides the lobby data to every guest; the host's own
+         * debug controls are governed by allow_debug_controls as usual. */
+        extern int g_PcCoopGame;
+        if (!g_PcCoopGame || !ShSession_Active() || !ShSession_IsHost()) {
+            cprintf("coopdebug: only the host of a co-op game can allow guest debug controls");
+        } else if (strcmp(arg, "1") == 0 || strcmp(arg, "ON") == 0) {
+            ShSession_SetGuestDebug(1);
+            cprintf("coopdebug: joined players MAY now use debug controls");
+        } else if (strcmp(arg, "0") == 0 || strcmp(arg, "OFF") == 0) {
+            ShSession_SetGuestDebug(0);
+            cprintf("coopdebug: joined players may NOT use debug controls");
+        } else {
+            cprintf("coopdebug <0|1>  allow joined players debug controls (off by default)");
+        }
     } else if (strcmp(cmd, "BGM") == 0) {
         /* Play a sequenced music track by number. IMPORTANT: a track only plays
          * if its sequence is in the CURRENT area's sound bank -- the engine

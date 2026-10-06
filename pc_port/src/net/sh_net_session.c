@@ -53,6 +53,8 @@ static struct
     unsigned short     poseAnim, poseFrame;
 
     int                wantWorldMap; /* host: send S_WORLD(map) to guests; -1 none */
+
+    int                hostGuestDebug; /* host: allow joined players debug controls (0 default) */
 } s_req;
 
 static struct
@@ -64,6 +66,7 @@ static struct
     ShSessionMember    members[SHSESSION_MAX_MEMBERS];
     char               status[128];
     int                worldReq;    /* guest: a map the host said to boot into, -1 none */
+    int                guestDebug;  /* host granted joined players debug controls */
 } s_pub;
 
 /* Worker-private. */
@@ -315,6 +318,19 @@ unsigned long long ShSession_LobbyId(void)
 int ShSession_IsHost(void)
 {
     return s_pub.isHost;
+}
+
+void ShSession_SetGuestDebug(int on)
+{
+    if (!s_lock) return;
+    SDL_LockMutex(s_lock);
+    s_req.hostGuestDebug = on ? 1 : 0;
+    SDL_UnlockMutex(s_lock);
+}
+
+int ShSession_GuestDebugGranted(void)
+{
+    return s_pub.guestDebug;
 }
 
 void ShSession_StatusLine(char* out, int cap)
@@ -606,6 +622,17 @@ static void ShSession_Publish(void)
         s_pub.worldReq = s_worldReqIn;
         s_worldReqIn   = -1;
     }
+    /* The host's debug-grant, read off the lobby data (host reads back its own
+     * value, a guest reads the host's). 0 when not in a lobby. */
+    if (s_pub.active)
+    {
+        const char* d  = ShSteam_GetLobbyData("dbg");
+        s_pub.guestDebug = (d && d[0] == '1') ? 1 : 0;
+    }
+    else
+    {
+        s_pub.guestDebug = 0;
+    }
     SDL_UnlockMutex(s_lock);
 }
 
@@ -624,6 +651,7 @@ void ShSession_Tick(unsigned int nowMs)
     ShSessionItem      itemOut[SESSION_ITEM_Q];
     int                itemOutN = 0;
     int                q;
+    int                hostGuestDebug;
 
     if (!s_lock || !s_enabled)
     {
@@ -644,6 +672,7 @@ void ShSession_Tick(unsigned int nowMs)
     poseX     = s_req.poseX;    poseY     = s_req.poseY;     poseZ     = s_req.poseZ;
     poseRotY  = s_req.poseRotY; poseAnim  = s_req.poseAnim;  poseFrame = s_req.poseFrame;
     wantWorldMap        = s_req.wantWorldMap;
+    hostGuestDebug      = s_req.hostGuestDebug; /* persistent: snapshot, do not reset */
     itemOutN            = s_itemOutCount;
     if (itemOutN > 0)
     {
@@ -722,6 +751,10 @@ void ShSession_Tick(unsigned int nowMs)
         /* So a joiner (and a lobby browser) can tell a session that has already
          * started from one still gathering in the lobby. */
         ShSteam_SetLobbyData("state", s_worldMapCur >= 0 ? "ingame" : "lobby");
+        /* Whether joined players may use debug controls; off by default, the host
+         * flips it with the `coopdebug` console command. Rides the lobby data so
+         * every guest reads the same answer. */
+        ShSteam_SetLobbyData("dbg", hostGuestDebug ? "1" : "0");
     }
 
     if (nowMs - s_lastHelloMs >= SESSION_HELLO_MS)

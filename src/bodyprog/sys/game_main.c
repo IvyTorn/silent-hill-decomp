@@ -2533,6 +2533,22 @@ void MainLoop(void) // 0x80032EE0
         g_PcWorldDrawnThisFrame = 0;
 #endif
 
+#ifdef SH_PC_PORT
+        /* Effective debug-controls gate, recomputed each frame BEFORE the state
+         * update (its consumers run inside it). Single-player and the co-op HOST
+         * use the config value; a co-op GUEST gets debug controls only if the host
+         * granted them (coopdebug, off by default), never from its own config. */
+        {
+            extern int  g_PcCoopGame;
+            extern int  ShSession_IsHost(void);
+            extern int  ShSession_GuestDebugGranted(void);
+            if (!g_PcCoopGame || ShSession_IsHost())
+                g_PcAllowDebugControls = g_PcConfig.allowDebugControls;
+            else
+                g_PcAllowDebugControls = ShSession_GuestDebugGranted();
+        }
+#endif
+
         // Call update function for current GameState.
 #ifdef SH_PC_PORT
         s_sfUpdStart = (unsigned int)SDL_GetTicks();

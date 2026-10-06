@@ -120,6 +120,12 @@ int  ShSession_TakeWorldRequest(void);
 void ShSession_QueueItem(int itemId, int count);
 int  ShSession_TakeItem(int* itemId, int* count);
 
+/* Co-op debug/cheat permission for JOINED players. The host sets it (off by
+ * default); it rides the Steam lobby data so every guest reads the same answer.
+ * The host's own debug controls are never gated by this -- only guests'. */
+void ShSession_SetGuestDebug(int on);
+int  ShSession_GuestDebugGranted(void);
+
 #ifdef __cplusplus
 }
 #endif
