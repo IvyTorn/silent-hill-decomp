@@ -1302,12 +1302,26 @@ static void Nu_DrawCoopMenu(int px)
     panelY = (s_vpH - panelH) * 0.5f;
     cx     = s_vpW * 0.5f;
 
-    /* Hand this frame's row geometry to the menu; hover and click are hit-tested
-     * in Pc_CoopMenu_Update (once per game frame), not here in the render pass --
-     * which is what made clicks land on the wrong row. First row y = panelY +
-     * titleH, pitch = rowH. */
-    Pc_CoopMenu_SetGeometry(panelX, panelX + panelW, panelY + titleH, rowH,
-                            s_vpW, s_vpH);
+    /* Which row is under the pointer, computed with the EXACT geometry the rows
+     * are drawn with just below, so the hit row can never disagree with what is
+     * on screen. We hand the menu only the row index; the click is confirmed in
+     * Pc_CoopMenu_Update (edge-latched, once per press). A row under the pointer
+     * also drives the highlight. */
+    {
+        float mnx, mny;
+        int   hov = -1;
+        if (Pc_MouseCursor_ViewportPos(&mnx, &mny))
+        {
+            float mx = mnx * s_vpW;
+            float my = mny * s_vpH;
+            if (mx >= panelX && mx <= panelX + panelW)
+            {
+                int r = (int)((my - (panelY + titleH)) / rowH);
+                if (r >= 0 && r < n) hov = r;
+            }
+        }
+        Pc_CoopMenu_SetHover(hov);
+    }
 
     sel = Pc_CoopMenu_Selected();
 
