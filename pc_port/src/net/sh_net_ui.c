@@ -87,6 +87,14 @@ static struct { int x, y, w, h, cw, ch, free; } s_slot[NU_SLOT_MAX];
 static int s_slotCount;
 static int s_atlasX, s_atlasY, s_atlasRowH;
 
+/* The mouse cursor is a fixed bitmap drawn every frame. It is uploaded ONCE into
+ * a permanent atlas slot and the handle reused, because the per-frame path does
+ * not free its slot the way the text cache does -- re-uploading each frame
+ * leaked a slot per frame and ran the 192-slot atlas dry in a few seconds, at
+ * which point the cursor AND every text row stopped drawing. Reset to 0 whenever
+ * the atlas is rebuilt so it re-uploads. */
+static GLuint s_curSlot = 0;
+
 static stbtt_fontinfo s_font;
 static unsigned char* s_fontData;
 static int            s_fontOk;
@@ -138,6 +146,7 @@ static void Nu_AtlasReset(void)
     s_slot[0].ch = 1;
     s_slot[0].free = 0;
     s_slotCount = 1;
+    s_curSlot   = 0; /* the cursor must re-upload into the rebuilt atlas */
 }
 
 static void Nu_GlInit(void)
@@ -1261,7 +1270,13 @@ static void Nu_DrawCursor(void)
         s_curBuilt = 1;
     }
 
-    slot = Nu_Upload(s_cur, NU_CUR_W, NU_CUR_H);
+    /* Upload once into a permanent slot; reuse the handle every frame. Uploading
+     * per frame leaked a slot per frame and exhausted the atlas. */
+    if (!s_curSlot)
+    {
+        s_curSlot = Nu_Upload(s_cur, NU_CUR_W, NU_CUR_H);
+    }
+    slot = s_curSlot;
     if (!slot)
     {
         return;
