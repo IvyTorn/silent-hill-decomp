@@ -25,6 +25,8 @@
 #include "bodyprog/items.h"
 #include "bodyprog/savegame.h"
 #include "bodyprog/sys/joy.h"
+#include "bodyprog/text/text_draw.h"
+#include "font_region.h"
 
 #include <string.h>
 
@@ -36,9 +38,9 @@
 #include <SDL.h>
 
 #define SS_TAG       "SH2Screen"
-#define SS_VERSION   2
+#define SS_VERSION   3
 #define SS_NAME_MAX  48
-#define SS_HEADER    24
+#define SS_HEADER    28
 #define SS_BLOB_MAX  (SS_HEADER + INV_ITEM_COUNT_MAX * (4 + SS_NAME_MAX))
 
 /* Header flag bits. */
@@ -54,6 +56,138 @@ static unsigned char   s_pub[SS_BLOB_MAX];
 static int             s_pubLen;
 static int             s_serial;
 static int             s_session;
+
+/* ---- The game's own font, for the second screen to draw its text with. ----
+ *
+ * Nothing is shipped: the glyphs are read back out of the emulated VRAM, where
+ * the game itself uploaded FONT16 from the player's disc, together with the
+ * kerning table and the byte -> glyph mapping the stock text drawer uses
+ * (Font_MapChar), so accents and spacing come out the way the game draws them.
+ *
+ * Blob: "SHF1", cols, rows, cellW, cellH, glyphCount, spaceWidth, 2 pad;
+ * widths[FONT_ATLAS_CELL_MAX]; map[256][7] = count, then (cell, dy, advance)
+ * twice; clut[16] as LE u16; then rows*cellH lines of cols*cellW palette
+ * indices. */
+#define SF_COLS      FONT_12X16_ATLAS_COLUMN_COUNT
+#define SF_ROWS_MAX  ((FONT_ATLAS_CELL_MAX + SF_COLS - 1) / SF_COLS)
+#define SF_LINE      (SF_COLS * FONT_12X16_GLYPH_SIZE_X)
+#define SF_HEAD      (12 + FONT_ATLAS_CELL_MAX + 256 * 7 + 32)
+#define SF_MAX       (SF_HEAD + SF_ROWS_MAX * FONT_12X16_GLYPH_SIZE_Y * SF_LINE)
+#define SF_PERIOD    30 /* frames between looks at VRAM */
+
+extern void GR_ReadVRAM(unsigned short* dst, int x, int y, int dst_w, int dst_h);
+
+static unsigned char s_font[SF_MAX];
+static int           s_fontLen;
+static int           s_fontSerial; /* 0 = no usable font seen yet */
+static int           s_fontTick;
+
+static void Sf_Capture(void)
+{
+    static unsigned char buf[SF_MAX];
+
+    const s_FontLayout* fl = g_FontLayout;
+    unsigned short      line[SF_LINE / 4];
+    unsigned short      clut[16];
+    unsigned char*      p;
+    int                 rows, row, y, x, i, len;
+    int                 inked = 0;
+
+    if (fl == NULL || fl->glyphCount <= 0 || fl->glyphCount > FONT_ATLAS_CELL_MAX || fl->rowsPerPage <= 0)
+        return;
+
+    rows = (fl->glyphCount + SF_COLS - 1) / SF_COLS;
+
+    memset(buf, 0, SF_HEAD);
+    buf[0] = 'S';
+    buf[1] = 'H';
+    buf[2] = 'F';
+    buf[3] = '1';
+    buf[4] = SF_COLS;
+    buf[5] = (unsigned char)rows;
+    buf[6] = FONT_12X16_GLYPH_SIZE_X;
+    buf[7] = FONT_12X16_GLYPH_SIZE_Y;
+    buf[8] = (unsigned char)fl->glyphCount;
+    buf[9] = FONT_12X16_SPACE_SIZE;
+
+    memcpy(buf + 12, fl->glyphWidths, (size_t)fl->glyphCount);
+
+    p = buf + 12 + FONT_ATLAS_CELL_MAX;
+    for (i = 0; i < 256; i++, p += 7)
+    {
+        s_GlyphEmit emits[2];
+        int         ch = i;
+        int         n  = 0;
+        int         k;
+
+        /* The two literal remaps Gfx_StringDraw applies before the lookup. */
+        if (ch == '!')
+            ch = '\\';
+        else if (ch == '&')
+            ch = '^';
+
+        if (ch >= GLYPH_TABLE_ASCII_OFFSET && ch != '_')
+            n = Font_MapChar((unsigned int)ch, emits);
+
+        p[0] = (unsigned char)n;
+        for (k = 0; k < n && k < 2; k++)
+        {
+            p[1 + k * 3] = (unsigned char)emits[k].cell;
+            p[2 + k * 3] = (unsigned char)(signed char)emits[k].dy;
+            p[3 + k * 3] = (unsigned char)emits[k].advance;
+        }
+    }
+
+    /* getClut() packing: x in 16-texel steps in the low 6 bits, y above. */
+    GR_ReadVRAM(clut, (int)(fl->packedClut & 0x3F) * 16, (int)((fl->packedClut >> 6) & 0x1FF), 16, 1);
+    for (i = 0; i < 16; i++)
+    {
+        p[i * 2]     = (unsigned char)(clut[i] & 0xFF);
+        p[i * 2 + 1] = (unsigned char)(clut[i] >> 8);
+    }
+    p += 32;
+
+    /* Same cell -> texture page / v arithmetic as the stock drawer. A 4bpp
+     * page is 64 VRAM words wide; bit 4 of the page number is the lower half
+     * of VRAM. */
+    for (row = 0; row < rows; row++)
+    {
+        unsigned int page = fl->tpageBase + (unsigned int)(row / fl->rowsPerPage);
+        int          vx   = (int)(page & 0xF) * 64;
+        int          vy   = ((page & 0x10) ? 256 : 0) + fl->vBase + (row % fl->rowsPerPage) * FONT_12X16_GLYPH_SIZE_Y;
+
+        for (y = 0; y < FONT_12X16_GLYPH_SIZE_Y; y++)
+        {
+            GR_ReadVRAM(line, vx, vy + y, SF_LINE / 4, 1);
+            for (x = 0; x < SF_LINE; x++)
+            {
+                unsigned char idx = (unsigned char)((line[x >> 2] >> ((x & 3) * 4)) & 0xF);
+
+                if (clut[idx] != 0)
+                    inked++;
+                *p++ = idx;
+            }
+        }
+    }
+
+    len = (int)(p - buf);
+
+    /* Before the game has uploaded FONT16 the region is empty; publish nothing
+     * rather than a blank font. */
+    if (inked == 0)
+        return;
+
+    pthread_mutex_lock(&s_lock);
+    if (len != s_fontLen || memcmp(buf, s_font, (size_t)len) != 0)
+    {
+        memcpy(s_font, buf, (size_t)len);
+        s_fontLen    = len;
+        s_fontSerial = (s_fontSerial % 255) + 1;
+        __android_log_print(ANDROID_LOG_INFO, SS_TAG, "font: captured %d glyphs, %d rows, %d inked texels (serial %d)",
+                            fl->glyphCount, rows, inked, s_fontSerial);
+    }
+    pthread_mutex_unlock(&s_lock);
+}
 
 /* ---- Touch: what the second screen asked for, and where the answer is. ---- */
 
@@ -571,6 +705,22 @@ static int Ss_Build(unsigned char* out)
     out[6] = (unsigned char)g_GameWork.gameState;
     out[7] = (unsigned char)g_SysWork.sysState;
 
+    /* Shown whether or not a game is loaded: the font, and which of the port's
+     * post-process filters is on, so the second screen can wear the same one. */
+    {
+        extern int   g_cfg_postProcess;
+        extern float g_cfg_postProcessIntensity;
+        float        mix = g_cfg_postProcessIntensity;
+
+        if (mix < 0.0f)
+            mix = 0.0f;
+        if (mix > 1.0f)
+            mix = 1.0f;
+        out[23] = (unsigned char)s_fontSerial;
+        out[24] = (unsigned char)g_cfg_postProcess;
+        out[25] = (unsigned char)(mix * 100.0f + 0.5f);
+    }
+
     if (!s_session || save == NULL)
         return SS_HEADER;
 
@@ -665,6 +815,15 @@ void Pc_SecondScreen_Update(void)
 
     Ss_TrackSession();
     Ui_Watchdog();
+    /* Only while the game is on a screen that draws text with FONT16. Movies
+     * and the boot logos use the same corner of VRAM for other things, and a
+     * font captured then would be a font made of whatever was there. */
+    if (s_fontTick-- <= 0 &&
+        (g_GameWork.gameState == GameState_InGame || g_GameWork.gameState == GameState_InventoryScreen))
+    {
+        s_fontTick = SF_PERIOD;
+        Sf_Capture();
+    }
     len = Ss_Build(buf);
 
     pthread_mutex_lock(&s_lock);
@@ -712,6 +871,31 @@ Java_com_silenthill_port_SecondScreen_nativePoll(JNIEnv* env, jclass cls, jint l
         return NULL;
     }
     (*env)->SetByteArrayRegion(env, arr, 0, (jsize)(len + 4), (const jbyte*)buf);
+    return arr;
+}
+
+/* UI thread. The current font blob, or null before the game has loaded one. */
+JNIEXPORT jbyteArray JNICALL
+Java_com_silenthill_port_SecondScreen_nativeFont(JNIEnv* env, jclass cls)
+{
+    static unsigned char copy[SF_MAX];
+    int                  len;
+    jbyteArray           arr;
+
+    (void)cls;
+
+    pthread_mutex_lock(&s_lock);
+    len = s_fontLen;
+    if (len > 0)
+        memcpy(copy, s_font, (size_t)len);
+    pthread_mutex_unlock(&s_lock);
+
+    if (len <= 0)
+        return NULL;
+
+    arr = (*env)->NewByteArray(env, (jsize)len);
+    if (arr != NULL)
+        (*env)->SetByteArrayRegion(env, arr, 0, (jsize)len, (const jbyte*)copy);
     return arr;
 }
 
