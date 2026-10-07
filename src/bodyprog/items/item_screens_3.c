@@ -570,6 +570,13 @@ static const char* s_ItemDesc(u8 id) {
         return lang;
     return (idx >= 0 && idx < n && g_ItemDescriptions[idx]) ? g_ItemDescriptions[idx] : "";
 }
+
+/* The localized name outside this file: the Android second-screen inventory
+ * (pc_second_screen.c) lists items by the same text the carousel shows. */
+const char* Pc_Inventory_ItemName(u8 id)
+{
+    return s_ItemName(id);
+}
 #endif
 
 // TODO: `Items_` subsystem globals and funcs could be part of `Inventory_` instead, not sure yet.

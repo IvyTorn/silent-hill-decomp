@@ -1980,6 +1980,10 @@ void DbgOverlay_Render(void)
      * an app id is set); does no drawing. */
     { extern void Pc_Discord_Update(void); Pc_Discord_Update(); }
 
+    /* Second-screen inventory snapshot (Android dual-display handhelds). Same
+     * heartbeat; a no-op everywhere else. Read-only and does no drawing. */
+    { extern void Pc_SecondScreen_Update(void); Pc_SecondScreen_Update(); }
+
     /* Achievement unlock popup: fully self-contained GL (own program, VAO and
      * textures, with its own state save/restore), so it lives here rather than
      * inside the shared panel state block below — and above the early-out, or

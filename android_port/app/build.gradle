@@ -6,11 +6,16 @@ android {
     ndkVersion '27.3.13750724'
 
     defaultConfig {
-        applicationId 'com.silenthill.port'
+        // Not the upstream id on purpose: this build installs next to the
+        // stock com.silenthill.port APK instead of replacing it, so that
+        // install and its saves are left alone. Only the application id
+        // changes -- the Java package (namespace) stays, and with it every JNI
+        // symbol name in libmain.so.
+        applicationId 'com.silenthill.port.thor'
         minSdk 21
         targetSdk 34
         versionCode 1
-        versionName '0.1-android'
+        versionName '0.1-android-thor1'
 
         externalNativeBuild {
             cmake {
@@ -53,6 +58,20 @@ android {
             // Relative paths here resolve against app/, not the project root,
             // so anchor on rootProject (android_port/) explicitly.
             assets.srcDirs += "${rootProject.projectDir}/../pc_port/assets"
+        }
+    }
+
+    signingConfigs {
+        // A fixed key, committed with the project. Gradle otherwise invents a
+        // debug key per machine, and every CI runner is a new machine: each
+        // build would carry a different signature, Android would refuse to
+        // install one over the other, and the uninstall that forces deletes
+        // the saves. Sideload-only, so the key protects nothing.
+        debug {
+            storeFile file('thor-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
         }
     }
 

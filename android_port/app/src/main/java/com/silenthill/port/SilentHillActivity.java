@@ -44,6 +44,29 @@ public class SilentHillActivity extends SDLActivity {
         unpackBundledAssets();
         publishDiscDropDir();
         super.onCreate(savedInstanceState);
+        secondScreen = new SecondScreen(this);
+    }
+
+    /* The inventory on a second display, where the device has one. It follows
+     * the activity being visible rather than being created: a window left on
+     * the other panel while the game is in the background would sit on top of
+     * whatever the player switched to. */
+    private SecondScreen secondScreen;
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (secondScreen != null) {
+            secondScreen.start();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        if (secondScreen != null) {
+            secondScreen.stop();
+        }
+        super.onStop();
     }
 
     /**
