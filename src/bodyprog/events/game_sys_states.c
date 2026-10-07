@@ -478,6 +478,13 @@ void SysState_Gameplay_Update(void) // 0x80038BD4
         return;
     }
 
+#ifdef SH_PC_PORT
+    /* Second-screen touch (Android): a tapped item presses Item here, ahead of
+     * the checks below that decide whether the inventory may open at all. A
+     * no-op on every other platform. */
+    { extern void Pc_SecondScreen_GameplayInput(void); Pc_SecondScreen_GameplayInput(); }
+#endif
+
     if (g_Controller0->clickedBtnFlags & g_GameWorkPtr->config.controllerConfig.light &&
         g_SysWork.field_2388.field_154.effectsInfo_0.field_0.s_field_0.field_0 & (1 << 1))
     {

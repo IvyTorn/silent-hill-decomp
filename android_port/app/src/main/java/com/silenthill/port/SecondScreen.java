@@ -42,7 +42,9 @@ import java.util.Properties;
  * The game itself is untouched: it keeps its one SDL window on the display the
  * activity lives on. This puts an ordinary Android window on the OTHER display
  * and draws the inventory there from a snapshot the game thread publishes
- * (pc_second_screen.c). Phase 1 is read-only.
+ * (pc_second_screen.c). Tapping an item asks the game to open its own
+ * inventory on it; the command the player then picks here is pressed there, by
+ * the game's own code.
  *
  * The window is a Presentation, and it is deliberately NOT focusable. Android
  * delivers key and gamepad events to the focused window of the focused
@@ -56,7 +58,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     static final String TAG = "SH2Screen";
 
     private static final String CFG_NAME = "second_screen.cfg";
-    private static final int POLL_MS = 100;
+    private static final int POLL_MS = 50;
 
     private final Activity activity;
     private final DisplayManager displayManager;
@@ -73,6 +75,12 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private boolean listening;
 
     private static native byte[] nativePoll(int lastSerial);
+    private static native void nativeInput(int kind, int a, int b);
+
+    /* Request kinds and driver states: the enums in pc_second_screen.c. */
+    private static final int RQ_SELECT = 1, RQ_CHOOSE = 2, RQ_CANCEL = 3, RQ_DISMISS = 4;
+    private static final int UI_IDLE = 0, UI_OPENING = 1, UI_SEEK = 2, UI_MENU = 3,
+                             UI_VIEWING = 7, UI_SETTLE = 8, UI_CLOSING = 9;
 
     SecondScreen(Activity activity) {
         this.activity = activity;
@@ -294,7 +302,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "config: enabled=" + enabled + " display=" + disp + " focusable=" + focusable
+        Log.i(TAG, "build: fase2 (touch)  config: enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
 
@@ -357,15 +365,20 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         int ammoLoaded;
         int ammoReserve;
         int equippedSlot;
+        int uiState;
+        int uiSlot;
+        int uiCmd;
+        int eventSeq;
+        int eventCode;
         final List<Item> items = new ArrayList<Item>();
     }
 
     private static final Charset LATIN1 = Charset.forName("ISO-8859-1");
 
     static Snapshot parse(byte[] b) {
-        final int head = 4 + 20;
+        final int head = 4 + 24;
         if (b == null || b.length < head) return null;
-        if (b[4] != 'S' || b[5] != 'H' || b[6] != '2' || b[7] != 'S' || b[8] != 1) return null;
+        if (b[4] != 'S' || b[5] != 'H' || b[6] != '2' || b[7] != 'S' || b[8] != 2) return null;
 
         Snapshot s = new Snapshot();
         s.serial = (b[0] & 0xFF) | ((b[1] & 0xFF) << 8) | ((b[2] & 0xFF) << 16) | ((b[3] & 0xFF) << 24);
@@ -381,6 +394,11 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         s.ammoReserve = b[18] & 0xFF;
         int count = b[19] & 0xFF;
         s.equippedSlot = b[21] & 0xFF;
+        s.uiState = b[22] & 0xFF;
+        s.uiSlot = b[23] & 0xFF;
+        s.uiCmd = b[24] & 0xFF;
+        s.eventSeq = b[25] & 0xFF;
+        s.eventCode = b[26] & 0xFF;
 
         int p = head;
         for (int i = 0; i < count; i++) {
@@ -547,10 +565,12 @@ final class SecondScreen implements DisplayManager.DisplayListener {
 
     private final class InventoryView extends View {
 
-        /* Everything is laid out in units of 1/1080 of the view's width, so
-         * the 1080x1240 panel this was designed for is 1:1 and any other
-         * panel scales instead of reflowing. */
+        /* Everything is laid out in units of 1/1240 of the view's width when
+         * the panel is wider than tall (the Thor's second screen reports
+         * 1240x1080, so that is 1:1) and 1/1080 when it is taller than wide.
+         * Any other panel scales instead of reflowing. */
         private float u = 1f;
+        private boolean wide;
 
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -564,6 +584,28 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         private float scrollY;
         private float maxScroll;
         private float lastTouchY;
+        private float downX;
+        private float downY;
+        private boolean dragging;
+
+        /* Where things were last drawn, for taps. */
+        private final List<RectF> cellRects = new ArrayList<RectF>();
+        private final List<Item> cellItems = new ArrayList<Item>();
+        private final RectF equippedRect = new RectF();
+        private final RectF listRect = new RectF();
+        private final RectF[] buttonRects = { new RectF(), new RectF(), new RectF() };
+        private final int[] buttonActions = new int[3];
+        private int buttonCount;
+
+        /* A tap is drawn as "opening" at once rather than a poll later. */
+        private Item pendingItem;
+        private long pendingUntil;
+
+        private int lastEventSeq = -1;
+        private String toast;
+        private long toastUntil;
+
+        private static final int ACT_CANCEL = -1, ACT_DISMISS = -2;
         private boolean loggedLayout;
         private String insetsText = "";
 
@@ -584,13 +626,117 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         }
 
         void setSnapshot(Snapshot s) {
+            if (lastEventSeq >= 0 && s.eventSeq != lastEventSeq) {
+                showToast(eventText(s.eventCode));
+            }
+            lastEventSeq = s.eventSeq;
+            if (s.uiState != UI_IDLE) {
+                pendingItem = null;
+            }
             snap = s;
             invalidate();
         }
 
+        private void showToast(String t) {
+            toast = t;
+            toastUntil = android.os.SystemClock.uptimeMillis() + 2200;
+            pendingItem = null;
+            postInvalidateDelayed(2250);
+        }
+
+        private String eventText(int code) {
+            switch (code) {
+                case 2: return tr("No se puede usar aqu\u00ED", "Can't be used here");
+                case 3: return tr("Demasiado oscuro para examinarlo", "Too dark to look at it");
+                case 4: return tr("El juego no respondi\u00F3", "The game did not respond");
+                default: return tr("No disponible ahora", "Not available right now");
+            }
+        }
+
+        private Item itemAtSlot(int slot) {
+            if (snap == null) return null;
+            for (Item it : snap.items) {
+                if (it.slot == slot) return it;
+            }
+            return null;
+        }
+
+        /** The item the sheet is about, or null when no sheet should show. */
+        private Item sheetItem() {
+            if (snap == null || !snap.session) return null;
+            if (snap.uiState != UI_IDLE) {
+                Item it = itemAtSlot(snap.uiSlot);
+                return (it != null) ? it : pendingItem;
+            }
+            if (pendingItem != null && android.os.SystemClock.uptimeMillis() < pendingUntil) {
+                return pendingItem;
+            }
+            pendingItem = null;
+            return null;
+        }
+
+        private void requestItem(Item it) {
+            if (it == null) return;
+            pendingItem = it;
+            pendingUntil = android.os.SystemClock.uptimeMillis() + 2500;
+            postInvalidateDelayed(2550);
+            Log.i(TAG, "tap: slot=" + it.slot + " id=" + it.id + " '" + it.name + "'");
+            try {
+                nativeInput(RQ_SELECT, it.slot, it.id);
+            } catch (UnsatisfiedLinkError e) {
+                pendingItem = null;
+            }
+            invalidate();
+        }
+
+        private void pressButton(int action) {
+            try {
+                if (action == ACT_CANCEL) {
+                    pendingItem = null;
+                    nativeInput(RQ_CANCEL, 0, 0);
+                } else if (action == ACT_DISMISS) {
+                    nativeInput(RQ_DISMISS, 0, 0);
+                } else {
+                    Log.i(TAG, "tap: command row " + action);
+                    nativeInput(RQ_CHOOSE, action, 0);
+                }
+            } catch (UnsatisfiedLinkError e) {
+                Log.w(TAG, "native input unavailable");
+            }
+            invalidate();
+        }
+
+        private void handleTap(float x, float y) {
+            if (snap == null || !snap.session) return;
+
+            if (sheetItem() != null) {
+                /* The sheet is modal: only its buttons take taps. */
+                for (int i = 0; i < buttonCount; i++) {
+                    if (buttonRects[i].contains(x, y)) {
+                        pressButton(buttonActions[i]);
+                        return;
+                    }
+                }
+                return;
+            }
+
+            if (equippedRect.contains(x, y) && snap.equippedId != 0) {
+                requestItem(itemAtSlot(snap.equippedSlot));
+                return;
+            }
+            if (!listRect.contains(x, y)) return;
+            for (int i = 0; i < cellRects.size(); i++) {
+                if (cellRects.get(i).contains(x, y)) {
+                    requestItem(cellItems.get(i));
+                    return;
+                }
+            }
+        }
+
         @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
             super.onSizeChanged(w, h, oldw, oldh);
-            u = w / 1080f;
+            wide = w >= h;
+            u = w / (wide ? 1240f : 1080f);
             Log.i(TAG, "second screen view " + w + "x" + h);
             loggedLayout = false;
         }
@@ -616,22 +762,39 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         }
 
         @Override public boolean onTouchEvent(MotionEvent e) {
-            /* Phase 1: the only gesture is dragging the list when it is longer
-             * than the screen. Nothing reaches the game from here. */
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    lastTouchY = e.getY();
+                    downX = e.getX();
+                    downY = e.getY();
+                    lastTouchY = downY;
+                    dragging = false;
                     return true;
+
                 case MotionEvent.ACTION_MOVE: {
-                    float dy = e.getY() - lastTouchY;
-                    lastTouchY = e.getY();
-                    float ns = Math.max(0f, Math.min(maxScroll, scrollY - dy));
-                    if (ns != scrollY) {
-                        scrollY = ns;
-                        invalidate();
+                    /* A finger that travels is scrolling the list, not
+                     * choosing from it. */
+                    if (!dragging && Math.abs(e.getY() - downY) > 22 * u) {
+                        dragging = true;
+                        lastTouchY = e.getY();
+                    }
+                    if (dragging && sheetItem() == null) {
+                        float dy = e.getY() - lastTouchY;
+                        lastTouchY = e.getY();
+                        float ns = Math.max(0f, Math.min(maxScroll, scrollY - dy));
+                        if (ns != scrollY) {
+                            scrollY = ns;
+                            invalidate();
+                        }
                     }
                     return true;
                 }
+
+                case MotionEvent.ACTION_UP:
+                    if (!dragging && Math.abs(e.getX() - downX) <= 22 * u) {
+                        handleTap(e.getX(), e.getY());
+                    }
+                    return true;
+
                 default:
                     return true;
             }
@@ -667,10 +830,22 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 Log.i(TAG, "second screen first draw " + w + "x" + h + " " + insetsText);
             }
 
+            buttonCount = 0;
             if (snap == null || !snap.session) {
                 drawIdle(c, w, h);
             } else {
                 drawInventory(c, w, h);
+                Item sheet = sheetItem();
+                if (sheet != null) {
+                    drawSheet(c, w, h, sheet);
+                }
+                if (toast != null) {
+                    if (android.os.SystemClock.uptimeMillis() < toastUntil) {
+                        drawToast(c, w, h);
+                    } else {
+                        toast = null;
+                    }
+                }
             }
 
             if (debugOverlay) {
@@ -696,14 +871,27 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             final float pad = 24 * u;
             float y = pad;
 
-            y = drawStatus(c, pad, y, w - 2 * pad);
-            y += 16 * u;
-            y = drawEquipped(c, pad, y, w - 2 * pad);
-            y += 20 * u;
-
-            /* Item grid: two columns. Rows are 112 units tall -- about 9 mm on
-             * a 3.92" panel, which is what phase 2 needs for a touch target. */
             final float gap = 12 * u;
+
+            if (wide) {
+                /* Wider than tall: the two header panels share one row, which
+                 * leaves seven full rows of items on a 1240x1080 panel. */
+                float half = (w - 2 * pad - gap) / 2f;
+                drawStatus(c, pad, y, half);
+                equippedRect.set(pad + half + gap, y, pad + half + gap + half, y + 150 * u);
+                y = drawEquipped(c, pad + half + gap, y, half);
+                y += gap;
+            } else {
+                y = drawStatus(c, pad, y, w - 2 * pad);
+                y += 16 * u;
+                equippedRect.set(pad, y, w - pad, y + 150 * u);
+                y = drawEquipped(c, pad, y, w - 2 * pad);
+                y += 20 * u;
+            }
+
+            /* Item grid: two columns. Rows are 112 units tall -- just under
+             * 7 mm on a 3.92" panel, and nearly the full half-width wide,
+             * which is what phase 2 needs for a touch target. */
             final float cellW = (w - 2 * pad - gap) / 2f;
             final float cellH = 112 * u;
             final float top = y;
@@ -715,13 +903,20 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             maxScroll = Math.max(0f, contentH - viewH);
             if (scrollY > maxScroll) scrollY = maxScroll;
 
+            listRect.set(0, top, w, h);
+            cellRects.clear();
+            cellItems.clear();
+
             c.save();
             c.clipRect(0, top, w, h);
             for (int i = 0; i < n; i++) {
                 float cx = pad + (i % 2) * (cellW + gap);
                 float cy = top + (i / 2) * (cellH + gap) - scrollY;
                 if (cy + cellH < top || cy > h) continue;
-                drawCell(c, snap.items.get(i), cx, cy, cellW, cellH);
+                Item it = snap.items.get(i);
+                drawCell(c, it, cx, cy, cellW, cellH);
+                cellRects.add(new RectF(cx, cy, cx + cellW, cy + cellH));
+                cellItems.add(it);
             }
             c.restore();
 
@@ -740,6 +935,137 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 r.set(w - 10 * u, ty, w - 4 * u, ty + thumbH);
                 c.drawRoundRect(r, 3 * u, 3 * u, fill);
             }
+        }
+
+        /* The command sheet. The rows are the stock screen's own, in its own
+         * order (Gfx_Inventory_CmdOptionsDraw); the index a button sends back
+         * is the row the game then presses. */
+        private String[] commandLabels(int cmd) {
+            String use = tr("Usar", "Use");
+            String equip = tr("Equipar", "Equip");
+            String unequip = tr("Quitar", "Unequip");
+            String reload = tr("Recargar", "Reload");
+            String look = tr("Examinar", "Look");
+            switch (cmd) {
+                case 0:
+                case 1: return new String[] { use };
+                case 2: return new String[] { equip };
+                case 3: return new String[] { unequip };
+                case 4: return new String[] { equip, reload };
+                case 5: return new String[] { unequip, reload };
+                case 6: return new String[] { tr("Encender", "On"), tr("Apagar", "Off") };
+                case 7: return new String[] { reload };
+                case 8: return new String[] { look };
+                case 9: return new String[] { use, look };
+                default: return new String[0];
+            }
+        }
+
+        private void addButton(Canvas c, float x, float y, float w, float h, String label, int action, boolean primary) {
+            if (buttonCount >= buttonRects.length) return;
+            RectF br = buttonRects[buttonCount];
+            br.set(x, y, x + w, y + h);
+            buttonActions[buttonCount] = action;
+            buttonCount++;
+
+            fill.setColor(primary ? C_ACCENT : 0xFF2A2B30);
+            c.drawRoundRect(br, 18 * u, 18 * u, fill);
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(primary ? 0xFF14110A : C_TEXT);
+            text.setFakeBoldText(primary);
+            float size = fit(label, (primary ? 60 : 48) * u * textScale, w - 40 * u, 30 * u);
+            c.drawText(label, x + w / 2f, y + h / 2f + size * 0.35f, text);
+            text.setFakeBoldText(false);
+        }
+
+        private void drawSheet(Canvas c, int w, int h, Item item) {
+            int state = (snap.uiState == UI_IDLE) ? UI_OPENING : snap.uiState;
+
+            fill.setColor(0xD9000000);
+            r.set(0, 0, w, h);
+            c.drawRect(r, fill);
+
+            String[] labels = (state == UI_MENU) ? commandLabels(snap.uiCmd) : new String[0];
+            String note = null;
+            String closeLabel = null;
+            int closeAction = ACT_CANCEL;
+
+            if (state == UI_OPENING || state == UI_SEEK) {
+                note = tr("Abriendo el inventario\u2026", "Opening the inventory\u2026");
+                closeLabel = tr("Cancelar", "Cancel");
+            } else if (state == UI_MENU) {
+                if (labels.length == 0) {
+                    note = tr("No se puede usar aqu\u00ED", "Can't be used here");
+                    closeLabel = tr("Volver", "Back");
+                } else {
+                    closeLabel = tr("Cancelar", "Cancel");
+                }
+            } else if (state == UI_VIEWING) {
+                note = tr("M\u00EDralo en la pantalla principal", "Look at the main screen");
+                closeLabel = tr("Cerrar", "Close");
+                closeAction = ACT_DISMISS;
+            } else if (state == UI_CLOSING || state == UI_SETTLE) {
+                note = tr("Volviendo al juego\u2026", "Returning to the game\u2026");
+            } else {
+                note = tr("Un momento\u2026", "One moment\u2026");
+            }
+
+            final float pw = Math.min(w - 120 * u, 960 * u);
+            final float bh = 150 * u;
+            final float bgap = 22 * u;
+            float ph = 150 * u
+                     + (note != null ? 80 * u : 0f)
+                     + labels.length * (bh + bgap)
+                     + (closeLabel != null ? (120 * u + bgap) : 0f)
+                     + 30 * u;
+            float px = (w - pw) / 2f;
+            float py = Math.max(20 * u, (h - ph) / 2f);
+
+            fill.setColor(0xFF1B1C21);
+            r.set(px, py, px + pw, py + ph);
+            c.drawRoundRect(r, 24 * u, 24 * u, fill);
+            line.setColor(C_ACCENT);
+            line.setStrokeWidth(3 * u);
+            c.drawRoundRect(r, 24 * u, 24 * u, line);
+
+            drawGlyph(c, item.id >> 5, px + 86 * u, py + 82 * u, 38 * u, groupColor(item.id >> 5));
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(C_TEXT);
+            float nameMax = pw - 160 * u - 36 * u;
+            fit(item.name, 60 * u * textScale, nameMax, 34 * u);
+            c.drawText(ellipsize(item.name, nameMax), px + 160 * u, py + 102 * u, text);
+
+            float y = py + 150 * u;
+
+            if (note != null) {
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(C_DIM);
+                fit(note, 42 * u * textScale, pw - 60 * u, 28 * u);
+                c.drawText(note, px + pw / 2f, y + 34 * u, text);
+                y += 80 * u;
+            }
+
+            for (int i = 0; i < labels.length; i++) {
+                addButton(c, px + 36 * u, y, pw - 72 * u, bh, labels[i], i, true);
+                y += bh + bgap;
+            }
+
+            if (closeLabel != null) {
+                addButton(c, px + 36 * u, y, pw - 72 * u, 120 * u, closeLabel, closeAction, false);
+            }
+        }
+
+        private void drawToast(Canvas c, int w, int h) {
+            text.setTextAlign(Paint.Align.CENTER);
+            float size = fit(toast, 46 * u * textScale, w - 160 * u, 28 * u);
+            float tw = text.measureText(toast) + 80 * u;
+            float th = 110 * u;
+            float ty = h - th - 40 * u;
+            fill.setColor(0xF2D43C3C);
+            r.set((w - tw) / 2f, ty, (w + tw) / 2f, ty + th);
+            c.drawRoundRect(r, 20 * u, 20 * u, fill);
+            text.setColor(0xFFFFFFFF);
+            c.drawText(toast, w / 2f, ty + th / 2f + size * 0.35f, text);
         }
 
         /* Health. The game never shows a number, only a colour that goes
@@ -770,24 +1096,27 @@ final class SecondScreen implements DisplayManager.DisplayListener {
 
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(C_DIM);
-            text.setTextSize(34 * u * textScale);
-            c.drawText(tr("ESTADO", "STATUS"), x + 28 * u, y + 52 * u, text);
-
-            text.setColor(col);
-            text.setFakeBoldText(true);
-            text.setTextSize(52 * u * textScale);
-            c.drawText(word, x + 190 * u, y + 58 * u, text);
-            text.setFakeBoldText(false);
+            text.setTextSize(30 * u * textScale);
+            c.drawText(tr("ESTADO", "STATUS"), x + 28 * u, y + 46 * u, text);
 
             text.setTextAlign(Paint.Align.RIGHT);
             text.setColor(C_TEXT);
-            text.setTextSize(52 * u * textScale);
-            c.drawText(Math.round(pct) + "%", x + w - 28 * u, y + 58 * u, text);
+            text.setTextSize(48 * u * textScale);
+            String pctText = Math.round(pct) + "%";
+            float pctW = text.measureText(pctText);
+            c.drawText(pctText, x + w - 28 * u, y + 100 * u, text);
+
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(col);
+            text.setFakeBoldText(true);
+            fit(word, 52 * u * textScale, w - 56 * u - pctW - 20 * u, 30 * u);
+            c.drawText(word, x + 28 * u, y + 100 * u, text);
+            text.setFakeBoldText(false);
 
             float bx = x + 28 * u;
             float bw = w - 56 * u;
-            float by = y + 86 * u;
-            float bh = 36 * u;
+            float by = y + 116 * u;
+            float bh = 20 * u;
             fill.setColor(0xFF2A2B30);
             r.set(bx, by, bx + bw, by + bh);
             c.drawRoundRect(r, 8 * u, 8 * u, fill);
@@ -834,24 +1163,29 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             drawGlyph(c, eq.id >> 5, x + 76 * u, y + hgt / 2f, 44 * u, C_ACCENT);
 
             boolean gun = (eq.id >> 5) == 5;
-            float nameMax = w - 150 * u - (gun ? 330 * u : 28 * u);
-            text.setColor(C_TEXT);
-            fit(eq.name, 56 * u * textScale, nameMax, 34 * u);
-            c.drawText(ellipsize(eq.name, nameMax), x + 150 * u, y + 110 * u, text);
+            float ammoW = 0f;
 
             if (gun) {
                 text.setTextAlign(Paint.Align.RIGHT);
                 text.setColor(C_DIM);
-                text.setTextSize(44 * u * textScale);
+                text.setTextSize(40 * u * textScale);
                 String reserve = " / " + snap.ammoReserve;
                 float rw = text.measureText(reserve);
-                c.drawText(reserve, x + w - 28 * u, y + 104 * u, text);
+                c.drawText(reserve, x + w - 28 * u, y + 106 * u, text);
                 text.setColor(snap.ammoLoaded == 0 ? 0xFFD43C3C : C_TEXT);
                 text.setFakeBoldText(true);
-                text.setTextSize(84 * u * textScale);
-                c.drawText(String.valueOf(snap.ammoLoaded), x + w - 28 * u - rw, y + 108 * u, text);
+                text.setTextSize(76 * u * textScale);
+                String loaded = String.valueOf(snap.ammoLoaded);
+                ammoW = rw + text.measureText(loaded) + 24 * u;
+                c.drawText(loaded, x + w - 28 * u - rw, y + 110 * u, text);
                 text.setFakeBoldText(false);
             }
+
+            float nameMax = w - 150 * u - 28 * u - ammoW;
+            text.setTextAlign(Paint.Align.LEFT);
+            text.setColor(C_TEXT);
+            fit(eq.name, 52 * u * textScale, nameMax, 32 * u);
+            c.drawText(ellipsize(eq.name, nameMax), x + 150 * u, y + 108 * u, text);
             return y + hgt;
         }
 

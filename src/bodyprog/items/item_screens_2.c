@@ -126,6 +126,12 @@ void GameState_ItemScreens_Update(void) // 0x8004C9B0
     Gfx_StringSetColor(StringColorId_White);
     func_800363D0();
 
+#ifdef SH_PC_PORT
+    /* Second-screen touch (Android): before anything in the frame reads the
+     * pad. A no-op on every other platform. */
+    { extern void Pc_SecondScreen_InventoryInput(void); Pc_SecondScreen_InventoryInput(); }
+#endif
+
     // Update timer if current screen is inventory.
     if (g_GameWork.gameStateSteps[1] < 21)
     {
