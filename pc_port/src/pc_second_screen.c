@@ -716,9 +716,12 @@ static int Ss_Build(unsigned char* out)
             mix = 0.0f;
         if (mix > 1.0f)
             mix = 1.0f;
+        extern int   Pc_SecondScreenModels_Serial(void);
+
         out[23] = (unsigned char)s_fontSerial;
         out[24] = (unsigned char)g_cfg_postProcess;
         out[25] = (unsigned char)(mix * 100.0f + 0.5f);
+        out[26] = (unsigned char)Pc_SecondScreenModels_Serial();
     }
 
     if (!s_session || save == NULL)
@@ -815,6 +818,10 @@ void Pc_SecondScreen_Update(void)
 
     Ss_TrackSession();
     Ui_Watchdog();
+    {
+        extern void Pc_SecondScreenModels_Tick(void);
+        Pc_SecondScreenModels_Tick();
+    }
     /* Only while the game is on a screen that draws text with FONT16. Movies
      * and the boot logos use the same corner of VRAM for other things, and a
      * font captured then would be a font made of whatever was there. */

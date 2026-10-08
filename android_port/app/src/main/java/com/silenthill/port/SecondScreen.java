@@ -77,6 +77,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private float textScale = 1.0f;
     private boolean useGameFont = true;
     private boolean crtFollow = true;
+    private boolean dumpModels = false;
+    private int modelSerial;
 
     private Panel panel;
     private boolean started;
@@ -85,6 +87,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private static native byte[] nativePoll(int lastSerial);
     private static native void nativeInput(int kind, int a, int b);
     private static native byte[] nativeFont();
+    private static native byte[] nativeModels();
+    private static native void nativeModelsConfigure(String dumpDir);
 
     /* Request kinds and driver states: the enums in pc_second_screen.c. */
     private static final int RQ_SELECT = 1, RQ_CHOOSE = 2, RQ_CANCEL = 3, RQ_DISMISS = 4;
@@ -111,6 +115,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             displayManager.registerDisplayListener(this, handler);
             listening = true;
         }
+        configureModelDump();
         logDisplays();
         refresh();
     }
@@ -133,6 +138,45 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         if (panel == null || !panel.getDisplay().isValid()) {
             refresh();
         }
+    }
+
+    /* Step 1 of the 3D second screen: the models are read and, on request,
+     * dumped for checking; nothing draws them yet. */
+    private void configureModelDump() {
+        String dir = null;
+        if (dumpModels) {
+            File root = StorageLocations.resolve(activity);
+            if (root != null) {
+                File d = new File(root, "sh2screen_dump");
+                if (d.isDirectory() || d.mkdirs()) {
+                    dir = d.getAbsolutePath();
+                }
+            }
+            Log.i(TAG, "models: dump to " + dir);
+        }
+        try {
+            nativeModelsConfigure(dir);
+        } catch (UnsatisfiedLinkError e) {
+            Log.w(TAG, "models: native side not loaded yet");
+        }
+    }
+
+    void onModelSerial(int serial) {
+        if (serial == 0 || serial == modelSerial) return;
+        modelSerial = serial;
+        byte[] b;
+        try {
+            b = nativeModels();
+        } catch (UnsatisfiedLinkError e) {
+            return;
+        }
+        if (b == null || b.length < 16 || b[0] != 'S' || b[1] != 'H' || b[2] != 'M' || b[3] != '1') {
+            Log.w(TAG, "models: no usable blob");
+            return;
+        }
+        int count = (b[8] & 0xFF) | ((b[9] & 0xFF) << 8);
+        Log.i(TAG, "models: received " + count + " item models for map " + (b[5] & 0xFF)
+                + " (pack IT_00" + (b[6] & 0xFF) + "), " + b.length + " bytes");
     }
 
     private void refresh() {
@@ -294,6 +338,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         debugOverlay = "1".equals(p.getProperty("debug", "0").trim());
         useGameFont = !"0".equals(p.getProperty("game_font", "1").trim());
         crtFollow = !"0".equals(p.getProperty("crt", "1").trim());
+        dumpModels = "1".equals(p.getProperty("dump_models", "0").trim());
 
         String disp = p.getProperty("display", "auto").trim();
         if (!"auto".equalsIgnoreCase(disp)) {
@@ -313,7 +358,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: fase3 (game font + crt)  config: game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
+        Log.i(TAG, "build: fase4-paso1 (item models)  config: dump_models=" + dumpModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
 
@@ -346,6 +391,10 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             + "# 1 = put the game's post_process filter (CRT, Scanlines or Vignette) on the\n"
             + "#     second screen as well. 0 = never.\n"
             + "crt=1\n"
+            + "\n"
+            + "# 1 = copy the inventory's item models and textures, as read from your disc,\n"
+            + "#     to the sh2screen_dump folder next to this file (for checking).\n"
+            + "dump_models=0\n"
             + "\n"
             + "# 1 = draw the window size and system-bar insets on the second screen,\n"
             + "#     for a screenshot when reporting a layout problem.\n"
@@ -393,6 +442,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         int fontSerial;
         int postMode;
         int postMix;
+        int modelSerial;
         final List<Item> items = new ArrayList<Item>();
     }
 
@@ -425,6 +475,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         s.fontSerial = b[27] & 0xFF;
         s.postMode = b[28] & 0xFF;
         s.postMix = b[29] & 0xFF;
+        s.modelSerial = b[30] & 0xFF;
 
         int p = head;
         for (int i = 0; i < count; i++) {
@@ -758,6 +809,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
             snap = s;
 
+            onModelSerial(s.modelSerial);
             if (useGameFont && s.fontSerial != 0 && s.fontSerial != fontSerial) {
                 fontSerial = s.fontSerial;
                 loadFont();
