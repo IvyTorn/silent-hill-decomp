@@ -407,7 +407,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: fase4-paso2 (item icons)  config: dump_models=" + dumpModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
+        Log.i(TAG, "build: fase4-paso2b (item icons, game pose)  config: dump_models=" + dumpModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
 

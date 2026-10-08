@@ -544,15 +544,18 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
     return need;
 }
 
-/* A still picture of one record for the item list: the model turned to a
- * three-quarter view, fitted to the square, drawn with its own texture the way
- * the GPU would -- nearest texel, colour word 0 not drawn, ABE prims blended
- * half and half -- plus a light shade by face angle so the shape reads at
- * small size. RGBA, transparent around the model. */
-#define SM_ICON_YAW   0.62f /* ~35 degrees */
-#define SM_ICON_PITCH -0.44f /* ~-25 degrees */
+/* A still picture of one record for the item list, posed the way the stock
+ * inventory poses it: the game's own per-item tilt (INV_ITEM_ROTATIONS, X then
+ * Z) under a fixed turn about the vertical axis, where the game spins the item.
+ * Without the tilt, flat items such as the medallions show their back. Fitted
+ * to the square, drawn with its own texture the way the GPU would -- nearest
+ * texel, colour word 0 not drawn, ABE prims blended half and half -- plus a
+ * light shade by face angle so the shape reads at small size. RGBA,
+ * transparent around the model. */
+#define SM_ICON_SPIN 0.6109f /* 35 degrees of the game's turntable */
 
 #include <math.h>
+#include "../../src/bodyprog/items/item_rotations.h"
 
 void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
 {
@@ -563,8 +566,9 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
     int                  th   = (int)Sm_U16(rec + 6);
     const unsigned char* vtx  = rec + SM_ITEM_HDR;
     const unsigned char* tex  = vtx + (long)ntri * 3 * SM_VERT_BYTES;
-    float                ca = cosf(SM_ICON_YAW), sa = sinf(SM_ICON_YAW);
-    float                ce = cosf(SM_ICON_PITCH), se = sinf(SM_ICON_PITCH);
+    int                  rot  = (int)rec[0] - 32;
+    float                tx   = 0.0f, tz = 0.0f, m[3][3];
+    float                sx, cxr, sy, cyr, sz, czr;
     float                cx, cy, cz, minx = 1e30f, miny = 1e30f, maxx = -1e30f, maxy = -1e30f, scale, ox, oy;
     unsigned             i;
     int                  k;
@@ -572,6 +576,19 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
     if (size > 256)
         size = 256;
     memset(rgba, 0, (size_t)size * size * 4);
+
+    if (rot >= 0 && rot < (int)(sizeof(INV_ITEM_ROTATIONS) / sizeof(INV_ITEM_ROTATIONS[0])))
+    {
+        tx = INV_ITEM_ROTATIONS[rot].vx * (6.2831853f / 4096.0f);
+        tz = INV_ITEM_ROTATIONS[rot].vy * (6.2831853f / 4096.0f);
+    }
+    /* Ry * Rx * Rz, as Math_RotMatrixZxyNeg builds it for the item screen. */
+    sx = sinf(tx); cxr = cosf(tx);
+    sy = sinf(SM_ICON_SPIN); cyr = cosf(SM_ICON_SPIN);
+    sz = sinf(tz); czr = cosf(tz);
+    m[0][0] = cyr * czr + sy * sx * sz;  m[0][1] = -cyr * sz + sy * sx * czr; m[0][2] = sy * cxr;
+    m[1][0] = cxr * sz;                  m[1][1] = cxr * czr;                 m[1][2] = -sx;
+    m[2][0] = -sy * czr + cyr * sx * sz; m[2][1] = sy * sz + cyr * sx * czr;  m[2][2] = cyr * cxr;
     for (i = 0; i < (unsigned)(size * size); i++)
         zb[i] = 1e30f;
 
@@ -584,11 +601,9 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
         float x_ = (short)Sm_U16(p_) - cx;                               \
         float y_ = (short)Sm_U16((p_) + 2) - cy;                         \
         float z_ = (short)Sm_U16((p_) + 4) - cz;                         \
-        float x2 = x_ * ca + z_ * sa;                                    \
-        float z2 = -x_ * sa + z_ * ca;                                   \
-        X_ = x2;                                                         \
-        Y_ = y_ * ce - z2 * se;                                          \
-        Z_ = y_ * se + z2 * ce;                                          \
+        X_ = m[0][0] * x_ + m[0][1] * y_ + m[0][2] * z_;                 \
+        Y_ = m[1][0] * x_ + m[1][1] * y_ + m[1][2] * z_;                 \
+        Z_ = m[2][0] * x_ + m[2][1] * y_ + m[2][2] * z_;                 \
     } while (0)
 
     /* Fit what the camera actually sees, not the model's box: a long thin
