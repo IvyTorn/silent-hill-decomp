@@ -78,6 +78,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private boolean useGameFont = true;
     private boolean crtFollow = true;
     private boolean dumpModels = false;
+    private boolean spinModels = true;
     private int modelSerial;
 
     /* Item icons, drawn natively from the game's own models (pc_second_screen_
@@ -99,6 +100,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private static native byte[] nativeModels();
     private static native byte[] nativeIcons();
     private static native void nativeModelsConfigure(String dumpDir);
+    private static native boolean nativeRenderModel(int itemId, int mask, float spin, int size, int[] out);
 
     /* Request kinds and driver states: the enums in pc_second_screen.c. */
     private static final int RQ_SELECT = 1, RQ_CHOOSE = 2, RQ_CANCEL = 3, RQ_DISMISS = 4;
@@ -213,6 +215,11 @@ final class SecondScreen implements DisplayManager.DisplayListener {
      * first map's pack, IT_000, files a first-aid-kit model under the health
      * drink, which is the game's own data but would read as a mistake here. */
     Bitmap iconFor(int itemId) {
+        Icon ic = bestIcon(itemId);
+        return (ic != null) ? ic.bitmap : null;
+    }
+
+    Icon bestIcon(int itemId) {
         List<Icon> l = icons.get(itemId);
         if (l == null || l.isEmpty()) return null;
         Icon best = null;
@@ -225,8 +232,66 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 bestScore = score;
             }
         }
-        return best.bitmap;
+        return best;
     }
+
+    /* The turntable. The stock inventory turns the selected item by -0x10 and
+     * the equipped one by +0x20 (of 4096 to the turn) every frame, and the
+     * item screen runs a frame a vblank (g_IntervalVBlanks = 1), 60 a second
+     * in the port: a turn in 4.27 s and in 2.13 s, in opposite directions.
+     * Each frame is drawn natively from the same record as the item's icon,
+     * starting from the icon's own angle so nothing jumps when it starts. */
+    private static final int ICON_SIZE = 112;
+    private static final float ICON_START = 0.6109f;
+    private static final long SPIN_FRAME_MS = 33;
+
+    private final class Spinner {
+        private final double periodMs;
+        private final int sign;
+        private int itemId = -1;
+        private int mask = -1;
+        private long t0;
+        private final int[] px = new int[ICON_SIZE * ICON_SIZE];
+        private Bitmap bm;
+        boolean used;
+
+        Spinner(int stepPerFrame) {
+            sign = stepPerFrame < 0 ? -1 : 1;
+            periodMs = 4096.0 / Math.abs(stepPerFrame) / 60.0 * 1000.0;
+        }
+
+        void reset() {
+            itemId = -1;
+            mask = -1;
+        }
+
+        Bitmap frame(int id, long now) {
+            used = true;
+            if (!spinModels || nativeRenderBroken) return null;
+            Icon ic = bestIcon(id);
+            if (ic == null) return null;
+            if (id != itemId || ic.mask != mask) {
+                itemId = id;
+                mask = ic.mask;
+                t0 = now;
+            }
+            double turn = ((now - t0) % (long) Math.max(1.0, periodMs)) / periodMs;
+            float angle = (float) (ICON_START + sign * turn * 2.0 * Math.PI);
+            boolean ok;
+            try {
+                ok = nativeRenderModel(id, ic.mask, angle, ICON_SIZE, px);
+            } catch (UnsatisfiedLinkError e) {
+                nativeRenderBroken = true;
+                Log.w(TAG, "models: native turntable unavailable; icons stay still");
+                return null;
+            }
+            if (!ok) return null;
+            if (bm == null) bm = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888);
+            bm.setPixels(px, 0, ICON_SIZE, 0, 0, ICON_SIZE, ICON_SIZE);
+            return bm;
+        }
+    }
+    private boolean nativeRenderBroken;
 
     private void refresh() {
         if (!started || !enabled || activity.isFinishing() || activity.isDestroyed()) {
@@ -388,6 +453,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         useGameFont = !"0".equals(p.getProperty("game_font", "1").trim());
         crtFollow = !"0".equals(p.getProperty("crt", "1").trim());
         dumpModels = "1".equals(p.getProperty("dump_models", "0").trim());
+        spinModels = !"0".equals(p.getProperty("spin", "1").trim());
 
         String disp = p.getProperty("display", "auto").trim();
         if (!"auto".equalsIgnoreCase(disp)) {
@@ -407,7 +473,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: fase4-paso2b (item icons, game pose)  config: dump_models=" + dumpModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
+        Log.i(TAG, "build: fase4-paso3a (turntable)  config: dump_models=" + dumpModels + " spin=" + spinModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
 
@@ -444,6 +510,10 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             + "# 1 = copy the inventory's item models and textures, as read from your disc,\n"
             + "#     to the sh2screen_dump folder next to this file (for checking).\n"
             + "dump_models=0\n"
+            + "\n"
+            + "# 1 = the selected and the equipped item turn, as in the game's inventory;\n"
+            + "#     0 = still pictures (a little less work for the battery).\n"
+            + "spin=1\n"
             + "\n"
             + "# 1 = draw the window size and system-bar insets on the second screen,\n"
             + "#     for a screenshot when reporting a layout problem.\n"
@@ -483,6 +553,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         int ammoLoaded;
         int ammoReserve;
         int equippedSlot;
+        int selectedSlot;
         int uiState;
         int uiSlot;
         int uiCmd;
@@ -516,6 +587,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         s.ammoLoaded = b[17] & 0xFF;
         s.ammoReserve = b[18] & 0xFF;
         int count = b[19] & 0xFF;
+        s.selectedSlot = b[20] & 0xFF;
         s.equippedSlot = b[21] & 0xFF;
         s.uiState = b[22] & 0xFF;
         s.uiSlot = b[23] & 0xFF;
@@ -781,6 +853,11 @@ final class SecondScreen implements DisplayManager.DisplayListener {
 
         private Snapshot snap;
         private final boolean spanish;
+
+        private final Spinner spinSelected = new Spinner(-0x10);
+        private final Spinner spinEquipped = new Spinner(0x20);
+        private final Spinner spinSheet = new Spinner(-0x10);
+        private final Spinner[] spinners = { spinSelected, spinEquipped, spinSheet };
 
         private GameFont font;
         private int fontSerial;
@@ -1289,7 +1366,13 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         /** The item's own model as a picture, fitted into a square; false if
          * there is none and the category symbol should be drawn instead. */
         private boolean drawIcon(Canvas c, int itemId, float cx, float cy, float side) {
-            Bitmap bm = iconFor(itemId);
+            return drawIcon(c, itemId, cx, cy, side, null);
+        }
+
+        /** As above, turning on the given turntable when it can. */
+        private boolean drawIcon(Canvas c, int itemId, float cx, float cy, float side, Spinner turn) {
+            Bitmap bm = (turn != null) ? turn.frame(itemId, android.os.SystemClock.uptimeMillis()) : null;
+            if (bm == null) bm = iconFor(itemId);
             if (bm == null) return false;
             r.set(Math.round(cx - side / 2f), Math.round(cy - side / 2f),
                   Math.round(cx + side / 2f), Math.round(cy + side / 2f));
@@ -1346,6 +1429,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
 
             buttonCount = 0;
+            for (Spinner sp : spinners) sp.used = false;
             if (snap == null || !snap.session) {
                 drawIdle(c, w, h);
             } else {
@@ -1365,6 +1449,15 @@ final class SecondScreen implements DisplayManager.DisplayListener {
 
             if (fxOverlay) {
                 drawScanlines(c, w, h);
+            }
+
+            boolean turning = false;
+            for (Spinner sp : spinners) {
+                if (sp.used) turning = true;
+                else sp.reset();
+            }
+            if (turning && spinModels && !nativeRenderBroken) {
+                postInvalidateDelayed(SPIN_FRAME_MS);
             }
 
             if (debugOverlay) {
@@ -1534,7 +1627,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 return y + hgt;
             }
 
-            if (!drawIcon(c, eq.id, x + 72 * u, y + hgt / 2f, 128 * u)) {
+            if (!drawIcon(c, eq.id, x + 72 * u, y + hgt / 2f, 128 * u, spinEquipped)) {
                 drawGlyph(c, eq.id >> 5, x + 72 * u, y + hgt / 2f, 40 * u, C_GOLD);
             }
 
@@ -1576,7 +1669,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
 
             final float iconSide = h - 10 * u;
-            final boolean icon = drawIcon(c, it.id, x + 6 * u + iconSide / 2f, y + h / 2f, iconSide);
+            final boolean icon = drawIcon(c, it.id, x + 6 * u + iconSide / 2f, y + h / 2f, iconSide,
+                                          it.slot == snap.selectedSlot ? spinSelected : null);
             if (!icon) {
                 drawGlyph(c, group, x + 54 * u, y + h / 2f, 28 * u, col);
             }
@@ -1700,7 +1794,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             frame(c, pxl, py, pxl + pw, py + ph, C_EDGE);
             brackets(c, pxl - 2 * P, py - 2 * P, pxl + pw + 2 * P, py + ph + 2 * P, C_GOLD);
 
-            if (!drawIcon(c, item.id, pxl + 84 * u, py + 80 * u, 120 * u)) {
+            if (!drawIcon(c, item.id, pxl + 84 * u, py + 80 * u, 120 * u, spinSheet)) {
                 drawGlyph(c, item.id >> 5, pxl + 84 * u, py + 80 * u, 36 * u, groupColor(item.id >> 5));
             }
             float nameMax = pw - 156 * u - 36 * u;

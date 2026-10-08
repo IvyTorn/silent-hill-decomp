@@ -544,23 +544,24 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
     return need;
 }
 
-/* A still picture of one record for the item list, posed the way the stock
- * inventory poses it: the game's own per-item tilt (INV_ITEM_ROTATIONS, X then
- * Z) under a fixed turn about the vertical axis, where the game spins the item.
- * Without the tilt, flat items such as the medallions show their back. Fitted
- * to the square, drawn with its own texture the way the GPU would -- nearest
- * texel, colour word 0 not drawn, ABE prims blended half and half -- plus a
- * light shade by face angle so the shape reads at small size. RGBA,
- * transparent around the model. */
+/* One record drawn the way the stock inventory poses it: the game's own
+ * per-item tilt (INV_ITEM_ROTATIONS, X then Z) under a turn about the vertical
+ * axis, the axis the game spins the item on. Without the tilt, flat items
+ * such as the medallions show their back. Drawn with its own texture the way
+ * the GPU would -- nearest texel, colour word 0 not drawn, ABE prims blended
+ * half and half -- plus a light shade by face angle so the shape reads at
+ * small size. RGBA, transparent around the model.
+ *
+ * A still icon is fitted to what the camera sees at its one angle. A spinning
+ * one (steady) is fitted to the circle it sweeps instead, so it keeps its size
+ * all the way round. */
 #define SM_ICON_SPIN 0.6109f /* 35 degrees of the game's turntable */
 
 #include <math.h>
 #include "../../src/bodyprog/items/item_rotations.h"
 
-void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
+static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgba, float spin, int steady, float* zb)
 {
-    static float zb[256 * 256];
-
     unsigned             ntri = Sm_U16(rec + 2);
     int                  tw   = (int)Sm_U16(rec + 4);
     int                  th   = (int)Sm_U16(rec + 6);
@@ -569,6 +570,7 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
     int                  rot  = (int)rec[0] - 32;
     float                tx   = 0.0f, tz = 0.0f, m[3][3];
     float                sx, cxr, sy, cyr, sz, czr;
+    float                tm[3][3];
     float                cx, cy, cz, minx = 1e30f, miny = 1e30f, maxx = -1e30f, maxy = -1e30f, scale, ox, oy;
     unsigned             i;
     int                  k;
@@ -584,11 +586,15 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
     }
     /* Ry * Rx * Rz, as Math_RotMatrixZxyNeg builds it for the item screen. */
     sx = sinf(tx); cxr = cosf(tx);
-    sy = sinf(SM_ICON_SPIN); cyr = cosf(SM_ICON_SPIN);
+    sy = sinf(spin); cyr = cosf(spin);
     sz = sinf(tz); czr = cosf(tz);
     m[0][0] = cyr * czr + sy * sx * sz;  m[0][1] = -cyr * sz + sy * sx * czr; m[0][2] = sy * cxr;
     m[1][0] = cxr * sz;                  m[1][1] = cxr * czr;                 m[1][2] = -sx;
     m[2][0] = -sy * czr + cyr * sx * sz; m[2][1] = sy * sz + cyr * sx * czr;  m[2][2] = cyr * cxr;
+    /* The same without the turn: Rx * Rz. */
+    tm[0][0] = czr;       tm[0][1] = -sz;       tm[0][2] = 0.0f;
+    tm[1][0] = cxr * sz;  tm[1][1] = cxr * czr; tm[1][2] = -sx;
+    tm[2][0] = sx * sz;   tm[2][1] = sx * czr;  tm[2][2] = cxr;
     for (i = 0; i < (unsigned)(size * size); i++)
         zb[i] = 1e30f;
 
@@ -606,23 +612,51 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
         Z_ = m[2][0] * x_ + m[2][1] * y_ + m[2][2] * z_;                 \
     } while (0)
 
-    /* Fit what the camera actually sees, not the model's box: a long thin
-     * item seen at an angle would otherwise come out tiny. */
-    for (i = 0; i < ntri * 3; i++)
+    if (steady)
     {
-        float X, Y, Z;
-        SM_XFORM(vtx + (long)i * SM_VERT_BYTES, X, Y, Z);
-        (void)Z;
-        if (X < minx) minx = X;
-        if (X > maxx) maxx = X;
-        if (Y < miny) miny = Y;
-        if (Y > maxy) maxy = Y;
+        float r2 = 0.0f, ext;
+
+        for (i = 0; i < ntri * 3; i++)
+        {
+            const unsigned char* q  = vtx + (long)i * SM_VERT_BYTES;
+            float                x_ = (short)Sm_U16(q) - cx;
+            float                y_ = (short)Sm_U16(q + 2) - cy;
+            float                z_ = (short)Sm_U16(q + 4) - cz;
+            float                X  = tm[0][0] * x_ + tm[0][1] * y_ + tm[0][2] * z_;
+            float                Y  = tm[1][0] * x_ + tm[1][1] * y_ + tm[1][2] * z_;
+            float                Z  = tm[2][0] * x_ + tm[2][1] * y_ + tm[2][2] * z_;
+
+            if (X * X + Z * Z > r2) r2 = X * X + Z * Z;
+            if (Y < miny) miny = Y;
+            if (Y > maxy) maxy = Y;
+        }
+        if (r2 <= 0.0f || maxy <= miny)
+            return;
+        ext   = 2.0f * sqrtf(r2);
+        scale = (size * 0.88f) / (ext > (maxy - miny) ? ext : (maxy - miny));
+        ox    = size * 0.5f;
+        oy    = size * 0.5f - (miny + maxy) * 0.5f * scale;
     }
-    if (maxx <= minx || maxy <= miny)
-        return;
-    scale = (size * 0.88f) / ((maxx - minx) > (maxy - miny) ? (maxx - minx) : (maxy - miny));
-    ox    = size * 0.5f - (minx + maxx) * 0.5f * scale;
-    oy    = size * 0.5f - (miny + maxy) * 0.5f * scale;
+    else
+    {
+        /* Fit what the camera actually sees, not the model's box: a long thin
+         * item seen at an angle would otherwise come out tiny. */
+        for (i = 0; i < ntri * 3; i++)
+        {
+            float X, Y, Z;
+            SM_XFORM(vtx + (long)i * SM_VERT_BYTES, X, Y, Z);
+            (void)Z;
+            if (X < minx) minx = X;
+            if (X > maxx) maxx = X;
+            if (Y < miny) miny = Y;
+            if (Y > maxy) maxy = Y;
+        }
+        if (maxx <= minx || maxy <= miny)
+            return;
+        scale = (size * 0.88f) / ((maxx - minx) > (maxy - miny) ? (maxx - minx) : (maxy - miny));
+        ox    = size * 0.5f - (minx + maxx) * 0.5f * scale;
+        oy    = size * 0.5f - (miny + maxy) * 0.5f * scale;
+    }
 
     for (i = 0; i < ntri; i++)
     {
@@ -707,6 +741,13 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
         }
     }
 #undef SM_XFORM
+}
+
+void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
+{
+    static float zb[256 * 256];
+
+    Sm_RenderPose(rec, size, rgba, SM_ICON_SPIN, 0, zb);
 }
 
 /* The pack a map shows in its inventory: GameFs_MapItemsTextureLoad. */
@@ -1338,6 +1379,53 @@ Java_com_silenthill_port_SecondScreen_nativeIcons(JNIEnv* env, jclass cls)
     arr = Sm_ToJava(env, s_smIcons, s_smIconsLen);
     pthread_mutex_unlock(&s_smLock);
     return arr;
+}
+
+/* UI thread, once a frame for each turning item: one record, picked by item
+ * and pack mask as the icon was, drawn at the given turn and fitted to the
+ * circle it sweeps. ARGB into out (size x size). False if there is no such
+ * record (yet). */
+JNIEXPORT jboolean JNICALL
+Java_com_silenthill_port_SecondScreen_nativeRenderModel(JNIEnv* env, jclass cls, jint itemId, jint mask,
+                                                       jfloat spin, jint size, jintArray out)
+{
+    static float         zb[SM_ICON * SM_ICON];
+    static unsigned char rgba[SM_ICON * SM_ICON * 4];
+    static jint          argb[SM_ICON * SM_ICON];
+    const unsigned char* rec = NULL;
+    long                 q;
+    int                  i;
+
+    (void)cls;
+    if (size != SM_ICON || out == NULL || (*env)->GetArrayLength(env, out) < SM_ICON * SM_ICON)
+        return JNI_FALSE;
+
+    pthread_mutex_lock(&s_smLock);
+    if (s_smBlob != NULL)
+    {
+        for (q = SM_BLOB_HDR; q < s_smBlobLen; q += Sm_RecordLen(s_smBlob + q))
+        {
+            if (s_smBlob[q] == (unsigned char)itemId && s_smBlob[q + 1] == (unsigned char)mask)
+            {
+                rec = s_smBlob + q;
+                break;
+            }
+        }
+    }
+    if (rec != NULL)
+        Sm_RenderPose(rec, SM_ICON, rgba, spin, 1, zb);
+    pthread_mutex_unlock(&s_smLock);
+
+    if (rec == NULL)
+        return JNI_FALSE;
+
+    for (i = 0; i < SM_ICON * SM_ICON; i++)
+    {
+        const unsigned char* p = rgba + i * 4;
+        argb[i] = (jint)(((unsigned)p[3] << 24) | ((unsigned)p[0] << 16) | ((unsigned)p[1] << 8) | p[2]);
+    }
+    (*env)->SetIntArrayRegion(env, out, 0, SM_ICON * SM_ICON, argb);
+    return JNI_TRUE;
 }
 
 #else
