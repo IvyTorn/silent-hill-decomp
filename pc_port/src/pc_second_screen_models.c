@@ -24,8 +24,10 @@
  * disc's item packs (pc_big_tmd.c): gouraud tris 0x30/0x34/0x36 and quads
  * 0x38/0x3C, each with interleaved (normal, vertex) index pairs.
  *
- * Step 1 of the 3D second screen: this builds the data and can dump it for
- * checking; nothing draws it yet.
+ * Step 2 of the 3D second screen: every pack is built once into a library,
+ * so an item has its model wherever the player is, and each model is also
+ * drawn into a still icon for the item list. The models themselves are kept
+ * for the real-time view that comes next.
  */
 #include "game.h"
 
@@ -285,7 +287,7 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
     long                 p;
     int                  nprim = 0, nreg = 0, ntri = 0;
     int                  i, k;
-    int                  texW = SM_ATLAS_W, texH;
+    int                  texW = SM_ATLAS_W, texH = 0;
     int                  shelfX, shelfY, shelfH;
     int                  bb[6] = { 32767, 32767, 32767, -32768, -32768, -32768 };
     unsigned char*       w;
@@ -379,30 +381,55 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
         return 0;
 
     /* Shelf-pack the texture regions, each with a one-texel border, after a
-     * 3x3 white cell for the untextured triangles. */
-    shelfX = 3;
-    shelfY = 0;
-    shelfH = 3;
-    for (i = 0; i < nreg; i++)
+     * 3x3 white cell for the untextured triangles. The width is whichever of
+     * 64, 128 or 256 gives the smallest texture: most items use a handful of
+     * small patches, and a fixed 256 left most of every texture empty. */
     {
-        int rw = regions[i].u1 - regions[i].u0 + 1 + 2;
-        int rh = regions[i].v1 - regions[i].v0 + 1 + 2;
+        static const int WIDTHS[3] = { 64, 128, 256 };
+        int              best = -1, bestArea = 0, pass;
 
-        if (rw > texW)
-            texW = rw;
-        if (shelfX + rw > texW)
+        for (pass = 0; pass < 4; pass++)
         {
-            shelfY += shelfH;
-            shelfX = 0;
-            shelfH = 0;
+            int cand = (pass < 3) ? WIDTHS[pass] : WIDTHS[best];
+            int ok   = 1;
+
+            shelfX = 3;
+            shelfY = 0;
+            shelfH = 3;
+            for (i = 0; i < nreg; i++)
+            {
+                int rw = regions[i].u1 - regions[i].u0 + 1 + 2;
+                int rh = regions[i].v1 - regions[i].v0 + 1 + 2;
+
+                if (rw > cand)
+                {
+                    ok = 0;
+                    break;
+                }
+                if (shelfX + rw > cand)
+                {
+                    shelfY += shelfH;
+                    shelfX = 0;
+                    shelfH = 0;
+                }
+                regions[i].ax = shelfX + 1;
+                regions[i].ay = shelfY + 1;
+                shelfX += rw;
+                if (rh > shelfH)
+                    shelfH = rh;
+            }
+            texW = cand;
+            texH = (shelfY + shelfH + 3) & ~3;
+
+            if (pass == 3)
+                break;
+            if (ok && (best < 0 || texW * texH < bestArea))
+            {
+                best     = pass;
+                bestArea = texW * texH;
+            }
         }
-        regions[i].ax = shelfX + 1;
-        regions[i].ay = shelfY + 1;
-        shelfX += rw;
-        if (rh > shelfH)
-            shelfH = rh;
     }
-    texH = (shelfY + shelfH + 3) & ~3;
 
     need = SM_ITEM_HDR + (long)ntri * 3 * SM_VERT_BYTES + (long)texW * texH * 4;
     if (need > cap)
@@ -517,6 +544,156 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
     return need;
 }
 
+/* A still picture of one record for the item list: the model turned to a
+ * three-quarter view, fitted to the square, drawn with its own texture the way
+ * the GPU would -- nearest texel, colour word 0 not drawn, ABE prims blended
+ * half and half -- plus a light shade by face angle so the shape reads at
+ * small size. RGBA, transparent around the model. */
+#define SM_ICON_YAW   0.62f /* ~35 degrees */
+#define SM_ICON_PITCH -0.44f /* ~-25 degrees */
+
+#include <math.h>
+
+void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
+{
+    static float zb[256 * 256];
+
+    unsigned             ntri = Sm_U16(rec + 2);
+    int                  tw   = (int)Sm_U16(rec + 4);
+    int                  th   = (int)Sm_U16(rec + 6);
+    const unsigned char* vtx  = rec + SM_ITEM_HDR;
+    const unsigned char* tex  = vtx + (long)ntri * 3 * SM_VERT_BYTES;
+    float                ca = cosf(SM_ICON_YAW), sa = sinf(SM_ICON_YAW);
+    float                ce = cosf(SM_ICON_PITCH), se = sinf(SM_ICON_PITCH);
+    float                cx, cy, cz, minx = 1e30f, miny = 1e30f, maxx = -1e30f, maxy = -1e30f, scale, ox, oy;
+    unsigned             i;
+    int                  k;
+
+    if (size > 256)
+        size = 256;
+    memset(rgba, 0, (size_t)size * size * 4);
+    for (i = 0; i < (unsigned)(size * size); i++)
+        zb[i] = 1e30f;
+
+    cx = ((short)Sm_U16(rec + 8) + (short)Sm_U16(rec + 14)) * 0.5f;
+    cy = ((short)Sm_U16(rec + 10) + (short)Sm_U16(rec + 16)) * 0.5f;
+    cz = ((short)Sm_U16(rec + 12) + (short)Sm_U16(rec + 18)) * 0.5f;
+
+#define SM_XFORM(p_, X_, Y_, Z_)                                         \
+    do {                                                                 \
+        float x_ = (short)Sm_U16(p_) - cx;                               \
+        float y_ = (short)Sm_U16((p_) + 2) - cy;                         \
+        float z_ = (short)Sm_U16((p_) + 4) - cz;                         \
+        float x2 = x_ * ca + z_ * sa;                                    \
+        float z2 = -x_ * sa + z_ * ca;                                   \
+        X_ = x2;                                                         \
+        Y_ = y_ * ce - z2 * se;                                          \
+        Z_ = y_ * se + z2 * ce;                                          \
+    } while (0)
+
+    /* Fit what the camera actually sees, not the model's box: a long thin
+     * item seen at an angle would otherwise come out tiny. */
+    for (i = 0; i < ntri * 3; i++)
+    {
+        float X, Y, Z;
+        SM_XFORM(vtx + (long)i * SM_VERT_BYTES, X, Y, Z);
+        (void)Z;
+        if (X < minx) minx = X;
+        if (X > maxx) maxx = X;
+        if (Y < miny) miny = Y;
+        if (Y > maxy) maxy = Y;
+    }
+    if (maxx <= minx || maxy <= miny)
+        return;
+    scale = (size * 0.88f) / ((maxx - minx) > (maxy - miny) ? (maxx - minx) : (maxy - miny));
+    ox    = size * 0.5f - (minx + maxx) * 0.5f * scale;
+    oy    = size * 0.5f - (miny + maxy) * 0.5f * scale;
+
+    for (i = 0; i < ntri; i++)
+    {
+        const unsigned char* v[3];
+        float                X[3], Y[3], Z[3], U[3], V[3], den, shade;
+        float                nx, ny, nz, nl;
+        int                  x0, x1, y0, y1, xx, yy;
+        int                  semi;
+
+        for (k = 0; k < 3; k++)
+        {
+            v[k] = vtx + ((long)i * 3 + k) * SM_VERT_BYTES;
+            SM_XFORM(v[k], X[k], Y[k], Z[k]);
+            X[k] = X[k] * scale + ox;
+            Y[k] = Y[k] * scale + oy;
+            U[k] = (float)Sm_U16(v[k] + 8);
+            V[k] = (float)Sm_U16(v[k] + 10);
+        }
+        semi = (v[0][6] & SM_VF_SEMI) != 0;
+
+        nx = (Y[1] - Y[0]) * (Z[2] - Z[0]) - (Z[1] - Z[0]) * (Y[2] - Y[0]);
+        ny = (Z[1] - Z[0]) * (X[2] - X[0]) - (X[1] - X[0]) * (Z[2] - Z[0]);
+        nz = (X[1] - X[0]) * (Y[2] - Y[0]) - (Y[1] - Y[0]) * (X[2] - X[0]);
+        nl = sqrtf(nx * nx + ny * ny + nz * nz);
+        shade = (nl > 0.0f) ? 0.72f + 0.28f * fabsf((nx * -0.35f + ny * -0.55f + nz * -0.76f) / nl) : 1.0f;
+
+        den = (Y[1] - Y[2]) * (X[0] - X[2]) + (X[2] - X[1]) * (Y[0] - Y[2]);
+        if (fabsf(den) < 1e-6f)
+            continue;
+
+        x0 = (int)floorf(fminf(X[0], fminf(X[1], X[2])));
+        x1 = (int)ceilf(fmaxf(X[0], fmaxf(X[1], X[2])));
+        y0 = (int)floorf(fminf(Y[0], fminf(Y[1], Y[2])));
+        y1 = (int)ceilf(fmaxf(Y[0], fmaxf(Y[1], Y[2])));
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > size - 1) x1 = size - 1;
+        if (y1 > size - 1) y1 = size - 1;
+
+        for (yy = y0; yy <= y1; yy++)
+        {
+            for (xx = x0; xx <= x1; xx++)
+            {
+                float          px = xx + 0.5f, py = yy + 0.5f;
+                float          w0 = ((Y[1] - Y[2]) * (px - X[2]) + (X[2] - X[1]) * (py - Y[2])) / den;
+                float          w1 = ((Y[2] - Y[0]) * (px - X[2]) + (X[0] - X[2]) * (py - Y[2])) / den;
+                float          w2 = 1.0f - w0 - w1;
+                float          z;
+                int            tu, tv, c;
+                const unsigned char* t;
+                unsigned char* d;
+
+                if (w0 < 0.0f || w1 < 0.0f || w2 < 0.0f)
+                    continue;
+                z = w0 * Z[0] + w1 * Z[1] + w2 * Z[2];
+                if (z >= zb[yy * size + xx])
+                    continue;
+
+                tu = (int)(w0 * U[0] + w1 * U[1] + w2 * U[2]);
+                tv = (int)(w0 * V[0] + w1 * V[1] + w2 * V[2]);
+                if (tu < 0) tu = 0;
+                if (tv < 0) tv = 0;
+                if (tu > tw - 1) tu = tw - 1;
+                if (tv > th - 1) tv = th - 1;
+                t = tex + ((long)tv * tw + tu) * 4;
+                if (t[3] == 0)
+                    continue;
+
+                d = rgba + ((long)yy * size + xx) * 4;
+                for (c = 0; c < 3; c++)
+                {
+                    float col = t[c] * (v[0][12 + c] / 255.0f) * shade;
+                    if (col > 255.0f)
+                        col = 255.0f;
+                    if (semi && t[3] == 0xFE && d[3] != 0)
+                        col = (col + d[c]) * 0.5f;
+                    d[c] = (unsigned char)col;
+                }
+                d[3] = 255;
+                zb[yy * size + xx] = z;
+            }
+        }
+    }
+#undef SM_XFORM
+}
+
 /* The pack a map shows in its inventory: GameFs_MapItemsTextureLoad. */
 int Sm_PackForMap(int map)
 {
@@ -592,7 +769,7 @@ int Sm_KeyTimForMap(int map)
 }
 
 /* ---------------------------------------------------------------------- */
-/* Android: the worker, the dump and JNI.                                 */
+/* Android: the library, the icons, the dump and JNI.                     */
 /* ---------------------------------------------------------------------- */
 
 #if defined(__ANDROID__)
@@ -602,34 +779,44 @@ int Sm_KeyTimForMap(int map)
 #include <sys/stat.h>
 #include <android/log.h>
 
-#include "lang_text.h" /* Pc_LangReadDiscFile */
+#include "lang_text.h"   /* Pc_LangReadDiscFile */
+#include "map_registry.h" /* MapRegistry_GetName */
+#ifdef SH_STATIC_MAPS
+#include "map_static_registry.h"
+#endif
 
 #define SM_TAG       "SH2Screen"
+#define SM_PACKS     7
 #define SM_LIST_MAX  64
 #define SM_BLOB_HDR  16
+#define SM_ICON      112
+#define SM_ICON_HDR  4
+#define SM_LIB_CAP   (8L * 1024 * 1024)
 
+/* Everything the worker needs, copied on the game thread. */
 typedef struct
 {
-    int           map;
-    int           pack;
-    int           keyTim;
-    int           count;
-    unsigned char items[SM_LIST_MAX];
+    int           count[SM_PACKS];
+    unsigned char items[SM_PACKS][SM_LIST_MAX];
+    int           keyTim[SM_PACKS];
+    int           listMap[SM_PACKS]; /* the map whose list was used, for the report */
+    unsigned long packSector[SM_PACKS], packSize[SM_PACKS];
+    unsigned long keySector[SM_PACKS], keySize[SM_PACKS];
+    unsigned long sector07, size07, sector00, size00;
     s_FsImageDesc descKey, descCommon, descAlways;
-    unsigned long sector[4], size[4]; /* pack, TIM07, TIM00, key TIM */
     char          dumpDir[512];
 } s_SmJob;
 
 static pthread_mutex_t s_smLock = PTHREAD_MUTEX_INITIALIZER;
-static unsigned char*  s_smBlob;
+static unsigned char*  s_smBlob;   /* "SHM1": the models, for the 3D view */
 static long            s_smBlobLen;
+static unsigned char*  s_smIcons;  /* "SHI1": a still picture per model */
+static long            s_smIconsLen;
 static int             s_smSerial;
 static int             s_smBusy;
+static int             s_smBuilt;
 static char            s_smDumpDir[512];
 static int             s_smForce;
-
-static int             s_smLastMap = -2;
-static const void*     s_smLastList;
 
 static void Sm_WriteFile(const char* dir, const char* name, const void* data, long len)
 {
@@ -647,12 +834,25 @@ static void Sm_WriteFile(const char* dir, const char* name, const void* data, lo
     fclose(f);
 }
 
-static void Sm_DumpItem(const char* dir, const unsigned char* rec, long len)
+static void Sm_WritePng(const char* dir, const char* name, const unsigned char* rgba, int w, int h)
 {
     extern void* tdefl_write_image_to_png_file_in_memory(const void*, int, int, int, size_t*);
     extern void  mz_free(void*);
 
+    size_t len = 0;
+    void*  png = tdefl_write_image_to_png_file_in_memory(rgba, w, h, 4, &len);
+
+    if (png != NULL)
+    {
+        Sm_WriteFile(dir, name, png, (long)len);
+        mz_free(png);
+    }
+}
+
+static void Sm_DumpRecord(const char* dir, const unsigned char* rec, const unsigned char* icon)
+{
     int                  item = rec[0];
+    int                  mask = rec[1];
     unsigned             ntri = Sm_U16(rec + 2);
     int                  tw   = (int)Sm_U16(rec + 4);
     int                  th   = (int)Sm_U16(rec + 6);
@@ -660,28 +860,20 @@ static void Sm_DumpItem(const char* dir, const unsigned char* rec, long len)
     const unsigned char* tex  = v + (long)ntri * 3 * SM_VERT_BYTES;
     char                 name[64];
     char                 path[700];
-    size_t               pngLen = 0;
-    void*                png;
     FILE*                f;
     unsigned             i;
 
-    (void)len;
+    snprintf(name, sizeof(name), "item_%03d_%02x.png", item, mask);
+    Sm_WritePng(dir, name, tex, tw, th);
+    snprintf(name, sizeof(name), "icon_%03d_%02x.png", item, mask);
+    Sm_WritePng(dir, name, icon, SM_ICON, SM_ICON);
 
-    png = tdefl_write_image_to_png_file_in_memory(tex, tw, th, 4, &pngLen);
-    if (png != NULL)
-    {
-        snprintf(name, sizeof(name), "item_%03d.png", item);
-        Sm_WriteFile(dir, name, png, (long)pngLen);
-        mz_free(png);
-    }
-
-    /* Wavefront OBJ: opens in most 3D viewers, and is what gets checked
-     * against the original on a PC. PSX y points down, hence the flip. */
-    snprintf(path, sizeof(path), "%s/item_%03d.obj", dir, item);
+    /* Wavefront OBJ: opens in most 3D viewers. PSX y points down. */
+    snprintf(path, sizeof(path), "%s/item_%03d_%02x.obj", dir, item, mask);
     f = fopen(path, "w");
     if (f == NULL)
         return;
-    fprintf(f, "mtllib item_%03d.mtl\nusemtl m\n", item);
+    fprintf(f, "mtllib item_%03d_%02x.mtl\nusemtl m\n", item, mask);
     for (i = 0; i < ntri * 3; i++)
     {
         const unsigned char* p = v + (long)i * SM_VERT_BYTES;
@@ -697,151 +889,231 @@ static void Sm_DumpItem(const char* dir, const unsigned char* rec, long len)
         fprintf(f, "f %u/%u %u/%u %u/%u\n", i * 3 + 1, i * 3 + 1, i * 3 + 2, i * 3 + 2, i * 3 + 3, i * 3 + 3);
     fclose(f);
 
-    snprintf(path, sizeof(path), "%s/item_%03d.mtl", dir, item);
+    snprintf(path, sizeof(path), "%s/item_%03d_%02x.mtl", dir, item, mask);
     f = fopen(path, "w");
     if (f != NULL)
     {
-        fprintf(f, "newmtl m\nKd 1 1 1\nmap_Kd item_%03d.png\n", item);
+        fprintf(f, "newmtl m\nKd 1 1 1\nmap_Kd item_%03d_%02x.png\n", item, mask);
         fclose(f);
     }
 }
 
+static long Sm_RecordLen(const unsigned char* rec)
+{
+    return SM_ITEM_HDR + (long)Sm_U16(rec + 2) * 3 * SM_VERT_BYTES + (long)Sm_U16(rec + 4) * Sm_U16(rec + 6) * 4;
+}
+
+/* Builds every item model of every pack once, merging identical copies: the
+ * common items appear in all seven packs and are, as a rule, the same model.
+ * A record's byte 1 is the set of packs (bit = pack) it came from, so the
+ * second screen can prefer the copy of the pack the player is in, which is
+ * what the stock inventory would show. */
 static void* Sm_Worker(void* arg)
 {
-    static const char* const TIM_NAME[4] = { "pack", "TIM07.TIM", "TIM00.TIM", "key.TIM" };
+    s_SmJob*        job   = (s_SmJob*)arg;
+    unsigned char*  f07   = NULL;
+    unsigned char*  f00   = NULL;
+    unsigned short* base  = NULL;
+    unsigned short* vram  = NULL;
+    unsigned char*  blob  = NULL;
+    unsigned char*  icons = NULL;
+    long            len   = SM_BLOB_HDR;
+    long            ilen  = SM_BLOB_HDR;
+    int             nrec  = 0;
+    int             p, i;
+    char            dumpPack[600];
+    const char*     dump  = job->dumpDir[0] ? job->dumpDir : NULL;
+    unsigned char   have[256][SM_PACKS];
 
-    s_SmJob*        job  = (s_SmJob*)arg;
-    unsigned char*  file[4] = { NULL, NULL, NULL, NULL };
-    unsigned short* vram = NULL;
-    unsigned char*  blob = NULL;
-    long            cap  = 4L * 1024 * 1024;
-    long            len  = SM_BLOB_HDR;
-    int             i, built = 0;
-    const char*     dump = NULL;
-    char            dumpMap[600];
+    memset(have, 0, sizeof(have));
 
-    /* One folder per map, so walking through a few areas collects them all. */
-    if (job->dumpDir[0])
-    {
-        snprintf(dumpMap, sizeof(dumpMap), "%s/map_%02d", job->dumpDir, job->map);
-        mkdir(dumpMap, 0775);
-        dump = dumpMap;
-    }
-
-    for (i = 0; i < 4; i++)
-    {
-        if (job->size[i] > 0)
-            file[i] = Pc_LangReadDiscFile((unsigned)job->sector[i], (unsigned)job->size[i]);
-    }
-
-    if (file[0] == NULL)
-    {
-        __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: could not read pack IT_%03d from the disc", job->pack);
-        goto done;
-    }
-
-    vram = (unsigned short*)calloc((size_t)SM_VRAM_W * SM_VRAM_H, sizeof(unsigned short));
-    blob = (unsigned char*)malloc((size_t)cap);
-    if (vram == NULL || blob == NULL)
+    f07  = job->size07 ? Pc_LangReadDiscFile((unsigned)job->sector07, (unsigned)job->size07) : NULL;
+    f00  = job->size00 ? Pc_LangReadDiscFile((unsigned)job->sector00, (unsigned)job->size00) : NULL;
+    base = (unsigned short*)calloc((size_t)SM_VRAM_W * SM_VRAM_H, sizeof(unsigned short));
+    vram = (unsigned short*)malloc((size_t)SM_VRAM_W * SM_VRAM_H * sizeof(unsigned short));
+    blob = (unsigned char*)malloc((size_t)SM_LIB_CAP);
+    icons = (unsigned char*)malloc((size_t)SM_BLOB_HDR + 256L * (SM_ICON_HDR + SM_ICON * SM_ICON * 4));
+    if (base == NULL || vram == NULL || blob == NULL || icons == NULL)
         goto done;
 
-    if (file[1] && !Sm_PlaceTim(vram, file[1], (long)job->size[1], &job->descAlways))
-        __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: TIM07 not a TIM");
-    if (file[2] && !Sm_PlaceTim(vram, file[2], (long)job->size[2], &job->descCommon))
-        __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: TIM00 not a TIM");
-    if (file[3] && !Sm_PlaceTim(vram, file[3], (long)job->size[3], &job->descKey))
-        __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: TIM%02d not a TIM", job->keyTim);
+    if (f07 == NULL || !Sm_PlaceTim(base, f07, (long)job->size07, &job->descAlways))
+        __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: TIM07 unreadable");
+    if (f00 == NULL || !Sm_PlaceTim(base, f00, (long)job->size00, &job->descCommon))
+        __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: TIM00 unreadable");
+
+    if (dump != NULL)
+    {
+        if (f07) Sm_WriteFile(dump, "TIM07.TIM", f07, (long)job->size07);
+        if (f00) Sm_WriteFile(dump, "TIM00.TIM", f00, (long)job->size00);
+    }
 
     memset(blob, 0, SM_BLOB_HDR);
-    blob[0] = 'S';
-    blob[1] = 'H';
-    blob[2] = 'M';
-    blob[3] = '1';
-    blob[4] = 1;
-    blob[5] = (unsigned char)job->map;
-    blob[6] = (unsigned char)job->pack;
+    memcpy(blob, "SHM1", 4);
+    blob[4] = 2;
+    blob[6] = SM_PACKS;
 
-    if (dump != NULL)
+    for (p = 0; p < SM_PACKS; p++)
     {
-        char name[32];
+        unsigned char* tmd = NULL;
+        unsigned char* key = NULL;
+        int            built = 0;
 
-        snprintf(name, sizeof(name), "IT_%03d.TMD", job->pack);
-        Sm_WriteFile(dump, name, file[0], (long)job->size[0]);
-        for (i = 1; i < 4; i++)
+        if (job->count[p] == 0 || job->packSize[p] == 0)
+            continue;
+
+        tmd = Pc_LangReadDiscFile((unsigned)job->packSector[p], (unsigned)job->packSize[p]);
+        if (tmd == NULL)
         {
-            if (file[i] == NULL)
-                continue;
-            if (i == 3)
-                snprintf(name, sizeof(name), "TIM%02d.TIM", job->keyTim);
-            else
-                snprintf(name, sizeof(name), "%s", TIM_NAME[i]);
-            Sm_WriteFile(dump, name, file[i], (long)job->size[i]);
-        }
-        Sm_WriteFile(dump, "vram.bin", vram, (long)SM_VRAM_W * SM_VRAM_H * 2);
-    }
-
-    for (i = 0; i < job->count; i++)
-    {
-        long n = Sm_BuildItem(blob + len, cap - len, job->items[i], file[0], (long)job->size[0], i, vram);
-
-        if (n <= 0)
-        {
-            __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: item %d (object %d) has no usable model",
-                                job->items[i], i);
+            __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: could not read IT_%03d from the disc", p);
             continue;
         }
-        __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: item %d = object %d, %u triangles, texture %ux%u",
-                            job->items[i], i, Sm_U16(blob + len + 2), Sm_U16(blob + len + 4), Sm_U16(blob + len + 6));
+
+        /* Each pack sees the textures its own maps load: the shared two, plus
+         * its key-item TIM over them. */
+        memcpy(vram, base, (size_t)SM_VRAM_W * SM_VRAM_H * sizeof(unsigned short));
+        if (job->keySize[p] > 0)
+        {
+            key = Pc_LangReadDiscFile((unsigned)job->keySector[p], (unsigned)job->keySize[p]);
+            if (key == NULL || !Sm_PlaceTim(vram, key, (long)job->keySize[p], &job->descKey))
+                __android_log_print(ANDROID_LOG_WARN, SM_TAG, "models: TIM%02d unreadable", job->keyTim[p]);
+        }
+
         if (dump != NULL)
-            Sm_DumpItem(dump, blob + len, n);
-        len += n;
-        built++;
+        {
+            char name[32];
+
+            snprintf(dumpPack, sizeof(dumpPack), "%s/pack_%d", dump, p);
+            mkdir(dumpPack, 0775);
+            snprintf(name, sizeof(name), "IT_%03d.TMD", p);
+            Sm_WriteFile(dumpPack, name, tmd, (long)job->packSize[p]);
+            if (key != NULL)
+            {
+                snprintf(name, sizeof(name), "TIM%02d.TIM", job->keyTim[p]);
+                Sm_WriteFile(dumpPack, name, key, (long)job->keySize[p]);
+            }
+        }
+
+        for (i = 0; i < job->count[p]; i++)
+        {
+            int  item = job->items[p][i];
+            long n    = Sm_BuildItem(blob + len, SM_LIB_CAP - len, item, tmd, (long)job->packSize[p], i, vram);
+            long q;
+            int  merged = 0;
+
+            if (n <= 0)
+            {
+                __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: IT_%03d object %d (item %d) unusable", p, i, item);
+                continue;
+            }
+            built++;
+            have[item][p] = 1;
+
+            /* Same model already seen in another pack? Compare everything
+             * after the id/pack bytes. */
+            for (q = SM_BLOB_HDR; q < len; q += Sm_RecordLen(blob + q))
+            {
+                if (blob[q] == item && Sm_RecordLen(blob + q) == n &&
+                    memcmp(blob + q + 2, blob + len + 2, (size_t)(n - 2)) == 0)
+                {
+                    blob[q + 1] |= (unsigned char)(1 << p);
+                    merged = 1;
+                    break;
+                }
+            }
+            if (merged)
+                continue;
+
+            blob[len + 1] = (unsigned char)(1 << p);
+            len += n;
+            nrec++;
+        }
+
+        __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: IT_%03d (list of map %d, key TIM%02d): %d of %d built",
+                            p, job->listMap[p], job->keyTim[p], built, job->count[p]);
+        free(tmd);
+        free(key);
     }
-    Sm_Put16(blob + 8, (unsigned)built);
+    Sm_Put16(blob + 8, (unsigned)nrec);
+
+    /* Icons, one per distinct model. */
+    memset(icons, 0, SM_BLOB_HDR);
+    memcpy(icons, "SHI1", 4);
+    icons[4] = 1;
+    icons[5] = SM_ICON;
+    Sm_Put16(icons + 8, (unsigned)nrec);
+    {
+        long q;
+        for (q = SM_BLOB_HDR; q < len; q += Sm_RecordLen(blob + q))
+        {
+            unsigned char* d = icons + ilen;
+            d[0] = blob[q];
+            d[1] = blob[q + 1];
+            d[2] = d[3] = 0;
+            Sm_RenderIcon(blob + q, SM_ICON, d + SM_ICON_HDR);
+            if (dump != NULL)
+                Sm_DumpRecord(dump, blob + q, d + SM_ICON_HDR);
+            ilen += SM_ICON_HDR + (long)SM_ICON * SM_ICON * 4;
+        }
+    }
+
+    /* Which items have a model at all, and where. Every inventory item id the
+     * game names is listed; the unnamed ids are gaps in the enum. */
+    {
+        extern const char* Pc_Inventory_ItemName(u8 id);
+
+        char  report[16384];
+        int   rl = 0, id, missing = 0;
+
+        rl += snprintf(report + rl, sizeof(report) - rl, "item  packs    name\n");
+        for (id = 32; id < 256 && rl < (int)sizeof(report) - 200; id++)
+        {
+            const char* nm = Pc_Inventory_ItemName((u8)id);
+            char        packs[SM_PACKS + 1];
+            int         any = 0;
+
+            if (nm == NULL || nm[0] == '\0' || (id >= InvItemId_CutscenePhone && id <= InvItemId_CutsceneBloodPack))
+                continue;
+            for (p = 0; p < SM_PACKS; p++)
+            {
+                packs[p] = have[id][p] ? (char)('0' + p) : '.';
+                any |= have[id][p];
+            }
+            packs[SM_PACKS] = '\0';
+            if (!any)
+                missing++;
+            rl += snprintf(report + rl, sizeof(report) - rl, "%3d   %s  %s%s\n", id, packs, any ? "" : "NO MODEL  ", nm);
+        }
+        __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: %d distinct models; %d named items have no model in any pack",
+                            nrec, missing);
+        if (dump != NULL)
+            Sm_WriteFile(dump, "coverage.txt", report, rl);
+    }
 
     if (dump != NULL)
-    {
-        char  path[700];
-        FILE* f;
-
-        snprintf(path, sizeof(path), "%s/items.txt", dump);
-        f = fopen(path, "w");
-        if (f != NULL)
-        {
-            extern const char* Pc_Inventory_ItemName(u8 id);
-
-            fprintf(f, "map %d  pack IT_%03d.TMD  key texture TIM%02d.TIM  region %d\n", job->map, job->pack,
-                    job->keyTim, (int)g_GameRegion);
-            fprintf(f, "TIM07 desc tpage %d u %d v %d clut %d,%d\n", job->descAlways.tPage[1], job->descAlways.u,
-                    job->descAlways.v, job->descAlways.clutX, job->descAlways.clutY);
-            fprintf(f, "TIM00 desc tpage %d u %d v %d clut %d,%d\n", job->descCommon.tPage[1], job->descCommon.u,
-                    job->descCommon.v, job->descCommon.clutX, job->descCommon.clutY);
-            fprintf(f, "key   desc tpage %d u %d v %d clut %d,%d\n", job->descKey.tPage[1], job->descKey.u,
-                    job->descKey.v, job->descKey.clutX, job->descKey.clutY);
-            for (i = 0; i < job->count; i++)
-                fprintf(f, "object %2d  item %3d  %s\n", i, job->items[i], Pc_Inventory_ItemName(job->items[i]));
-            fclose(f);
-        }
-        Sm_WriteFile(dump, "models.bin", blob, len);
         __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: dumped to %s", dump);
-    }
 
     pthread_mutex_lock(&s_smLock);
     free(s_smBlob);
-    s_smBlob    = blob;
-    s_smBlobLen = len;
-    s_smSerial  = (s_smSerial % 255) + 1;
+    free(s_smIcons);
+    s_smBlob     = blob;
+    s_smBlobLen  = len;
+    s_smIcons    = icons;
+    s_smIconsLen = ilen;
+    s_smSerial   = (s_smSerial % 255) + 1;
+    s_smBuilt    = 1;
     pthread_mutex_unlock(&s_smLock);
-    blob = NULL;
+    blob  = NULL;
+    icons = NULL;
 
-    __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: map %d, pack IT_%03d, %d of %d items built, %ld bytes",
-                        job->map, job->pack, built, job->count, len);
+    __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: library ready, %ld bytes of models, %ld bytes of icons", len, ilen);
 
 done:
-    for (i = 0; i < 4; i++)
-        free(file[i]);
+    free(f07);
+    free(f00);
+    free(base);
     free(vram);
     free(blob);
+    free(icons);
     free(job);
 
     pthread_mutex_lock(&s_smLock);
@@ -850,17 +1122,47 @@ done:
     return NULL;
 }
 
-static void Sm_FileOf(s_SmJob* job, int slot, int fileIdx)
+/* The overlay header of any map, loaded or not. The Android build links all
+ * 43 overlays in (SH_STATIC_MAPS), so every map's item list is plain data
+ * that can be read without visiting the map; map0_s00 is built in either way. */
+static const s_MapOverlayHdr* Sm_MapHeader(int map)
 {
-    job->sector[slot] = g_FileTable[fileIdx].startSector;
-    job->size[slot]   = (unsigned long)g_FileTable[fileIdx].blockCount * 256;
+    extern s_MapOverlayHdr g_MapOverlayHeader_map0_s00;
+
+    if (map == MapIdx_MAP0_S00)
+        return &g_MapOverlayHeader_map0_s00;
+#ifdef SH_STATIC_MAPS
+    return MapStatic_Find(MapRegistry_GetName((e_MapIdx)map));
+#else
+    return NULL;
+#endif
 }
 
-/* Game thread, every frame (pc_second_screen.c). Starts a rebuild when the
- * map -- and with it the item list -- has changed. */
+static void Sm_SetList(s_SmJob* job, int p, int map, const u8* list)
+{
+    int n = 0;
+
+    if (list == NULL)
+        return;
+    while (n < SM_LIST_MAX && list[n] != 0)
+        n++;
+    /* Maps that share a pack index the same TMD, so their lists agree; the
+     * longest one is kept in case one stops short. */
+    if (n > job->count[p])
+    {
+        memcpy(job->items[p], list, (size_t)n);
+        job->count[p]   = n;
+        job->listMap[p] = map;
+        job->keyTim[p]  = Sm_KeyTimForMap(map);
+    }
+}
+
+/* Game thread, every frame (pc_second_screen.c). Builds the library once a
+ * game is under way -- the disc and the region's file table are settled by
+ * then -- and again when a dump is asked for. */
 void Pc_SecondScreenModels_Tick(void)
 {
-    static const int PACK_FILE[7] = {
+    static const int PACK_FILE[SM_PACKS] = {
         FILE_ITEM_IT_000_TMD, FILE_ITEM_IT_001_TMD, FILE_ITEM_IT_002_TMD, FILE_ITEM_IT_003_TMD,
         FILE_ITEM_IT_004_TMD, FILE_ITEM_IT_005_TMD, FILE_ITEM_IT_006_TMD
     };
@@ -869,80 +1171,82 @@ void Pc_SecondScreenModels_Tick(void)
         FILE_ITEM_TIM04_TIM, FILE_ITEM_TIM05_TIM, FILE_ITEM_TIM06_TIM
     };
 
-    s_SmJob*        job;
-    const u8*       list;
-    int             map, pack, i, busy;
-    pthread_t       th;
-    pthread_attr_t  attr;
+    s_SmJob*       job;
+    int            map, p, go;
+    pthread_t      th;
+    pthread_attr_t attr;
 
-    if (g_GameWork.gameState != GameState_InGame || g_pMapOverlayHeader == NULL || g_SavegamePtr == NULL)
+    if (g_GameWork.gameState != GameState_InGame || g_SavegamePtr == NULL)
         return;
-
-    map  = g_SavegamePtr->mapIdx;
-    list = g_pMapOverlayHeader->loadableItems;
 
     pthread_mutex_lock(&s_smLock);
-    busy = s_smBusy;
-    if (!busy && s_smForce)
+    go = !s_smBusy && (!s_smBuilt || s_smForce);
+    if (go)
     {
-        s_smForce   = 0;
-        s_smLastMap = -2;
+        s_smForce = 0;
+        s_smBusy  = 1;
     }
     pthread_mutex_unlock(&s_smLock);
-
-    if (busy || (map == s_smLastMap && (const void*)list == s_smLastList))
-        return;
-
-    s_smLastMap  = map;
-    s_smLastList = list;
-
-    pack = Sm_PackForMap(map);
-    if (pack < 0 || list == NULL)
+    if (!go)
         return;
 
     job = (s_SmJob*)calloc(1, sizeof(*job));
     if (job == NULL)
-        return;
+        goto fail;
 
-    job->map    = map;
-    job->pack   = pack;
-    job->keyTim = Sm_KeyTimForMap(map);
-    for (i = 0; i < SM_LIST_MAX && list[i] != 0; i++)
-        job->items[i] = list[i];
-    job->count = i;
+    for (map = MapIdx_MAP0_S00; map <= MapIdx_MAP7_S03; map++)
+    {
+        const s_MapOverlayHdr* h = Sm_MapHeader(map);
 
-    /* Copies, taken here on the game thread: the descriptors carry the PAL
-     * palette homes Font_ApplyRegionPatches installed. */
+        p = Sm_PackForMap(map);
+        if (p >= 0 && h != NULL)
+            Sm_SetList(job, p, map, h->loadableItems);
+    }
+    /* The current map always counts, whatever the build links in. */
+    if (g_pMapOverlayHeader != NULL && Sm_PackForMap(g_SavegamePtr->mapIdx) >= 0)
+        Sm_SetList(job, Sm_PackForMap(g_SavegamePtr->mapIdx), g_SavegamePtr->mapIdx,
+                   g_pMapOverlayHeader->loadableItems);
+
+    for (p = 0; p < SM_PACKS; p++)
+    {
+        job->packSector[p] = g_FileTable[PACK_FILE[p]].startSector;
+        job->packSize[p]   = (unsigned long)g_FileTable[PACK_FILE[p]].blockCount * 256;
+        if (job->keyTim[p] > 0)
+        {
+            job->keySector[p] = g_FileTable[KEY_FILE[job->keyTim[p]]].startSector;
+            job->keySize[p]   = (unsigned long)g_FileTable[KEY_FILE[job->keyTim[p]]].blockCount * 256;
+        }
+    }
+    job->sector07 = g_FileTable[FILE_ITEM_TIM07_TIM].startSector;
+    job->size07   = (unsigned long)g_FileTable[FILE_ITEM_TIM07_TIM].blockCount * 256;
+    job->sector00 = g_FileTable[FILE_ITEM_TIM00_TIM].startSector;
+    job->size00   = (unsigned long)g_FileTable[FILE_ITEM_TIM00_TIM].blockCount * 256;
+
+    /* Copies, taken here: they carry the PAL palette homes. */
     job->descKey    = g_InventoryKeyItemTextureImg;
     job->descCommon = g_FirstAidKitItemTextureImg;
     job->descAlways = D_800A9074;
 
-    Sm_FileOf(job, 0, PACK_FILE[pack]);
-    Sm_FileOf(job, 1, FILE_ITEM_TIM07_TIM);
-    Sm_FileOf(job, 2, FILE_ITEM_TIM00_TIM);
-    if (job->keyTim > 0)
-        Sm_FileOf(job, 3, KEY_FILE[job->keyTim]);
-
     pthread_mutex_lock(&s_smLock);
     snprintf(job->dumpDir, sizeof(job->dumpDir), "%s", s_smDumpDir);
-    s_smBusy = 1;
     pthread_mutex_unlock(&s_smLock);
-
-    if (job->count == 0)
-    {
-        __android_log_print(ANDROID_LOG_INFO, SM_TAG, "models: map %d lists no inventory models", map);
-    }
+    if (job->dumpDir[0])
+        mkdir(job->dumpDir, 0775);
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    if (pthread_create(&th, &attr, Sm_Worker, job) != 0)
+    if (pthread_create(&th, &attr, Sm_Worker, job) == 0)
     {
-        free(job);
-        pthread_mutex_lock(&s_smLock);
-        s_smBusy = 0;
-        pthread_mutex_unlock(&s_smLock);
+        pthread_attr_destroy(&attr);
+        return;
     }
     pthread_attr_destroy(&attr);
+    free(job);
+
+fail:
+    pthread_mutex_lock(&s_smLock);
+    s_smBusy = 0;
+    pthread_mutex_unlock(&s_smLock);
 }
 
 int Pc_SecondScreenModels_Serial(void)
@@ -955,8 +1259,16 @@ int Pc_SecondScreenModels_Serial(void)
     return s;
 }
 
-/* UI thread: where the dump goes, or null for no dump. Takes effect at the
- * next map change; a set directory also forces a rebuild of the current map. */
+/* The pack the stock inventory would load right now, or -1. */
+int Pc_SecondScreenModels_CurrentPack(void)
+{
+    if (g_SavegamePtr == NULL)
+        return -1;
+    return Sm_PackForMap(g_SavegamePtr->mapIdx);
+}
+
+/* UI thread: where the dump goes, or null for no dump. A set directory
+ * rebuilds the library so the dump happens. */
 JNIEXPORT void JNICALL
 Java_com_silenthill_port_SecondScreen_nativeModelsConfigure(JNIEnv* env, jclass cls, jstring jDir)
 {
@@ -974,21 +1286,41 @@ Java_com_silenthill_port_SecondScreen_nativeModelsConfigure(JNIEnv* env, jclass 
         (*env)->ReleaseStringUTFChars(env, jDir, dir);
 }
 
-/* UI thread: the current model blob, or null. */
-JNIEXPORT jbyteArray JNICALL
-Java_com_silenthill_port_SecondScreen_nativeModels(JNIEnv* env, jclass cls)
+static jbyteArray Sm_ToJava(JNIEnv* env, const unsigned char* data, long len)
 {
     jbyteArray arr = NULL;
 
-    (void)cls;
-
-    pthread_mutex_lock(&s_smLock);
-    if (s_smBlob != NULL && s_smBlobLen > 0)
+    if (data != NULL && len > 0)
     {
-        arr = (*env)->NewByteArray(env, (jsize)s_smBlobLen);
+        arr = (*env)->NewByteArray(env, (jsize)len);
         if (arr != NULL)
-            (*env)->SetByteArrayRegion(env, arr, 0, (jsize)s_smBlobLen, (const jbyte*)s_smBlob);
+            (*env)->SetByteArrayRegion(env, arr, 0, (jsize)len, (const jbyte*)data);
     }
+    return arr;
+}
+
+/* UI thread: the model library, or null. */
+JNIEXPORT jbyteArray JNICALL
+Java_com_silenthill_port_SecondScreen_nativeModels(JNIEnv* env, jclass cls)
+{
+    jbyteArray arr;
+
+    (void)cls;
+    pthread_mutex_lock(&s_smLock);
+    arr = Sm_ToJava(env, s_smBlob, s_smBlobLen);
+    pthread_mutex_unlock(&s_smLock);
+    return arr;
+}
+
+/* UI thread: the icons, or null. */
+JNIEXPORT jbyteArray JNICALL
+Java_com_silenthill_port_SecondScreen_nativeIcons(JNIEnv* env, jclass cls)
+{
+    jbyteArray arr;
+
+    (void)cls;
+    pthread_mutex_lock(&s_smLock);
+    arr = Sm_ToJava(env, s_smIcons, s_smIconsLen);
     pthread_mutex_unlock(&s_smLock);
     return arr;
 }
@@ -1002,6 +1334,11 @@ void Pc_SecondScreenModels_Tick(void)
 int Pc_SecondScreenModels_Serial(void)
 {
     return 0;
+}
+
+int Pc_SecondScreenModels_CurrentPack(void)
+{
+    return -1;
 }
 
 #endif

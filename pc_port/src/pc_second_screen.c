@@ -722,6 +722,10 @@ static int Ss_Build(unsigned char* out)
         out[24] = (unsigned char)g_cfg_postProcess;
         out[25] = (unsigned char)(mix * 100.0f + 0.5f);
         out[26] = (unsigned char)Pc_SecondScreenModels_Serial();
+        {
+            extern int Pc_SecondScreenModels_CurrentPack(void);
+            out[27] = (unsigned char)Pc_SecondScreenModels_CurrentPack(); /* 0xFF = none */
+        }
     }
 
     if (!s_session || save == NULL)

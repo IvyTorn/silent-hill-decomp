@@ -80,6 +80,15 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private boolean dumpModels = false;
     private int modelSerial;
 
+    /* Item icons, drawn natively from the game's own models (pc_second_screen_
+     * models.c). Several per item when packs disagree; mask = packs it is from. */
+    static final class Icon {
+        int mask;
+        Bitmap bitmap;
+    }
+    private final java.util.HashMap<Integer, List<Icon>> icons = new java.util.HashMap<Integer, List<Icon>>();
+    private int currentPack = -1;
+
     private Panel panel;
     private boolean started;
     private boolean listening;
@@ -88,6 +97,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private static native void nativeInput(int kind, int a, int b);
     private static native byte[] nativeFont();
     private static native byte[] nativeModels();
+    private static native byte[] nativeIcons();
     private static native void nativeModelsConfigure(String dumpDir);
 
     /* Request kinds and driver states: the enums in pc_second_screen.c. */
@@ -140,8 +150,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         }
     }
 
-    /* Step 1 of the 3D second screen: the models are read and, on request,
-     * dumped for checking; nothing draws them yet. */
+    /* The models are read once per session (all seven packs); dump_models=1
+     * also writes them, their icons and a coverage report out for checking. */
     private void configureModelDump() {
         String dir = null;
         if (dumpModels) {
@@ -166,17 +176,56 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         modelSerial = serial;
         byte[] b;
         try {
-            b = nativeModels();
+            b = nativeIcons();
         } catch (UnsatisfiedLinkError e) {
             return;
         }
-        if (b == null || b.length < 16 || b[0] != 'S' || b[1] != 'H' || b[2] != 'M' || b[3] != '1') {
-            Log.w(TAG, "models: no usable blob");
+        if (b == null || b.length < 16 || b[0] != 'S' || b[1] != 'H' || b[2] != 'I' || b[3] != '1') {
+            Log.w(TAG, "icons: no usable blob");
             return;
         }
+        int size = b[5] & 0xFF;
         int count = (b[8] & 0xFF) | ((b[9] & 0xFF) << 8);
-        Log.i(TAG, "models: received " + count + " item models for map " + (b[5] & 0xFF)
-                + " (pack IT_00" + (b[6] & 0xFF) + "), " + b.length + " bytes");
+        int rec = 4 + size * size * 4;
+        icons.clear();
+        int p = 16;
+        int[] px = new int[size * size];
+        for (int i = 0; i < count && p + rec <= b.length; i++, p += rec) {
+            for (int k = 0, q = p + 4; k < px.length; k++, q += 4) {
+                px[k] = ((b[q + 3] & 0xFF) << 24) | ((b[q] & 0xFF) << 16) | ((b[q + 1] & 0xFF) << 8) | (b[q + 2] & 0xFF);
+            }
+            Icon ic = new Icon();
+            ic.mask = b[p + 1] & 0xFF;
+            ic.bitmap = Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888);
+            int id = b[p] & 0xFF;
+            List<Icon> l = icons.get(id);
+            if (l == null) {
+                l = new ArrayList<Icon>();
+                icons.put(id, l);
+            }
+            l.add(ic);
+        }
+        Log.i(TAG, "icons: " + count + " icons for " + icons.size() + " items");
+    }
+
+    /** The item's icon. When packs disagree about an item, the version most
+     * packs share wins, and the player's current pack only breaks a tie: the
+     * first map's pack, IT_000, files a first-aid-kit model under the health
+     * drink, which is the game's own data but would read as a mistake here. */
+    Bitmap iconFor(int itemId) {
+        List<Icon> l = icons.get(itemId);
+        if (l == null || l.isEmpty()) return null;
+        Icon best = null;
+        int bestScore = -1;
+        for (Icon ic : l) {
+            int score = Integer.bitCount(ic.mask) * 2;
+            if (currentPack >= 0 && currentPack < 8 && (ic.mask & (1 << currentPack)) != 0) score += 1;
+            if (score > bestScore) {
+                best = ic;
+                bestScore = score;
+            }
+        }
+        return best.bitmap;
     }
 
     private void refresh() {
@@ -358,7 +407,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: fase4-paso1 (item models)  config: dump_models=" + dumpModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
+        Log.i(TAG, "build: fase4-paso2 (item icons)  config: dump_models=" + dumpModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
 
@@ -443,6 +492,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         int postMode;
         int postMix;
         int modelSerial;
+        int currentPack;
         final List<Item> items = new ArrayList<Item>();
     }
 
@@ -476,6 +526,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         s.postMode = b[28] & 0xFF;
         s.postMix = b[29] & 0xFF;
         s.modelSerial = b[30] & 0xFF;
+        s.currentPack = b[31] == (byte) 0xFF ? -1 : (b[31] & 0xFF);
 
         int p = head;
         for (int i = 0; i < count; i++) {
@@ -721,6 +772,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         private final Paint line = new Paint();
         private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         private final Paint glyphPaint = new Paint();
+        private final Paint iconPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
         private final RectF r = new RectF();
         private final Rect src = new Rect();
         private final Path path = new Path();
@@ -810,6 +862,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             snap = s;
 
             onModelSerial(s.modelSerial);
+            currentPack = s.currentPack;
             if (useGameFont && s.fontSerial != 0 && s.fontSerial != fontSerial) {
                 fontSerial = s.fontSerial;
                 loadFont();
@@ -1233,6 +1286,17 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         /* screen is flat gouraud quads and one-pixel lines.               */
         /* -------------------------------------------------------------- */
 
+        /** The item's own model as a picture, fitted into a square; false if
+         * there is none and the category symbol should be drawn instead. */
+        private boolean drawIcon(Canvas c, int itemId, float cx, float cy, float side) {
+            Bitmap bm = iconFor(itemId);
+            if (bm == null) return false;
+            r.set(Math.round(cx - side / 2f), Math.round(cy - side / 2f),
+                  Math.round(cx + side / 2f), Math.round(cy + side / 2f));
+            c.drawBitmap(bm, null, r, iconPaint);
+            return true;
+        }
+
         private void rect(Canvas c, float l, float t, float rr, float b, int color) {
             fill.setShader(null);
             fill.setColor(color);
@@ -1470,7 +1534,9 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 return y + hgt;
             }
 
-            drawGlyph(c, eq.id >> 5, x + 72 * u, y + hgt / 2f, 40 * u, C_GOLD);
+            if (!drawIcon(c, eq.id, x + 72 * u, y + hgt / 2f, 128 * u)) {
+                drawGlyph(c, eq.id >> 5, x + 72 * u, y + hgt / 2f, 40 * u, C_GOLD);
+            }
 
             boolean gun = (eq.id >> 5) == 5;
             float ammoW = 0f;
@@ -1509,7 +1575,11 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 brackets(c, x, y, x + w, y + h, C_GOLD);
             }
 
-            drawGlyph(c, group, x + 54 * u, y + h / 2f, 28 * u, col);
+            final float iconSide = h - 10 * u;
+            final boolean icon = drawIcon(c, it.id, x + 6 * u + iconSide / 2f, y + h / 2f, iconSide);
+            if (!icon) {
+                drawGlyph(c, group, x + 54 * u, y + h / 2f, 28 * u, col);
+            }
 
             /* Right-hand tag: a count where a count means something, on/off
              * for the two switchable items. Keys and puzzle items are always
@@ -1535,8 +1605,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 drawString(c, tag, x + w - 18 * u, top, np, tagTint, Paint.Align.RIGHT);
             }
 
-            float nameX = x + 100 * u;
-            float nameMax = w - 100 * u - 18 * u - tagW;
+            float nameX = x + (icon ? iconSide + 18 * u : 100 * u);
+            float nameMax = w - (nameX - x) - 18 * u - tagW;
             int fp = fitPx(it.name, np, 2, nameMax);
             drawString(c, ellipsize(it.name, fp, nameMax), nameX, y + (h - lineH(fp)) / 2f, fp,
                        equipped ? T_GOLD : T_WHITE, Paint.Align.LEFT);
@@ -1630,7 +1700,9 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             frame(c, pxl, py, pxl + pw, py + ph, C_EDGE);
             brackets(c, pxl - 2 * P, py - 2 * P, pxl + pw + 2 * P, py + ph + 2 * P, C_GOLD);
 
-            drawGlyph(c, item.id >> 5, pxl + 84 * u, py + 80 * u, 36 * u, groupColor(item.id >> 5));
+            if (!drawIcon(c, item.id, pxl + 84 * u, py + 80 * u, 120 * u)) {
+                drawGlyph(c, item.id >> 5, pxl + 84 * u, py + 80 * u, 36 * u, groupColor(item.id >> 5));
+            }
             float nameMax = pw - 156 * u - 36 * u;
             int np = fitPx(item.name, px(P + 1), 2, nameMax);
             drawString(c, ellipsize(item.name, np, nameMax), pxl + 156 * u, py + 80 * u - lineH(np) / 2f, np, T_WHITE, Paint.Align.LEFT);
