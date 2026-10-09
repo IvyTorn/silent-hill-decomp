@@ -79,6 +79,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private boolean crtFollow = true;
     private boolean dumpModels = false;
     private boolean spinModels = true;
+    private boolean animateUi = true;
     private int modelSerial;
 
     /* Item icons, drawn natively from the game's own models (pc_second_screen_
@@ -454,6 +455,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         crtFollow = !"0".equals(p.getProperty("crt", "1").trim());
         dumpModels = "1".equals(p.getProperty("dump_models", "0").trim());
         spinModels = !"0".equals(p.getProperty("spin", "1").trim());
+        animateUi = !"0".equals(p.getProperty("anim", "1").trim());
 
         String disp = p.getProperty("display", "auto").trim();
         if (!"auto".equalsIgnoreCase(disp)) {
@@ -473,7 +475,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: fase4-paso3a (turntable)  config: dump_models=" + dumpModels + " spin=" + spinModels + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
+        Log.i(TAG, "build: fase4-paso3b (animations)  config: dump_models=" + dumpModels + " spin=" + spinModels + " anim=" + animateUi + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
 
@@ -514,6 +516,10 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             + "# 1 = the selected and the equipped item turn, as in the game's inventory;\n"
             + "#     0 = still pictures (a little less work for the battery).\n"
             + "spin=1\n"
+            + "\n"
+            + "# 1 = animate the screen (selection cursor, health bar and scan, list,\n"
+            + "#     command window); 0 = everything changes at once.\n"
+            + "anim=1\n"
             + "\n"
             + "# 1 = draw the window size and system-bar insets on the second screen,\n"
             + "#     for a screenshot when reporting a layout problem.\n"
@@ -859,6 +865,58 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         private final Spinner spinSheet = new Spinner(-0x10);
         private final Spinner[] spinners = { spinSelected, spinEquipped, spinSheet };
 
+        /* -- Step 3b: motion. Timed from the clock, so a slow frame never
+         * slows an animation down, it only skips part of it. -- */
+        private long frameNow;
+        private boolean animating;
+
+        /* The stock item cursor (Gfx_Inventory_ItemSelectionDraw...): on a new
+         * selection the outline slides over in 8 frames at 60 Hz, eased by
+         * cos^2, and the three frames before it are drawn behind it in
+         * fading blue -- the trail seen when moving through the inventory. */
+        private static final float CURSOR_MS = 8 * 1000f / 60f;
+        private static final float FRAME60_MS = 1000f / 60f;
+        private final RectF curFrom = new RectF();
+        private final RectF curTo = new RectF();
+        private final RectF curTmp = new RectF();
+        private long curT0;
+        private int curSlot = -1;
+
+        /* Health: the bar and number glide to a new value instead of jumping. */
+        private static final float HP_MS = 600f;
+        private float hpShown = -1f;
+        private float hpFrom;
+        private float hpTo;
+        private long hpT0;
+
+        /* The status portrait's scan (Gfx_Inventory_HealthStatusDraw): a line
+         * runs down the picture, 1, 2 or 3 lines a frame over 164 as health
+         * is fine, caution or danger, and while hurt a stray line now and
+         * then flickers for 4 frames, more often the lower health is. */
+        private long scanT0 = android.os.SystemClock.uptimeMillis();
+        private long glitchUntil;
+        private float glitchY;
+        private final java.util.Random rng = new java.util.Random();
+
+        /* The list comes in cell by cell when the inventory first appears;
+         * an item that turns up later gets a brief glare, the stock
+         * inspection glare (0x40 frames). */
+        private static final float LIST_IN_MS = 180f;
+        private static final float LIST_STAGGER_MS = 35f;
+        private static final float GLARE_MS = 0x40 * 1000f / 60f;
+        private long listT0 = -1;
+        private final java.util.HashSet<Integer> knownItems = new java.util.HashSet<Integer>();
+        private final java.util.HashMap<Integer, Long> glare = new java.util.HashMap<Integer, Long>();
+
+        /* The command window unfolds from its middle and folds back. */
+        private static final float SHEET_OPEN_MS = 150f;
+        private static final float SHEET_CLOSE_MS = 120f;
+        private Item sheetLast;
+        private int sheetLastState;
+        private int sheetLastCmd;
+        private long sheetT0;
+        private boolean sheetClosing;
+
         private GameFont font;
         private int fontSerial;
 
@@ -936,7 +994,9 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             if (s.uiState != UI_IDLE) {
                 pendingItem = null;
             }
+            boolean wasShown = snap != null && snap.session;
             snap = s;
+            noteItems(s, wasShown);
 
             onModelSerial(s.modelSerial);
             currentPack = s.currentPack;
@@ -1429,6 +1489,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
 
             buttonCount = 0;
+            frameNow = android.os.SystemClock.uptimeMillis();
+            animating = false;
             for (Spinner sp : spinners) sp.used = false;
             if (snap == null || !snap.session) {
                 drawIdle(c, w, h);
@@ -1436,7 +1498,29 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 drawInventory(c, w, h);
                 Item sheet = sheetItem();
                 if (sheet != null) {
-                    drawSheet(c, w, h, sheet);
+                    if (sheetLast == null || sheetClosing) {
+                        sheetT0 = frameNow;
+                        sheetClosing = false;
+                    }
+                    sheetLast = sheet;
+                    sheetLastState = (snap.uiState == UI_IDLE) ? UI_OPENING : snap.uiState;
+                    sheetLastCmd = snap.uiCmd;
+                    float k = animateUi ? clamp01((frameNow - sheetT0) / SHEET_OPEN_MS) : 1f;
+                    if (k < 1f) animating = true;
+                    drawSheet(c, w, h, sheet, sheetLastState, 1f - cos2(k), k >= 1f);
+                } else if (sheetLast != null) {
+                    if (!sheetClosing) {
+                        sheetClosing = true;
+                        sheetT0 = frameNow;
+                    }
+                    float k = animateUi ? clamp01((frameNow - sheetT0) / SHEET_CLOSE_MS) : 1f;
+                    if (k < 1f) {
+                        animating = true;
+                        drawSheet(c, w, h, sheetLast, sheetLastState, cos2(k), false);
+                    } else {
+                        sheetLast = null;
+                        sheetClosing = false;
+                    }
                 }
                 if (toast != null) {
                     if (android.os.SystemClock.uptimeMillis() < toastUntil) {
@@ -1456,7 +1540,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 if (sp.used) turning = true;
                 else sp.reset();
             }
-            if (turning && spinModels && !nativeRenderBroken) {
+            if ((turning && spinModels && !nativeRenderBroken) || animating) {
                 postInvalidateDelayed(SPIN_FRAME_MS);
             }
 
@@ -1485,6 +1569,162 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
         }
 
+        private static float clamp01(float v) {
+            return v < 0f ? 0f : (v > 1f ? 1f : v);
+        }
+
+        private static float cos2(float k) {
+            double c = Math.cos(clamp01(k) * Math.PI / 2.0);
+            return (float) (c * c);
+        }
+
+        private static int itemKey(Item it) {
+            return (it.slot << 8) | it.id;
+        }
+
+        private void noteItems(Snapshot s, boolean wasShown) {
+            if (!s.session) {
+                knownItems.clear();
+                glare.clear();
+                listT0 = -1;
+                hpShown = -1f;
+                curSlot = -1;
+                sheetLast = null;
+                sheetClosing = false;
+                return;
+            }
+            long now = android.os.SystemClock.uptimeMillis();
+            if (!wasShown || listT0 < 0) {
+                listT0 = animateUi ? now : 0;
+                knownItems.clear();
+                for (Item it : s.items) knownItems.add(itemKey(it));
+                return;
+            }
+            java.util.HashSet<Integer> cur = new java.util.HashSet<Integer>();
+            for (Item it : s.items) {
+                int k = itemKey(it);
+                cur.add(k);
+                if (animateUi && !knownItems.contains(k)) glare.put(k, now);
+            }
+            knownItems.clear();
+            knownItems.addAll(cur);
+        }
+
+        /** Health as drawn: gliding towards the game's value. */
+        private float healthShown(float target) {
+            if (hpShown < 0f || !animateUi) {
+                hpShown = hpTo = hpFrom = target;
+                return target;
+            }
+            if (target != hpTo) {
+                hpFrom = hpShown;
+                hpTo = target;
+                hpT0 = frameNow;
+            }
+            float k = clamp01((frameNow - hpT0) / HP_MS);
+            hpShown = hpFrom + (hpTo - hpFrom) * (1f - (1f - k) * (1f - k));
+            if (k < 1f) animating = true;
+            return hpShown;
+        }
+
+        private void cursorAt(float ms, RectF out) {
+            float e = cos2(ms / CURSOR_MS);
+            out.set(curTo.left + (curFrom.left - curTo.left) * e,
+                    curTo.top + (curFrom.top - curTo.top) * e,
+                    curTo.right + (curFrom.right - curTo.right) * e,
+                    curTo.bottom + (curFrom.bottom - curTo.bottom) * e);
+        }
+
+        /** A new target for the cursor, in list coordinates (before scroll). */
+        private void cursorTarget(int slot, float l, float t, float r, float b) {
+            if (curSlot >= 0 && slot == curSlot && curTo.left == l && curTo.top == t
+                    && curTo.right == r && curTo.bottom == b) {
+                return;
+            }
+            if (curSlot >= 0 && animateUi) {
+                cursorAt(frameNow - curT0, curFrom);
+            } else {
+                curFrom.set(l, t, r, b);
+            }
+            curTo.set(l, t, r, b);
+            curT0 = frameNow;
+            curSlot = slot;
+        }
+
+        private void drawCursor(Canvas c, float scroll) {
+            if (curSlot < 0) return;
+            float since = frameNow - curT0;
+            int echoes = animateUi ? 3 : 0;
+            if (animateUi && since < CURSOR_MS + 3 * FRAME60_MS) animating = true;
+            for (int j = echoes; j >= 0; j--) {
+                cursorAt(since - j * FRAME60_MS, curTmp);
+                int v = 0x60 - 0x20 * j;
+                int col = 0xFF000000 | (v << 16) | (v << 8) | 0xFF;
+                frame(c, curTmp.left, curTmp.top - scroll, curTmp.right, curTmp.bottom - scroll, col);
+            }
+        }
+
+        /** A vertical wash, from one colour at the top to another at the bottom. */
+        private void vgradient(Canvas c, float l, float t, float rr, float b, int from, int to) {
+            fill.setShader(new LinearGradient(0, t, 0, b, from, to, Shader.TileMode.CLAMP));
+            r.set(Math.round(l), Math.round(t), Math.round(rr), Math.round(b));
+            c.drawRect(r, fill);
+            fill.setShader(null);
+        }
+
+        private void drawScan(Canvas c, float x, float y, float w, float hgt, float pct) {
+            if (!animateUi) return;
+            animating = true;
+            int stage = pct < 10f ? 3 : (pct < 50f ? 2 : 1);
+            float period = 164f * FRAME60_MS / stage;
+            float phase = ((frameNow - scanT0) % (long) period) / period;
+            float top = y + P, bot = y + hgt - P;
+            float ly = top + phase * (bot - top);
+            float trail = (bot - top) * 30f / 164f;
+
+            c.save();
+            c.clipRect(x + P, top, x + w - P, bot);
+            vgradient(c, x + P, ly - trail, x + w - P, ly, 0x00FFFFFF, 0x26FFFFFF);
+            rect(c, x + P, ly, x + w - P, ly + P, 0x40FFFFFF);
+
+            if (pct < 100f) {
+                if (frameNow >= glitchUntil) {
+                    double p60 = 1.0 / ((int) (pct / 2f) + 2);
+                    double pFrame = 1.0 - Math.pow(1.0 - p60, Math.max(1.0, SPIN_FRAME_MS / FRAME60_MS));
+                    if (rng.nextDouble() < pFrame) {
+                        glitchUntil = frameNow + (long) (4 * FRAME60_MS);
+                        glitchY = top + rng.nextFloat() * (bot - top - 2 * P);
+                    }
+                }
+                if (frameNow < glitchUntil) {
+                    float off = (rng.nextFloat() - 0.5f) * 16f * u;
+                    rect(c, x + P + off, glitchY, x + w - P + off, glitchY + 2 * P, 0x40C0C0C0);
+                }
+            }
+            c.restore();
+        }
+
+        /** Opacity (0..1) and leftward offset of something that comes in at
+         * the given delay after the list appeared. */
+        private float entryProgress(float delayMs) {
+            if (!animateUi || listT0 <= 0) return 1f;
+            float k = clamp01((frameNow - listT0 - delayMs) / LIST_IN_MS);
+            if (k < 1f) animating = true;
+            return k;
+        }
+
+        /** Starts drawing something that fades in with the list; pass the
+         * result to endEntry. */
+        private int beginEntry(Canvas c, float delayMs, float l, float t, float rr, float b) {
+            float k = entryProgress(delayMs);
+            if (k >= 1f) return -1;
+            return c.saveLayerAlpha(l, t, rr, b, Math.round(k * 255f));
+        }
+
+        private void endEntry(Canvas c, int save) {
+            if (save >= 0) c.restoreToCount(save);
+        }
+
         private void drawIdle(Canvas c, int w, int h) {
             int big = px(P + 2);
             drawString(c, "SILENT HILL", w / 2f, h / 2f - lineH(big), big, T_GREY, Paint.Align.CENTER);
@@ -1501,15 +1741,23 @@ final class SecondScreen implements DisplayManager.DisplayListener {
 
             if (wide) {
                 float half = (w - 2 * pad - gap) / 2f;
+                int a0 = beginEntry(c, 0f, pad, y, pad + half, y + 150 * u);
                 drawStatus(c, pad, y, half);
+                endEntry(c, a0);
                 equippedRect.set(pad + half + gap, y, pad + half + gap + half, y + 150 * u);
+                int a1 = beginEntry(c, LIST_STAGGER_MS, equippedRect.left, y, equippedRect.right, y + 150 * u);
                 y = drawEquipped(c, pad + half + gap, y, half);
+                endEntry(c, a1);
                 y += gap;
             } else {
+                int a0 = beginEntry(c, 0f, pad, y, w - pad, y + 150 * u);
                 y = drawStatus(c, pad, y, w - 2 * pad);
+                endEntry(c, a0);
                 y += 16 * u;
                 equippedRect.set(pad, y, w - pad, y + 150 * u);
+                int a1 = beginEntry(c, LIST_STAGGER_MS, pad, y, w - pad, y + 150 * u);
                 y = drawEquipped(c, pad, y, w - 2 * pad);
+                endEntry(c, a1);
                 y += 20 * u;
             }
 
@@ -1531,16 +1779,41 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             cellRects.clear();
             cellItems.clear();
 
+            boolean selFound = false;
+            for (int i = 0; i < n; i++) {
+                if (snap.items.get(i).slot != snap.selectedSlot) continue;
+                float cx = pad + (i % 2) * (cellW + gap);
+                float cy = top + (i / 2) * (cellH + gap);
+                cursorTarget(snap.selectedSlot, cx + P, cy + P, cx + cellW - P, cy + cellH - P);
+                selFound = true;
+                break;
+            }
+            if (!selFound) curSlot = -1;
+
             c.save();
             c.clipRect(0, top, w, h);
+            int shown = 0;
             for (int i = 0; i < n; i++) {
                 float cx = pad + (i % 2) * (cellW + gap);
                 float cy = top + (i / 2) * (cellH + gap) - scrollY;
                 if (cy + cellH < top || cy > h) continue;
                 Item it = snap.items.get(i);
-                drawCell(c, it, cx, cy, cellW, cellH);
+                float k = entryProgress((2 + shown) * LIST_STAGGER_MS);
+                shown++;
+                if (k <= 0f) continue;
+                if (k < 1f) {
+                    int a = c.saveLayerAlpha(cx, cy, cx + cellW, cy + cellH, Math.round(k * 255f));
+                    c.translate((1f - k) * (1f - k) * 40f * u, 0f);
+                    drawCell(c, it, cx, cy, cellW, cellH);
+                    c.restoreToCount(a);
+                } else {
+                    drawCell(c, it, cx, cy, cellW, cellH);
+                }
                 cellRects.add(new RectF(cx, cy, cx + cellW, cy + cellH));
                 cellItems.add(it);
+            }
+            if (entryProgress((2 + shown) * LIST_STAGGER_MS) >= 1f) {
+                drawCursor(c, scrollY);
             }
             c.restore();
 
@@ -1564,6 +1837,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             float pct = snap.healthQ12 / 4096f;
             if (pct < 0f) pct = 0f;
             if (pct > 100f) pct = 100f;
+            final float target = pct;
+            pct = healthShown(target);
 
             int col;
             String word;
@@ -1582,6 +1857,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             int tint = ((col >> 1) & 0x7F7F7F) + 0x101010;
 
             brackets(c, x, y, x + w, y + hgt, C_EDGE);
+            drawScan(c, x, y, w, hgt, target);
 
             int small = px(P - 1);
             int big = px(P);
@@ -1704,6 +1980,19 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             int fp = fitPx(it.name, np, 2, nameMax);
             drawString(c, ellipsize(it.name, fp, nameMax), nameX, y + (h - lineH(fp)) / 2f, fp,
                        equipped ? T_GOLD : T_WHITE, Paint.Align.LEFT);
+
+            Long g0 = glare.get(itemKey(it));
+            if (g0 != null) {
+                float k = (frameNow - g0) / GLARE_MS;
+                if (k >= 1f || k < 0f) {
+                    glare.remove(itemKey(it));
+                } else {
+                    animating = true;
+                    float a = k < 0.25f ? k / 0.25f : (1f - k) / 0.75f;
+                    int hi = Math.round(a * 0x70);
+                    gradient(c, x, y, x + w, y + h, (hi << 24) | 0xFFFFFF, ((hi / 4) << 24) | 0xFFFFFF);
+                }
+            }
         }
 
         /* The command sheet. The rows are the stock screen's own, in its own
@@ -1749,12 +2038,12 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             drawString(c, label, x + w / 2f, y + (h - lineH(p)) / 2f, p, primary ? T_WHITE : T_GREY, Paint.Align.CENTER);
         }
 
-        private void drawSheet(Canvas c, int w, int h, Item item) {
-            int state = (snap.uiState == UI_IDLE) ? UI_OPENING : snap.uiState;
+        /** open: 0 folded flat .. 1 fully open. Buttons only take taps once
+         * the window is open (interactive). */
+        private void drawSheet(Canvas c, int w, int h, Item item, int state, float open, boolean interactive) {
+            rect(c, 0, 0, w, h, (Math.round(0xD9 * clamp01(open * 1.5f)) << 24));
 
-            rect(c, 0, 0, w, h, 0xD9000000);
-
-            String[] labels = (state == UI_MENU) ? commandLabels(snap.uiCmd) : new String[0];
+            String[] labels = (state == UI_MENU) ? commandLabels(sheetLastCmd) : new String[0];
             String note = null;
             String closeLabel = null;
             int closeAction = ACT_CANCEL;
@@ -1790,6 +2079,10 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             float pxl = Math.round((w - pw) / 2f);
             float py = Math.round(Math.max(20 * u, (h - ph) / 2f));
 
+            int folded = c.save();
+            if (open < 1f) {
+                c.scale(1f, Math.max(0.02f, open), w / 2f, py + ph / 2f);
+            }
             rect(c, pxl, py, pxl + pw, py + ph, 0xFF000000);
             frame(c, pxl, py, pxl + pw, py + ph, C_EDGE);
             brackets(c, pxl - 2 * P, py - 2 * P, pxl + pw + 2 * P, py + ph + 2 * P, C_GOLD);
@@ -1817,6 +2110,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             if (closeLabel != null) {
                 addButton(c, pxl + 36 * u, y, pw - 72 * u, 110 * u, closeLabel, closeAction, false);
             }
+            c.restoreToCount(folded);
+            if (!interactive) buttonCount = 0;
         }
 
         private void drawToast(Canvas c, int w, int h) {
