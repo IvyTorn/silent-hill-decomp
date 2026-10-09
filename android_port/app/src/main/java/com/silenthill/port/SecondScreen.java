@@ -82,6 +82,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private boolean animateUi = true;
     private boolean psxLook = true;
     private boolean psxLight = true;
+    private int fps = 60;
     private int modelSerial;
 
     /* Item icons, drawn natively from the game's own models (pc_second_screen_
@@ -254,7 +255,6 @@ final class SecondScreen implements DisplayManager.DisplayListener {
      * starting from the icon's own angle so nothing jumps when it starts. */
     private static final int ICON_SIZE = 112;
     private static final float ICON_START = 0.6109f;
-    private static final long SPIN_FRAME_MS = 33;
 
     private final class Spinner {
         private final double periodMs;
@@ -507,6 +507,12 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         animateUi = !"0".equals(p.getProperty("anim", "1").trim());
         psxLook = !"0".equals(p.getProperty("psx", "1").trim());
         psxLight = !"0".equals(p.getProperty("psx_light", "1").trim());
+        try {
+            int want = Integer.parseInt(p.getProperty("fps", "60").trim());
+            if (want >= 15 && want <= 120) fps = want;
+        } catch (NumberFormatException e) {
+            Log.w(TAG, "fps is not a number");
+        }
 
         String disp = p.getProperty("display", "auto").trim();
         if (!"auto".equalsIgnoreCase(disp)) {
@@ -526,7 +532,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: paso5 (static layer)  config: dump_models=" + dumpModels + " spin=" + spinModels + " anim=" + animateUi
+        Log.i(TAG, "build: paso5b (steady frame rate)  config: fps=" + fps + " dump_models=" + dumpModels + " spin=" + spinModels + " anim=" + animateUi
                 + " psx=" + psxLook + " psx_light=" + psxLight + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
@@ -568,6 +574,10 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             + "# 1 = the selected and the equipped item turn, as in the game's inventory;\n"
             + "#     0 = still pictures (a little less work for the battery).\n"
             + "spin=1\n"
+            + "\n"
+            + "# Frames a second while something on the second screen moves (15 to 120).\n"
+            + "#     60 matches the game's own inventory; 30 halves the work.\n"
+            + "fps=60\n"
             + "\n"
             + "# 1 = animate the screen (selection cursor, health bar and scan, list,\n"
             + "#     command window); 0 = everything changes at once.\n"
@@ -932,6 +942,14 @@ final class SecondScreen implements DisplayManager.DisplayListener {
          * slows an animation down, it only skips part of it. -- */
         private long frameNow;
         private boolean animating;
+        private boolean tickPending;
+        private double nextDue;
+        private final Runnable tick = new Runnable() {
+            @Override public void run() {
+                tickPending = false;
+                invalidate();
+            }
+        };
 
         /* The stock item cursor (Gfx_Inventory_ItemSelectionDraw...): on a new
          * selection the outline slides over in 8 frames at 60 Hz, eased by
@@ -1685,8 +1703,20 @@ final class SecondScreen implements DisplayManager.DisplayListener {
              * onDisplayChanged when it is turned back on. */
             Display shownOn = getDisplay();
             boolean screenOn = shownOn == null || shownOn.getState() != Display.STATE_OFF;
-            if (((turning && spinModels && !nativeRenderBroken) || animating) && screenOn) {
-                postInvalidateDelayed(SPIN_FRAME_MS);
+            /* One pending frame at a time. Every draw used to ask for the next
+             * one, so each extra draw -- a snapshot, a tap -- started a second
+             * chain beside the first, and the rate crept up to the screen's
+             * refresh rate (over 100 a second on the Thor). */
+            if (((turning && spinModels && !nativeRenderBroken) || animating) && screenOn && !tickPending) {
+                /* On a fixed schedule, so the wait for the screen's next
+                 * refresh after each tick does not stretch every period. */
+                double period = 1000.0 / fps;
+                if (nextDue <= frameNow) {
+                    nextDue += period;
+                    if (nextDue <= frameNow) nextDue = frameNow + period;
+                }
+                tickPending = true;
+                postDelayed(tick, Math.max(0L, (long) Math.ceil(nextDue - frameNow)));
             }
 
             if (debugOverlay) {
@@ -1892,7 +1922,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             if (pct < 100f) {
                 if (frameNow >= glitchUntil) {
                     double p60 = 1.0 / ((int) (pct / 2f) + 2);
-                    double pFrame = 1.0 - Math.pow(1.0 - p60, Math.max(1.0, SPIN_FRAME_MS / FRAME60_MS));
+                    double pFrame = 1.0 - Math.pow(1.0 - p60, Math.max(1.0, (1000.0 / fps) / FRAME60_MS));
                     if (rng.nextDouble() < pFrame) {
                         glitchUntil = frameNow + (long) (4 * FRAME60_MS);
                         glitchY = top + rng.nextFloat() * (bot - top - 2 * P);
