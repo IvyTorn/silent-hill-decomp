@@ -149,6 +149,11 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     @Override public void onDisplayRemoved(int displayId) { refresh(); }
 
     @Override public void onDisplayChanged(int displayId) {
+        /* The screen coming back on: the drawing loop stops while it is off
+         * (InventoryView.onDraw), so give it a frame to start again from. */
+        if (panel != null && panel.view != null && panel.getDisplay().getDisplayId() == displayId) {
+            panel.view.invalidate();
+        }
         /* Fires for rotation and brightness too. Only a display going away, or
          * one appearing while nothing is shown, needs a new window. */
         if (panel == null || !panel.getDisplay().isValid()) {
@@ -195,6 +200,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         int rec = 4 + size * size * 4;
         icons.clear();
         psxIcons.clear();
+        iconsVersion++;
         int p = 16;
         int[] px = new int[size * size];
         for (int i = 0; i < count && p + rec <= b.length; i++, p += rec) {
@@ -312,6 +318,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     /* Still PlayStation-style pictures, drawn on first use at the size a slot
      * needs, and kept until the library is rebuilt. */
     private final java.util.HashMap<Integer, Bitmap> psxIcons = new java.util.HashMap<Integer, Bitmap>();
+    private int iconsVersion;
 
     int psxMode() {
         return psxLook ? (psxLight ? 3 : 1) : 0;
@@ -519,7 +526,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: fase4-paso4 (psx look)  config: dump_models=" + dumpModels + " spin=" + spinModels + " anim=" + animateUi
+        Log.i(TAG, "build: paso5 (static layer)  config: dump_models=" + dumpModels + " spin=" + spinModels + " anim=" + animateUi
                 + " psx=" + psxLook + " psx_light=" + psxLight + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
@@ -964,6 +971,30 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         private final java.util.HashSet<Integer> knownItems = new java.util.HashSet<Integer>();
         private final java.util.HashMap<Integer, Long> glare = new java.util.HashMap<Integer, Long>();
 
+        /* -- Step 5: speed, with the same picture. Everything that does not
+         * move between two snapshots -- panels, text, the still icons -- is
+         * recorded once into a display list and replayed; each frame then
+         * draws only what moves: the health panel with its scan, the two
+         * turning items, the cursor and any glare. -- */
+        private static final int PH_ALL = 0, PH_STATIC = 1, PH_LIVE = 2;
+        private int phase = PH_ALL;
+        private android.graphics.RenderNode staticNode;
+        private boolean staticDirty = true;
+        private boolean staticBroken;
+        private int staticIcons = -1;
+        private int staticW, staticH;
+
+        /* debug=1: what a frame costs on this side, logged every 10 s. */
+        private long perfT0, perfNs, perfMaxNs;
+        private int perfFrames, perfRecords;
+
+        /* Gradients by their exact parameters, so a frame that draws what the
+         * last one drew allocates none. */
+        private final float[][] gradKey = new float[16][4];
+        private final int[][] gradCol = new int[16][2];
+        private final LinearGradient[] gradShader = new LinearGradient[16];
+        private int gradNext;
+
         /* The command window unfolds from its middle and folds back. */
         private static final float SHEET_OPEN_MS = 150f;
         private static final float SHEET_CLOSE_MS = 120f;
@@ -1053,6 +1084,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
             boolean wasShown = snap != null && snap.session;
             snap = s;
+            staticDirty = true;
             noteItems(s, wasShown);
 
             onModelSerial(s.modelSerial);
@@ -1089,6 +1121,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 return;
             }
             font = f;
+            staticDirty = true;
             Log.i(TAG, "font: game font in use, " + f.glyphCount + " glyphs, "
                     + f.cols + "x" + f.rows + " cells, inked " + Math.round(f.inkedShare * 100) + "%");
         }
@@ -1308,6 +1341,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                         float ns = Math.max(0f, Math.min(maxScroll, scrollY - dy));
                         if (ns != scrollY) {
                             scrollY = ns;
+                            staticDirty = true;
                             invalidate();
                         }
                     }
@@ -1519,8 +1553,28 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         }
 
         /** A quad shaded from one colour at its left edge to another at its right. */
+        private LinearGradient shaderFor(float x0, float y0, float x1, float y1, int from, int to) {
+            for (int i = 0; i < gradShader.length; i++) {
+                float[] k = gradKey[i];
+                if (gradShader[i] != null && k[0] == x0 && k[1] == y0 && k[2] == x1 && k[3] == y1
+                        && gradCol[i][0] == from && gradCol[i][1] == to) {
+                    return gradShader[i];
+                }
+            }
+            int i = gradNext;
+            gradNext = (gradNext + 1) % gradShader.length;
+            gradKey[i][0] = x0;
+            gradKey[i][1] = y0;
+            gradKey[i][2] = x1;
+            gradKey[i][3] = y1;
+            gradCol[i][0] = from;
+            gradCol[i][1] = to;
+            gradShader[i] = new LinearGradient(x0, y0, x1, y1, from, to, Shader.TileMode.CLAMP);
+            return gradShader[i];
+        }
+
         private void gradient(Canvas c, float l, float t, float rr, float b, int from, int to) {
-            fill.setShader(new LinearGradient(l, 0, rr, 0, from, to, Shader.TileMode.CLAMP));
+            fill.setShader(shaderFor(l, 0, rr, 0, from, to));
             r.set(Math.round(l), Math.round(t), Math.round(rr), Math.round(b));
             c.drawRect(r, fill);
             fill.setShader(null);
@@ -1559,6 +1613,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 Log.i(TAG, "second screen first draw " + w + "x" + h + " " + insetsText);
             }
 
+            final long perfStart = debugOverlay ? System.nanoTime() : 0L;
             buttonCount = 0;
             frameNow = android.os.SystemClock.uptimeMillis();
             animating = false;
@@ -1566,7 +1621,22 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             if (snap == null || !snap.session) {
                 drawIdle(c, w, h);
             } else {
-                drawInventory(c, w, h);
+                if (useStaticLayer(c)) {
+                    android.graphics.RenderNode node = staticLayer(w, h);
+                    if (node != null) {
+                        c.drawRenderNode(node);
+                        phase = PH_LIVE;
+                        try {
+                            drawInventory(c, w, h);
+                        } finally {
+                            phase = PH_ALL;
+                        }
+                    } else {
+                        drawInventory(c, w, h);
+                    }
+                } else {
+                    drawInventory(c, w, h);
+                }
                 Item sheet = sheetItem();
                 if (sheet != null) {
                     if (sheetLast == null || sheetClosing) {
@@ -1611,7 +1681,11 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 if (sp.used) turning = true;
                 else sp.reset();
             }
-            if ((turning && spinModels && !nativeRenderBroken) || animating) {
+            /* Nobody sees a screen that is off; its next frame comes from
+             * onDisplayChanged when it is turned back on. */
+            Display shownOn = getDisplay();
+            boolean screenOn = shownOn == null || shownOn.getState() != Display.STATE_OFF;
+            if (((turning && spinModels && !nativeRenderBroken) || animating) && screenOn) {
                 postInvalidateDelayed(SPIN_FRAME_MS);
             }
 
@@ -1620,7 +1694,64 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 text.setTextSize(30 * u);
                 text.setTextAlign(Paint.Align.LEFT);
                 c.drawText(w + "x" + h + "  " + insetsText, 12 * u, h - 14 * u, text);
+
+                long ns = System.nanoTime() - perfStart;
+                perfNs += ns;
+                if (ns > perfMaxNs) perfMaxNs = ns;
+                perfFrames++;
+                if (perfT0 == 0) perfT0 = frameNow;
+                if (frameNow - perfT0 >= 10000) {
+                    Log.i(TAG, String.format(Locale.ROOT,
+                            "perf: %d frames in %.1f s, draw %.2f ms avg / %.2f ms max, static layer %s, %d re-recorded",
+                            perfFrames, (frameNow - perfT0) / 1000f, perfNs / 1e6 / perfFrames, perfMaxNs / 1e6,
+                            staticBroken ? "off (failed)" : (Build.VERSION.SDK_INT >= 29 && c.isHardwareAccelerated() ? "on" : "off"),
+                            perfRecords));
+                    perfT0 = frameNow;
+                    perfNs = perfMaxNs = 0;
+                    perfFrames = perfRecords = 0;
+                }
             }
+        }
+
+        /** Whether this frame can replay the recorded still part. Not while
+         * the list is still coming in: then every cell is moving. */
+        private boolean useStaticLayer(Canvas c) {
+            if (staticBroken || Build.VERSION.SDK_INT < 29 || !c.isHardwareAccelerated()) return false;
+            if (animateUi && listT0 > 0
+                    && frameNow - listT0 < LIST_IN_MS + (2 + snap.items.size()) * LIST_STAGGER_MS + FRAME60_MS) {
+                staticDirty = true;
+                return false;
+            }
+            return true;
+        }
+
+        /** The still part, recorded again only when something in it changed. */
+        private android.graphics.RenderNode staticLayer(int w, int h) {
+            if (staticNode != null && !staticDirty && staticIcons == iconsVersion && staticW == w && staticH == h) {
+                return staticNode;
+            }
+            try {
+                if (staticNode == null) staticNode = new android.graphics.RenderNode("sh2screen-static");
+                staticNode.setPosition(0, 0, w, h);
+                android.graphics.RecordingCanvas rc = staticNode.beginRecording(w, h);
+                try {
+                    phase = PH_STATIC;
+                    drawInventory(rc, w, h);
+                } finally {
+                    phase = PH_ALL;
+                    staticNode.endRecording();
+                }
+            } catch (RuntimeException e) {
+                Log.w(TAG, "static layer failed (" + e + "); drawing every frame in full");
+                staticBroken = true;
+                return null;
+            }
+            staticDirty = false;
+            staticIcons = iconsVersion;
+            staticW = w;
+            staticH = h;
+            perfRecords++;
+            return staticNode;
         }
 
         /* The filter's scanline term, 240 lines down the picture, for when the
@@ -1737,7 +1868,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
 
         /** A vertical wash, from one colour at the top to another at the bottom. */
         private void vgradient(Canvas c, float l, float t, float rr, float b, int from, int to) {
-            fill.setShader(new LinearGradient(0, t, 0, b, from, to, Shader.TileMode.CLAMP));
+            fill.setShader(shaderFor(0, t, 0, b, from, to));
             r.set(Math.round(l), Math.round(t), Math.round(rr), Math.round(b));
             c.drawRect(r, fill);
             fill.setShader(null);
@@ -1810,20 +1941,28 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             final float gap = 12 * u;
             float y = pad;
 
+            final boolean still = phase != PH_LIVE;
+            final boolean live = phase != PH_STATIC;
+
             if (wide) {
                 float half = (w - 2 * pad - gap) / 2f;
-                int a0 = beginEntry(c, 0f, pad, y, pad + half, y + 150 * u);
-                drawStatus(c, pad, y, half);
-                endEntry(c, a0);
+                if (live) {
+                    int a0 = beginEntry(c, 0f, pad, y, pad + half, y + 150 * u);
+                    drawStatus(c, pad, y, half);
+                    endEntry(c, a0);
+                }
                 equippedRect.set(pad + half + gap, y, pad + half + gap + half, y + 150 * u);
                 int a1 = beginEntry(c, LIST_STAGGER_MS, equippedRect.left, y, equippedRect.right, y + 150 * u);
                 y = drawEquipped(c, pad + half + gap, y, half);
                 endEntry(c, a1);
                 y += gap;
             } else {
-                int a0 = beginEntry(c, 0f, pad, y, w - pad, y + 150 * u);
-                y = drawStatus(c, pad, y, w - 2 * pad);
-                endEntry(c, a0);
+                if (live) {
+                    int a0 = beginEntry(c, 0f, pad, y, w - pad, y + 150 * u);
+                    drawStatus(c, pad, y, w - 2 * pad);
+                    endEntry(c, a0);
+                }
+                y += 150 * u;
                 y += 16 * u;
                 equippedRect.set(pad, y, w - pad, y + 150 * u);
                 int a1 = beginEntry(c, LIST_STAGGER_MS, pad, y, w - pad, y + 150 * u);
@@ -1847,19 +1986,23 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             if (scrollY > maxScroll) scrollY = maxScroll;
 
             listRect.set(0, top, w, h);
-            cellRects.clear();
-            cellItems.clear();
-
-            boolean selFound = false;
-            for (int i = 0; i < n; i++) {
-                if (snap.items.get(i).slot != snap.selectedSlot) continue;
-                float cx = pad + (i % 2) * (cellW + gap);
-                float cy = top + (i / 2) * (cellH + gap);
-                cursorTarget(snap.selectedSlot, cx + P, cy + P, cx + cellW - P, cy + cellH - P);
-                selFound = true;
-                break;
+            if (still) {
+                cellRects.clear();
+                cellItems.clear();
             }
-            if (!selFound) curSlot = -1;
+
+            if (live) {
+                boolean selFound = false;
+                for (int i = 0; i < n; i++) {
+                    if (snap.items.get(i).slot != snap.selectedSlot) continue;
+                    float cx = pad + (i % 2) * (cellW + gap);
+                    float cy = top + (i / 2) * (cellH + gap);
+                    cursorTarget(snap.selectedSlot, cx + P, cy + P, cx + cellW - P, cy + cellH - P);
+                    selFound = true;
+                    break;
+                }
+                if (!selFound) curSlot = -1;
+            }
 
             c.save();
             c.clipRect(0, top, w, h);
@@ -1872,6 +2015,12 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 float k = entryProgress((2 + shown) * LIST_STAGGER_MS);
                 shown++;
                 if (k <= 0f) continue;
+                if (phase == PH_LIVE) {
+                    /* The recorded cell is underneath; add what moves. */
+                    if (it.slot == snap.selectedSlot) drawCellIcon(c, it, cx, cy, cellW, cellH, spinSelected);
+                    drawGlare(c, it, cx, cy, cellW, cellH);
+                    continue;
+                }
                 if (k < 1f) {
                     int a = c.saveLayerAlpha(cx, cy, cx + cellW, cy + cellH, Math.round(k * 255f));
                     c.translate((1f - k) * (1f - k) * 40f * u, 0f);
@@ -1883,10 +2032,12 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 cellRects.add(new RectF(cx, cy, cx + cellW, cy + cellH));
                 cellItems.add(it);
             }
-            if (entryProgress((2 + shown) * LIST_STAGGER_MS) >= 1f) {
+            if (live && entryProgress((2 + shown) * LIST_STAGGER_MS) >= 1f) {
                 drawCursor(c, scrollY);
             }
             c.restore();
+
+            if (!still) return;
 
             if (n == 0) {
                 drawString(c, tr("Sin objetos", "No items"), w / 2f, top + 100 * u, px(P), T_GREY, Paint.Align.CENTER);
@@ -1957,6 +2108,15 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         private float drawEquipped(Canvas c, float x, float y, float w) {
             final float hgt = 150 * u;
 
+            if (phase == PH_LIVE) {
+                /* Only the turning item; the panel is in the recorded layer. */
+                Item eq = (snap.equippedId != 0) ? itemAtSlot(snap.equippedSlot) : null;
+                if (eq != null && !drawIcon(c, eq.id, x + 72 * u, y + hgt / 2f, 128 * u, spinEquipped)) {
+                    drawGlyph(c, eq.id >> 5, x + 72 * u, y + hgt / 2f, 40 * u, C_GOLD);
+                }
+                return y + hgt;
+            }
+
             gradient(c, x, y, x + w * 0.6f, y + hgt, 0x40A08040, 0x00A08040);
             brackets(c, x, y, x + w, y + hgt, C_GOLD);
 
@@ -1974,7 +2134,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 return y + hgt;
             }
 
-            if (!drawIcon(c, eq.id, x + 72 * u, y + hgt / 2f, 128 * u, spinEquipped)) {
+            if (phase == PH_ALL && !drawIcon(c, eq.id, x + 72 * u, y + hgt / 2f, 128 * u, spinEquipped)) {
                 drawGlyph(c, eq.id >> 5, x + 72 * u, y + hgt / 2f, 40 * u, C_GOLD);
             }
 
@@ -2016,10 +2176,13 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
 
             final float iconSide = h - 10 * u;
-            final boolean icon = drawIcon(c, it.id, x + 6 * u + iconSide / 2f, y + h / 2f, iconSide,
-                                          it.slot == snap.selectedSlot ? spinSelected : null);
-            if (!icon) {
-                drawGlyph(c, group, x + 54 * u, y + h / 2f, 28 * u, col);
+            final boolean icon;
+            if (phase == PH_STATIC && it.slot == snap.selectedSlot) {
+                /* Left out of the recording: it turns, and is drawn every
+                 * frame. The layout only needs to know it is there. */
+                icon = bestIcon(it.id) != null;
+            } else {
+                icon = drawCellIcon(c, it, x, y, w, h, it.slot == snap.selectedSlot ? spinSelected : null);
             }
 
             /* Right-hand tag: a count where a count means something, on/off
@@ -2052,6 +2215,22 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             drawString(c, ellipsize(it.name, fp, nameMax), nameX, y + (h - lineH(fp)) / 2f, fp,
                        equipped ? T_GOLD : T_WHITE, Paint.Align.LEFT);
 
+            if (phase == PH_ALL) drawGlare(c, it, x, y, w, h);
+        }
+
+        /** A cell's picture: its model, or its category symbol. True if it
+         * was the model. */
+        private boolean drawCellIcon(Canvas c, Item it, float x, float y, float w, float h, Spinner turn) {
+            final float iconSide = h - 10 * u;
+            final boolean icon = drawIcon(c, it.id, x + 6 * u + iconSide / 2f, y + h / 2f, iconSide, turn);
+            if (!icon) {
+                drawGlyph(c, it.id >> 5, x + 54 * u, y + h / 2f, 28 * u, groupColor(it.id >> 5));
+            }
+            return icon;
+        }
+
+        private void drawGlare(Canvas c, Item it, float x, float y, float w, float h) {
+            if (glare.isEmpty()) return;
             Long g0 = glare.get(itemKey(it));
             if (g0 != null) {
                 float k = (frameNow - g0) / GLARE_MS;
