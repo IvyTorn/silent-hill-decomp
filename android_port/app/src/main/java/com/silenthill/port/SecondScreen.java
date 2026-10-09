@@ -1569,16 +1569,16 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
         }
 
-        private static float clamp01(float v) {
+        private float clamp01(float v) {
             return v < 0f ? 0f : (v > 1f ? 1f : v);
         }
 
-        private static float cos2(float k) {
+        private float cos2(float k) {
             double c = Math.cos(clamp01(k) * Math.PI / 2.0);
             return (float) (c * c);
         }
 
-        private static int itemKey(Item it) {
+        private int itemKey(Item it) {
             return (it.slot << 8) | it.id;
         }
 
