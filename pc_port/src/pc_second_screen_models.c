@@ -52,7 +52,7 @@
 #define SM_TMD_HDR   12 /* id, flags, nobj */
 #define SM_TMD_OBJ   28 /* vertop, vern, nortop, norn, primtop, primn, scale */
 
-#define SM_VERT_BYTES 16
+#define SM_VERT_BYTES 20
 #define SM_ITEM_HDR   20
 
 #define SM_ATLAS_W    256
@@ -215,6 +215,7 @@ typedef struct
 typedef struct
 {
     int      vi[4];
+    int      ni[4];
     int      quad;
     int      textured;
     unsigned tpage, clut;
@@ -272,7 +273,8 @@ static int Sm_RegionFor(s_SmRegion* regions, int* count, const s_SmPrim* pr)
  * Record: itemId u8, obj u8, triangle count u16, texture w u16, h u16,
  * bounding box 6 x s16 (min xyz, max xyz); then 3 vertices per triangle of
  * SM_VERT_BYTES (x, y, z s16; flags u8; pad u8; u, v u16 texel coordinates in
- * the record's texture; r, g, b, a u8, where 255 = the texel unchanged); then
+ * the record's texture; r, g, b, a u8, where 255 = the texel unchanged;
+ * the vertex normal as 3 x s8, 127 = 1.0, and a pad byte); then
  * w*h RGBA texels. A one-texel white cell at (1,1) serves the untextured
  * triangles. Returns the bytes written, or 0 if the object is unusable or
  * `cap` is too small. */
@@ -283,7 +285,7 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
     static s_SmRegion regions[SM_REGION_MAX];
 
     const unsigned char* ot;
-    unsigned long        vertop, vern, primtop, primn;
+    unsigned long        vertop, vern, nortop, norn, primtop, primn;
     long                 p;
     int                  nprim = 0, nreg = 0, ntri = 0;
     int                  i, k;
@@ -301,12 +303,16 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
     ot      = tmd + SM_TMD_HDR + obj * SM_TMD_OBJ;
     vertop  = Sm_U32(ot + 0);
     vern    = Sm_U32(ot + 4);
+    nortop  = Sm_U32(ot + 8);
+    norn    = Sm_U32(ot + 12);
     primtop = Sm_U32(ot + 16);
     primn   = Sm_U32(ot + 20);
 
     /* Offsets are from the object table, the file + 12 (pc_big_tmd.c). */
     if (SM_TMD_HDR + (long)vertop + (long)vern * 8 > tmdSize)
         return 0;
+    if (SM_TMD_HDR + (long)nortop + (long)norn * 8 > tmdSize)
+        norn = 0;
 
     p = SM_TMD_HDR + (long)primtop;
     for (i = 0; i < (int)primn; i++)
@@ -360,12 +366,16 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
             base = 8;
         }
 
-        /* (normal, vertex) pairs; the normal is not used. */
+        /* (normal, vertex) pairs. The normals light the items the stock
+         * inventory lights; a bad index just leaves that vertex unlit. */
         for (k = 0; k < n; k++)
         {
+            pr->ni[k] = (int)Sm_U16(pk + base + k * 4);
             pr->vi[k] = (int)Sm_U16(pk + base + k * 4 + 2);
             if ((unsigned long)pr->vi[k] >= vern)
                 break;
+            if ((unsigned long)pr->ni[k] >= norn)
+                pr->ni[k] = -1;
         }
         if (k < n)
             continue;
@@ -493,6 +503,17 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
                     w[14] = pr->rgb[2];
                 }
                 w[15] = 255;
+                if (pr->ni[c] >= 0)
+                {
+                    const unsigned char* np = tmd + SM_TMD_HDR + nortop + (long)pr->ni[c] * 8;
+                    int                  d;
+
+                    for (d = 0; d < 3; d++)
+                    {
+                        int q = ((short)Sm_U16(np + d * 2) * 127) / 4096;
+                        w[16 + d] = (unsigned char)(signed char)(q > 127 ? 127 : (q < -127 ? -127 : q));
+                    }
+                }
                 w += SM_VERT_BYTES;
 
                 if (x < bb[0]) bb[0] = x;
@@ -560,7 +581,57 @@ long Sm_BuildItem(unsigned char* out, long cap, int itemId, const unsigned char*
 #include <math.h>
 #include "../../src/bodyprog/items/item_rotations.h"
 
-static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgba, float spin, int steady, float* zb)
+/* The items the stock inventory draws lit (attribute 0 in Gfx_Items_Display);
+ * every other item has GsLOFF and shows its texture as it is. */
+static int Sm_ItemLit(int id)
+{
+    switch (id)
+    {
+        case InvItemId_HealthDrink: case InvItemId_FirstAidKit: case InvItemId_Ampoule:
+        case InvItemId_KitchenKnife: case InvItemId_SteelPipe: case InvItemId_Hammer:
+        case InvItemId_Chainsaw: case InvItemId_Axe: case InvItemId_Handgun:
+        case InvItemId_HuntingRifle: case InvItemId_Shotgun: case InvItemId_HandgunBullets:
+        case InvItemId_RifleShells: case InvItemId_ShotgunShells: case InvItemId_Flashlight:
+        case InvItemId_PocketRadio:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+/* The GPU's 4x4 dither, added before a shaded colour drops to 5 bits. */
+static const signed char SM_DITHER[4][4] = {
+    { -4, 0, -3, 1 }, { 2, -2, 3, -1 }, { -3, 1, -4, 0 }, { 3, -1, 2, -2 }
+};
+
+/* Light reaching a vertex in the stock inventory (Gfx_Items_SetAmbientLighting,
+ * func_800548D8): ambient 1024/4096, a white light travelling into the screen
+ * from the camera and a white light travelling +X, so faces towards the
+ * camera and to the left catch it. The GTE saturates the result at twice the
+ * neutral colour. A vertex with no normal is left neutral. */
+static float Sm_Light(float m[3][3], const unsigned char* v)
+{
+    float nx = (signed char)v[16] / 127.0f;
+    float ny = (signed char)v[17] / 127.0f;
+    float nz = (signed char)v[18] / 127.0f;
+    float rx, rz, l;
+
+    if (nx == 0.0f && ny == 0.0f && nz == 0.0f)
+        return 1.0f;
+    rx = m[0][0] * nx + m[0][1] * ny + m[0][2] * nz;
+    rz = m[2][0] * nx + m[2][1] * ny + m[2][2] * nz;
+    l  = 0.25f + (rz < 0.0f ? -rz : 0.0f) + (rx < 0.0f ? -rx : 0.0f);
+    return l > 2.0f ? 2.0f : l;
+}
+
+/* psx bit 0: the GPU's look -- every colour brought down to 15 bits, dithered
+ * where shaded, and no made-up face shading. Bit 1: the stock inventory's
+ * lights on the items it lights (gouraud, from the model's own normals); the
+ * rest keep their texture as it is.
+ * The game's perspective is left out: at its viewing distance (about 15000
+ * units, H = 1000) an item's depth changes its scale by under 2%. */
+static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgba, float spin, int steady,
+                          int psx, float* zb)
 {
     unsigned             ntri = Sm_U16(rec + 2);
     int                  tw   = (int)Sm_U16(rec + 4);
@@ -568,6 +639,7 @@ static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgb
     const unsigned char* vtx  = rec + SM_ITEM_HDR;
     const unsigned char* tex  = vtx + (long)ntri * 3 * SM_VERT_BYTES;
     int                  rot  = (int)rec[0] - 32;
+    int                  lit  = Sm_ItemLit(rec[0]);
     float                tx   = 0.0f, tz = 0.0f, m[3][3];
     float                sx, cxr, sy, cyr, sz, czr;
     float                tm[3][3];
@@ -661,7 +733,7 @@ static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgb
     for (i = 0; i < ntri; i++)
     {
         const unsigned char* v[3];
-        float                X[3], Y[3], Z[3], U[3], V[3], den, shade;
+        float                X[3], Y[3], Z[3], U[3], V[3], L[3], den, shade;
         float                nx, ny, nz, nl;
         int                  x0, x1, y0, y1, xx, yy;
         int                  semi;
@@ -676,12 +748,16 @@ static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgb
             V[k] = (float)Sm_U16(v[k] + 10);
         }
         semi = (v[0][6] & SM_VF_SEMI) != 0;
+        for (k = 0; k < 3; k++)
+            L[k] = ((psx & 2) && lit) ? Sm_Light(m, v[k]) : 1.0f;
 
         nx = (Y[1] - Y[0]) * (Z[2] - Z[0]) - (Z[1] - Z[0]) * (Y[2] - Y[0]);
         ny = (Z[1] - Z[0]) * (X[2] - X[0]) - (X[1] - X[0]) * (Z[2] - Z[0]);
         nz = (X[1] - X[0]) * (Y[2] - Y[0]) - (Y[1] - Y[0]) * (X[2] - X[0]);
         nl = sqrtf(nx * nx + ny * ny + nz * nz);
         shade = (nl > 0.0f) ? 0.72f + 0.28f * fabsf((nx * -0.35f + ny * -0.55f + nz * -0.76f) / nl) : 1.0f;
+        if (psx & 1)
+            shade = 1.0f;
 
         den = (Y[1] - Y[2]) * (X[0] - X[2]) + (X[2] - X[1]) * (Y[0] - Y[2]);
         if (fabsf(den) < 1e-6f)
@@ -704,7 +780,7 @@ static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgb
                 float          w0 = ((Y[1] - Y[2]) * (px - X[2]) + (X[2] - X[1]) * (py - Y[2])) / den;
                 float          w1 = ((Y[2] - Y[0]) * (px - X[2]) + (X[0] - X[2]) * (py - Y[2])) / den;
                 float          w2 = 1.0f - w0 - w1;
-                float          z;
+                float          z, light;
                 int            tu, tv, c;
                 const unsigned char* t;
                 unsigned char* d;
@@ -726,13 +802,23 @@ static void Sm_RenderPose(const unsigned char* rec, int size, unsigned char* rgb
                     continue;
 
                 d = rgba + ((long)yy * size + xx) * 4;
+                light = ((psx & 2) && lit) ? w0 * L[0] + w1 * L[1] + w2 * L[2] : 1.0f;
                 for (c = 0; c < 3; c++)
                 {
-                    float col = t[c] * (v[0][12 + c] / 255.0f) * shade;
+                    float col = t[c] * (v[0][12 + c] / 255.0f) * shade * light;
                     if (col > 255.0f)
                         col = 255.0f;
                     if (semi && t[3] == 0xFE && d[3] != 0)
                         col = (col + d[c]) * 0.5f;
+                    if (psx & 1)
+                    {
+                        int q = (int)col;
+                        if ((psx & 2) && lit)
+                            q += SM_DITHER[yy & 3][xx & 3];
+                        q = q < 0 ? 0 : (q > 255 ? 255 : q);
+                        q >>= 3;
+                        col = (float)((q << 3) | (q >> 2));
+                    }
                     d[c] = (unsigned char)col;
                 }
                 d[3] = 255;
@@ -747,7 +833,7 @@ void Sm_RenderIcon(const unsigned char* rec, int size, unsigned char* rgba)
 {
     static float zb[256 * 256];
 
-    Sm_RenderPose(rec, size, rgba, SM_ICON_SPIN, 0, zb);
+    Sm_RenderPose(rec, size, rgba, SM_ICON_SPIN, 0, 0, zb);
 }
 
 /* The pack a map shows in its inventory: GameFs_MapItemsTextureLoad. */
@@ -1005,7 +1091,7 @@ static void* Sm_Worker(void* arg)
 
     memset(blob, 0, SM_BLOB_HDR);
     memcpy(blob, "SHM1", 4);
-    blob[4] = 2;
+    blob[4] = 3;
     blob[6] = SM_PACKS;
 
     for (p = 0; p < SM_PACKS; p++)
@@ -1381,23 +1467,25 @@ Java_com_silenthill_port_SecondScreen_nativeIcons(JNIEnv* env, jclass cls)
     return arr;
 }
 
-/* UI thread, once a frame for each turning item: one record, picked by item
- * and pack mask as the icon was, drawn at the given turn and fitted to the
- * circle it sweeps. ARGB into out (size x size). False if there is no such
- * record (yet). */
+/* UI thread: one record, picked by item and pack mask as the icon was,
+ * drawn size x size at the given turn -- fitted to the circle it sweeps when
+ * steady (a turning item), or to what the camera sees (a still one); psx
+ * bits as in Sm_RenderPose. ARGB into out.
+ * False if there is no such record (yet) or the size is out of range. */
 JNIEXPORT jboolean JNICALL
 Java_com_silenthill_port_SecondScreen_nativeRenderModel(JNIEnv* env, jclass cls, jint itemId, jint mask,
-                                                       jfloat spin, jint size, jintArray out)
+                                                       jfloat spin, jint size, jboolean steady, jint psx,
+                                                       jintArray out)
 {
-    static float         zb[SM_ICON * SM_ICON];
-    static unsigned char rgba[SM_ICON * SM_ICON * 4];
-    static jint          argb[SM_ICON * SM_ICON];
+    static float         zb[256 * 256];
+    static unsigned char rgba[256 * 256 * 4];
+    static jint          argb[256 * 256];
     const unsigned char* rec = NULL;
     long                 q;
     int                  i;
 
     (void)cls;
-    if (size != SM_ICON || out == NULL || (*env)->GetArrayLength(env, out) < SM_ICON * SM_ICON)
+    if (size < 8 || size > 256 || out == NULL || (*env)->GetArrayLength(env, out) < size * size)
         return JNI_FALSE;
 
     pthread_mutex_lock(&s_smLock);
@@ -1413,18 +1501,18 @@ Java_com_silenthill_port_SecondScreen_nativeRenderModel(JNIEnv* env, jclass cls,
         }
     }
     if (rec != NULL)
-        Sm_RenderPose(rec, SM_ICON, rgba, spin, 1, zb);
+        Sm_RenderPose(rec, size, rgba, spin, steady ? 1 : 0, (int)psx & 3, zb);
     pthread_mutex_unlock(&s_smLock);
 
     if (rec == NULL)
         return JNI_FALSE;
 
-    for (i = 0; i < SM_ICON * SM_ICON; i++)
+    for (i = 0; i < size * size; i++)
     {
         const unsigned char* p = rgba + i * 4;
         argb[i] = (jint)(((unsigned)p[3] << 24) | ((unsigned)p[0] << 16) | ((unsigned)p[1] << 8) | p[2]);
     }
-    (*env)->SetIntArrayRegion(env, out, 0, SM_ICON * SM_ICON, argb);
+    (*env)->SetIntArrayRegion(env, out, 0, size * size, argb);
     return JNI_TRUE;
 }
 

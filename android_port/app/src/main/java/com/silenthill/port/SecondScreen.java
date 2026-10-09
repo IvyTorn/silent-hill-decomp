@@ -80,6 +80,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private boolean dumpModels = false;
     private boolean spinModels = true;
     private boolean animateUi = true;
+    private boolean psxLook = true;
+    private boolean psxLight = true;
     private int modelSerial;
 
     /* Item icons, drawn natively from the game's own models (pc_second_screen_
@@ -101,7 +103,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private static native byte[] nativeModels();
     private static native byte[] nativeIcons();
     private static native void nativeModelsConfigure(String dumpDir);
-    private static native boolean nativeRenderModel(int itemId, int mask, float spin, int size, int[] out);
+    private static native boolean nativeRenderModel(int itemId, int mask, float spin, int size, boolean steady,
+                                                    int psx, int[] out);
 
     /* Request kinds and driver states: the enums in pc_second_screen.c. */
     private static final int RQ_SELECT = 1, RQ_CHOOSE = 2, RQ_CANCEL = 3, RQ_DISMISS = 4;
@@ -191,6 +194,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         int count = (b[8] & 0xFF) | ((b[9] & 0xFF) << 8);
         int rec = 4 + size * size * 4;
         icons.clear();
+        psxIcons.clear();
         int p = 16;
         int[] px = new int[size * size];
         for (int i = 0; i < count && p + rec <= b.length; i++, p += rec) {
@@ -252,7 +256,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         private int itemId = -1;
         private int mask = -1;
         private long t0;
-        private final int[] px = new int[ICON_SIZE * ICON_SIZE];
+        private int size;
+        private int[] px;
         private Bitmap bm;
         boolean used;
 
@@ -267,6 +272,12 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         }
 
         Bitmap frame(int id, long now) {
+            return frame(id, now, ICON_SIZE, 0);
+        }
+
+        /** The item at this moment of its turn, size x size, drawn with the
+         * psx bits of nativeRenderModel. */
+        Bitmap frame(int id, long now, int sz, int psx) {
             used = true;
             if (!spinModels || nativeRenderBroken) return null;
             Icon ic = bestIcon(id);
@@ -278,21 +289,52 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             }
             double turn = ((now - t0) % (long) Math.max(1.0, periodMs)) / periodMs;
             float angle = (float) (ICON_START + sign * turn * 2.0 * Math.PI);
+            if (sz != size || px == null) {
+                size = sz;
+                px = new int[sz * sz];
+                bm = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888);
+            }
             boolean ok;
             try {
-                ok = nativeRenderModel(id, ic.mask, angle, ICON_SIZE, px);
+                ok = nativeRenderModel(id, ic.mask, angle, sz, true, psx, px);
             } catch (UnsatisfiedLinkError e) {
                 nativeRenderBroken = true;
-                Log.w(TAG, "models: native turntable unavailable; icons stay still");
+                Log.w(TAG, "models: native drawing unavailable; icons stay still");
                 return null;
             }
             if (!ok) return null;
-            if (bm == null) bm = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888);
-            bm.setPixels(px, 0, ICON_SIZE, 0, 0, ICON_SIZE, ICON_SIZE);
+            bm.setPixels(px, 0, sz, 0, 0, sz, sz);
             return bm;
         }
     }
     private boolean nativeRenderBroken;
+
+    /* Still PlayStation-style pictures, drawn on first use at the size a slot
+     * needs, and kept until the library is rebuilt. */
+    private final java.util.HashMap<Integer, Bitmap> psxIcons = new java.util.HashMap<Integer, Bitmap>();
+
+    int psxMode() {
+        return psxLook ? (psxLight ? 3 : 1) : 0;
+    }
+
+    Bitmap psxIcon(int itemId, int sz) {
+        if (nativeRenderBroken) return null;
+        Icon ic = bestIcon(itemId);
+        if (ic == null) return null;
+        int key = (itemId << 16) | (ic.mask << 8) | sz;
+        Bitmap bm = psxIcons.get(key);
+        if (bm != null) return bm;
+        int[] px = new int[sz * sz];
+        try {
+            if (!nativeRenderModel(itemId, ic.mask, ICON_START, sz, false, psxMode(), px)) return null;
+        } catch (UnsatisfiedLinkError e) {
+            nativeRenderBroken = true;
+            return null;
+        }
+        bm = Bitmap.createBitmap(px, sz, sz, Bitmap.Config.ARGB_8888);
+        psxIcons.put(key, bm);
+        return bm;
+    }
 
     private void refresh() {
         if (!started || !enabled || activity.isFinishing() || activity.isDestroyed()) {
@@ -456,6 +498,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         dumpModels = "1".equals(p.getProperty("dump_models", "0").trim());
         spinModels = !"0".equals(p.getProperty("spin", "1").trim());
         animateUi = !"0".equals(p.getProperty("anim", "1").trim());
+        psxLook = !"0".equals(p.getProperty("psx", "1").trim());
+        psxLight = !"0".equals(p.getProperty("psx_light", "1").trim());
 
         String disp = p.getProperty("display", "auto").trim();
         if (!"auto".equalsIgnoreCase(disp)) {
@@ -475,7 +519,8 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             Log.w(TAG, "text_scale is not a number");
         }
 
-        Log.i(TAG, "build: fase4-paso3b (animations)  config: dump_models=" + dumpModels + " spin=" + spinModels + " anim=" + animateUi + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
+        Log.i(TAG, "build: fase4-paso4 (psx look)  config: dump_models=" + dumpModels + " spin=" + spinModels + " anim=" + animateUi
+                + " psx=" + psxLook + " psx_light=" + psxLight + " game_font=" + useGameFont + " crt=" + crtFollow + " enabled=" + enabled + " display=" + disp + " focusable=" + focusable
                 + " debug=" + debugOverlay + " text_scale=" + textScale);
     }
 
@@ -520,6 +565,16 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             + "# 1 = animate the screen (selection cursor, health bar and scan, list,\n"
             + "#     command window); 0 = everything changes at once.\n"
             + "anim=1\n"
+            + "\n"
+            + "# 1 = draw the items the PlayStation way: at the console's resolution with\n"
+            + "#     square pixels like the text, 15-bit colour with its dithering;\n"
+            + "#     0 = the smooth pictures of step 3.\n"
+            + "psx=1\n"
+            + "\n"
+            + "# 1 = with psx=1, light the items the original inventory lights (health\n"
+            + "#     items, weapons, ammo, flashlight, radio) with its own two lights;\n"
+            + "#     0 = every item flat, as the port's main screen draws them.\n"
+            + "psx_light=1\n"
             + "\n"
             + "# 1 = draw the window size and system-bar insets on the second screen,\n"
             + "#     for a screenshot when reporting a layout problem.\n"
@@ -851,6 +906,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         private final Paint glyphPaint = new Paint();
         private final Paint iconPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
+        private final Paint pixelPaint = new Paint();
         private final RectF r = new RectF();
         private final Rect src = new Rect();
         private final Path path = new Path();
@@ -979,6 +1035,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
             line.setStrokeCap(Paint.Cap.BUTT);
             text.setTypeface(Typeface.create("sans-serif-condensed", Typeface.NORMAL));
             glyphPaint.setFilterBitmap(false);
+            pixelPaint.setFilterBitmap(false);
             setBackgroundColor(Color.BLACK);
         }
 
@@ -1431,6 +1488,20 @@ final class SecondScreen implements DisplayManager.DisplayListener {
 
         /** As above, turning on the given turntable when it can. */
         private boolean drawIcon(Canvas c, int itemId, float cx, float cy, float side, Spinner turn) {
+            if (psxLook && !nativeRenderBroken) {
+                /* The console's resolution: one model pixel is P screen pixels,
+                 * the size of one texel of the game font. */
+                int sz = Math.max(8, Math.min(256, (int) (side / P)));
+                Bitmap pb = (turn != null) ? turn.frame(itemId, android.os.SystemClock.uptimeMillis(), sz, psxMode()) : null;
+                if (pb == null) pb = psxIcon(itemId, sz);
+                if (pb != null) {
+                    float half = sz * P / 2f;
+                    float l = Math.round(cx - half), t = Math.round(cy - half);
+                    r.set(l, t, l + sz * P, t + sz * P);
+                    c.drawBitmap(pb, null, r, pixelPaint);
+                    return true;
+                }
+            }
             Bitmap bm = (turn != null) ? turn.frame(itemId, android.os.SystemClock.uptimeMillis()) : null;
             if (bm == null) bm = iconFor(itemId);
             if (bm == null) return false;
